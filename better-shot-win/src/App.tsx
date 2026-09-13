@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { RegionOverlay } from './components/RegionOverlay';
 import { RecordingModal } from './components/RecordingModal';
 import { RecordingSessionBar } from './components/RecordingSessionBar';
-import { CountdownOverlay } from './components/CountdownOverlay';
 import { RecorderState, RecordingConfig, RecordingHistoryItem, Rect } from './types/recorder';
 import './App.css';
 
@@ -12,6 +11,7 @@ export function App() {
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState<boolean>(true);
   const [modalInitialView, setModalInitialView] = useState<'launcher' | 'history'>('launcher');
   const [recordedRegion, setRecordedRegion] = useState<Rect | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [recordingConfig, setRecordingConfig] = useState<RecordingConfig>({
@@ -31,6 +31,11 @@ export function App() {
     }
   });
 
+  // Synchronize initial window state on startup
+  useEffect(() => {
+    invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
+  }, []);
+
   // Health check polling during active recording to detect unexpected backend crashes
   useEffect(() => {
     if (recorderState !== 'recording') return;
@@ -43,6 +48,7 @@ export function App() {
           setRecordedRegion(null);
           setModalInitialView('launcher');
           setIsRecordingModalOpen(true);
+          await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
           setToastMessage('Recording process terminated unexpectedly');
           setTimeout(() => setToastMessage(null), 6000);
         }
@@ -54,35 +60,24 @@ export function App() {
     return () => clearInterval(interval);
   }, [recorderState]);
 
-  // Primary Start Recording action from Launcher modal
-  const handleStartRecording = (config: RecordingConfig) => {
-    setRecordingConfig(config);
-    setIsRecordingModalOpen(false);
+  // Handle countdown interval and start recording when 0 is reached
+  useEffect(() => {
+    if (countdownSeconds === null) return;
 
-    if (config.mode === 'region') {
-      setRecorderState('area_selection');
-    } else {
-      setRecordedRegion(null);
-      setRecorderState('countdown');
+    if (countdownSeconds <= 0) {
+      setCountdownSeconds(null);
+      launchRecordingEngine();
+      return;
     }
-  };
 
-  // Area Selection Complete
-  const handleRegionComplete = (rect: Rect) => {
-    setRecordedRegion(rect);
-    setRecorderState('countdown');
-  };
+    const timer = setTimeout(() => {
+      setCountdownSeconds((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
 
-  // Area Selection Cancelled
-  const handleRegionCancel = () => {
-    setRecordedRegion(null);
-    setRecorderState('idle');
-    setModalInitialView('launcher');
-    setIsRecordingModalOpen(true);
-  };
+    return () => clearTimeout(timer);
+  }, [countdownSeconds]);
 
-  // Countdown Complete -> Launch Native Backend Engine with Zero Start Latency
-  const handleCountdownFinish = async () => {
+  const launchRecordingEngine = async () => {
     setRecorderState('recording');
 
     try {
@@ -105,12 +100,46 @@ export function App() {
       setRecordedRegion(null);
       setModalInitialView('launcher');
       setIsRecordingModalOpen(true);
+      await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
       setToastMessage(`Recording start failed: ${err}`);
       setTimeout(() => setToastMessage(null), 7000);
     }
   };
 
-  // Stop Recording -> Finalize and Save to History (Async Thumbnail Extraction)
+  // Primary Start Recording action from Launcher modal
+  const handleStartRecording = async (config: RecordingConfig) => {
+    setRecordingConfig(config);
+    setIsRecordingModalOpen(false);
+
+    if (config.mode === 'region') {
+      await invoke('set_window_mode', { mode: 'area_selection' }).catch(() => {});
+      setRecorderState('area_selection');
+    } else {
+      setRecordedRegion(null);
+      await invoke('set_window_mode', { mode: 'recording' }).catch(() => {});
+      setRecorderState('countdown');
+      setCountdownSeconds(3);
+    }
+  };
+
+  // Area Selection Complete -> switch to compact recording bar
+  const handleRegionComplete = async (rect: Rect) => {
+    setRecordedRegion(rect);
+    await invoke('set_window_mode', { mode: 'recording' }).catch(() => {});
+    setRecorderState('countdown');
+    setCountdownSeconds(3);
+  };
+
+  // Area Selection Cancelled -> restore launcher window
+  const handleRegionCancel = async () => {
+    setRecordedRegion(null);
+    setRecorderState('idle');
+    setModalInitialView('launcher');
+    setIsRecordingModalOpen(true);
+    await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
+  };
+
+  // Stop Recording -> Finalize, generate async thumbnail, open history window
   const handleStopRecording = async (seconds: number) => {
     const currentRegion = recordedRegion;
     setRecorderState('saving');
@@ -120,7 +149,6 @@ export function App() {
       if (outputPath) {
         const fileName = outputPath.split('\\').pop() || outputPath.split('/').pop() || 'Recording.mp4';
         
-        // Generate crisp thumbnail asynchronously from video without blocking
         let thumbUrl: string | undefined = undefined;
         try {
           thumbUrl = await invoke<string>('generate_video_thumbnail', { videoPath: outputPath });
@@ -163,9 +191,10 @@ export function App() {
     setRecorderState('saved');
     setModalInitialView('history');
     setIsRecordingModalOpen(true);
+    await invoke('set_window_mode', { mode: 'history' }).catch(() => {});
   };
 
-  // Discard Recording
+  // Discard Recording -> return to launcher window
   const handleDiscardRecording = async () => {
     setRecorderState('idle');
     setRecordedRegion(null);
@@ -178,6 +207,7 @@ export function App() {
 
     setModalInitialView('launcher');
     setIsRecordingModalOpen(true);
+    await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
   };
 
   // Delete Item from History
@@ -216,12 +246,7 @@ export function App() {
 
   return (
     <div className="app-container">
-      {/* 1. Countdown Overlay */}
-      {recorderState === 'countdown' && (
-        <CountdownOverlay initialCount={3} onFinish={handleCountdownFinish} />
-      )}
-
-      {/* 2. Area Selection Overlay */}
+      {/* 1. Fullscreen Region Selection (Only active during drag selection) */}
       {recorderState === 'area_selection' && (
         <RegionOverlay
           onComplete={handleRegionComplete}
@@ -229,82 +254,48 @@ export function App() {
         />
       )}
 
-      {/* 3. Saving State Indicator */}
+      {/* 2. Recording Setup & History Modal (Centered compact window) */}
+      {isRecordingModalOpen && recorderState !== 'recording' && recorderState !== 'countdown' && recorderState !== 'area_selection' && (
+        <RecordingModal
+          isOpen={isRecordingModalOpen}
+          onClose={() => setIsRecordingModalOpen(false)}
+          onStartRecord={handleStartRecording}
+          history={recordingHistory}
+          onDeleteHistoryItem={handleDeleteHistoryItem}
+          onClearHistory={handleClearHistory}
+          initialView={modalInitialView}
+          onToast={(msg) => {
+            setToastMessage(msg);
+            setTimeout(() => setToastMessage(null), 4000);
+          }}
+        />
+      )}
+
+      {/* 3. Compact Bottom-Pinned Recording Bar (Only 380x74px window - rest of desktop is 100% free) */}
+      {(recorderState === 'recording' || recorderState === 'countdown') && (
+        <RecordingSessionBar
+          isRecording={recorderState === 'recording'}
+          countdownSeconds={countdownSeconds}
+          initialMicActive={recordingConfig.micEnabled}
+          onStop={handleStopRecording}
+          onDiscard={handleDiscardRecording}
+        />
+      )}
+
+      {/* 4. Saving State Indicator */}
       {recorderState === 'saving' && (
-        <div className="saving-overlay">
-          <div className="saving-card">
-            <div className="saving-spinner" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
-              Saving recording...
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--apple-ink-muted-48)' }}>
-              Finalizing MP4 file
-            </span>
-          </div>
+        <div className="saving-card" style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}>
+          <div className="saving-spinner" />
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
+            Saving recording...
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--apple-ink-muted-48)' }}>
+            Finalizing MP4 file
+          </span>
         </div>
       )}
 
-      {/* 4. Recording Setup & History Modal */}
-      <RecordingModal
-        isOpen={isRecordingModalOpen && recorderState !== 'recording' && recorderState !== 'countdown' && recorderState !== 'area_selection' && recorderState !== 'saving'}
-        onClose={() => setIsRecordingModalOpen(false)}
-        onStartRecord={handleStartRecording}
-        history={recordingHistory}
-        onDeleteHistoryItem={handleDeleteHistoryItem}
-        onClearHistory={handleClearHistory}
-        initialView={modalInitialView}
-        onToast={(msg) => {
-          setToastMessage(msg);
-          setTimeout(() => setToastMessage(null), 4000);
-        }}
-      />
-
-      {/* 5. Live Recording Session Bar & Bounds Indicator */}
-      {recorderState === 'recording' && (
-        <>
-          <RecordingSessionBar
-            isRecording={true}
-            initialMicActive={recordingConfig.micEnabled}
-            onStop={handleStopRecording}
-            onDiscard={handleDiscardRecording}
-          />
-
-          {recordedRegion ? (
-            <div
-              className="recording-frame-overlay"
-              style={{
-                left: recordedRegion.x,
-                top: recordedRegion.y,
-                width: recordedRegion.width,
-                height: recordedRegion.height
-              }}
-            >
-              <div className="recording-frame-badge">
-                <span className="record-dot-animated" style={{ width: 8, height: 8 }} />
-                <span>REC • {Math.round(recordedRegion.width)} × {Math.round(recordedRegion.height)} PX</span>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="recording-frame-overlay"
-              style={{
-                left: 0,
-                top: 0,
-                width: '100vw',
-                height: '100vh',
-                borderRadius: 0
-              }}
-            >
-              <div className="recording-frame-badge" style={{ top: 12, left: 16, borderRadius: 'var(--apple-rounded-xs)' }}>
-                <span className="record-dot-animated" style={{ width: 8, height: 8 }} />
-                <span>REC • FULLSCREEN</span>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* 6. Toast Notification */}
+      {/* 5. Toast Notification */}
       {toastMessage && (
         <div className="toast-notification">
           <span style={{ fontSize: 15 }}>

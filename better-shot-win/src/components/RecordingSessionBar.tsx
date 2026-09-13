@@ -3,6 +3,7 @@ import { Square, Pause, Play, Mic, MicOff, Trash2, GripVertical } from 'lucide-r
 
 interface RecordingSessionBarProps {
   isRecording: boolean;
+  countdownSeconds?: number | null;
   initialMicActive?: boolean;
   onStop: (seconds: number) => void;
   onDiscard: () => void;
@@ -10,6 +11,7 @@ interface RecordingSessionBarProps {
 
 export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
   isRecording,
+  countdownSeconds = null,
   initialMicActive = true,
   onStop,
   onDiscard
@@ -26,13 +28,9 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
     }
   }, [isRecording, initialMicActive]);
 
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
   useEffect(() => {
     let timer: any = null;
-    if (isRecording && !isPaused) {
+    if (isRecording && !isPaused && countdownSeconds === null) {
       timer = setInterval(() => {
         setSeconds((prev) => prev + 1);
       }, 1000);
@@ -40,45 +38,9 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isRecording, isPaused]);
+  }, [isRecording, isPaused, countdownSeconds]);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        setPosition({
-          x: e.clientX - dragStart.x,
-          y: e.clientY - dragStart.y
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-      }
-    };
-
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragStart]);
-
-  if (!isRecording) return null;
-
-  const handleDragHandleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
+  if (!isRecording && countdownSeconds === null) return null;
 
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
@@ -89,97 +51,111 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: 32,
-        left: '50%',
-        transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)`,
+        width: '100%',
+        height: '100%',
         display: 'flex',
         alignItems: 'center',
-        gap: 'var(--apple-space-sm)',
-        padding: '8px 18px',
-        borderRadius: 'var(--apple-rounded-pill)',
-        background: 'rgba(22, 22, 24, 0.96)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(255, 255, 255, 0.16)',
-        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
-        zIndex: 2000,
-        userSelect: 'none',
-        pointerEvents: 'auto',
-        animation: 'appleSlideUpToast 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+        justifyContent: 'center',
+        padding: '0 8px',
+        boxSizing: 'border-box'
       }}
     >
       <div
-        onMouseDown={handleDragHandleMouseDown}
-        title="Drag to reposition bar"
+        data-tauri-drag-region
         style={{
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          padding: '4px',
-          borderRadius: 'var(--apple-rounded-xs)',
-          opacity: 0.6,
-          transition: 'var(--apple-transition-micro)'
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
-      >
-        <GripVertical size={16} color="#ffffff" />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="record-dot-animated" />
-        <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 13, fontWeight: 700, color: '#ffffff', letterSpacing: '0.04em' }}>
-          {formatTime(seconds)}
-        </span>
-      </div>
-
-      <div className="divider-vertical" />
-
-      <button
-        className="icon-btn"
-        title={isPaused ? 'Resume' : 'Pause'}
-        onClick={() => setIsPaused(!isPaused)}
-      >
-        {isPaused ? <Play size={15} fill="currentColor" /> : <Pause size={15} />}
-      </button>
-
-      <button
-        className="icon-btn"
-        title={micActive ? 'Mute Microphone' : 'Unmute Microphone'}
-        onClick={() => setMicActive(!micActive)}
-      >
-        {micActive ? <Mic size={15} color="var(--apple-primary-on-dark)" /> : <MicOff size={15} color="var(--apple-ink-muted-48)" />}
-      </button>
-
-      <div className="divider-vertical" />
-
-      <button
-        onClick={() => onStop(seconds)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
+          gap: 10,
           padding: '6px 16px',
           borderRadius: 'var(--apple-rounded-pill)',
-          background: 'var(--apple-system-red)',
-          border: 'none',
-          color: '#ffffff',
-          fontWeight: 600,
-          fontSize: 12,
-          fontFamily: 'var(--apple-font-text)',
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(255, 59, 48, 0.4)',
-          transition: 'var(--apple-transition-micro)'
+          background: 'rgba(20, 20, 22, 0.96)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+          userSelect: 'none',
+          pointerEvents: 'auto',
+          cursor: 'grab'
         }}
       >
-        <Square size={11} fill="currentColor" />
-        <span>Done</span>
-      </button>
+        <div
+          data-tauri-drag-region
+          title="Drag to reposition recording bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            opacity: 0.5,
+            cursor: 'grab'
+          }}
+        >
+          <GripVertical size={15} color="#ffffff" />
+        </div>
 
-      <button className="icon-btn" title="Discard Recording" onClick={onDiscard}>
-        <Trash2 size={14} color="var(--apple-system-red)" />
-      </button>
+        {countdownSeconds !== null && countdownSeconds > 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 8px' }}>
+            <span className="record-dot-animated" />
+            <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 13, fontWeight: 700, color: '#ffffff' }}>
+              Starting in {countdownSeconds}s...
+            </span>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="record-dot-animated" />
+              <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 13, fontWeight: 700, color: '#ffffff', letterSpacing: '0.04em' }}>
+                {formatTime(seconds)}
+              </span>
+            </div>
+
+            <div className="divider-vertical" />
+
+            <button
+              className="icon-btn"
+              title={isPaused ? 'Resume' : 'Pause'}
+              onClick={() => setIsPaused(!isPaused)}
+            >
+              {isPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} />}
+            </button>
+
+            <button
+              className="icon-btn"
+              title={micActive ? 'Mute Microphone' : 'Unmute Microphone'}
+              onClick={() => setMicActive(!micActive)}
+            >
+              {micActive ? <Mic size={14} color="var(--apple-primary-on-dark)" /> : <MicOff size={14} color="var(--apple-ink-muted-48)" />}
+            </button>
+
+            <div className="divider-vertical" />
+
+            <button
+              onClick={() => onStop(seconds)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 14px',
+                borderRadius: 'var(--apple-rounded-pill)',
+                background: 'var(--apple-system-red)',
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: 12,
+                fontFamily: 'var(--apple-font-text)',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(255, 59, 48, 0.4)',
+                transition: 'var(--apple-transition-micro)'
+              }}
+            >
+              <Square size={10} fill="currentColor" />
+              <span>Done</span>
+            </button>
+
+            <button className="icon-btn" title="Discard Recording" onClick={onDiscard}>
+              <Trash2 size={13} color="var(--apple-system-red)" />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };

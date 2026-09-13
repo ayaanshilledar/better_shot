@@ -1245,3 +1245,45 @@ pub fn delete_file(path: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String> {
+    match mode.as_str() {
+        "launcher" => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 420.0, height: 560.0 }));
+            let _ = window.set_always_on_top(true);
+            let _ = window.center();
+            let _ = window.set_ignore_cursor_events(false);
+        }
+        "history" => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 540.0, height: 600.0 }));
+            let _ = window.set_always_on_top(true);
+            let _ = window.center();
+            let _ = window.set_ignore_cursor_events(false);
+        }
+        "area_selection" => {
+            let _ = window.set_fullscreen(true);
+            let _ = window.set_always_on_top(true);
+            let _ = window.set_ignore_cursor_events(false);
+        }
+        "recording" => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 380.0, height: 74.0 }));
+            let _ = window.set_always_on_top(true);
+            if let Ok(Some(monitor)) = window.primary_monitor() {
+                let mon_size = monitor.size();
+                let scale = monitor.scale_factor();
+                let bar_w = (380.0 * scale) as i32;
+                let bar_h = (74.0 * scale) as i32;
+                let x = (mon_size.width as i32 - bar_w) / 2;
+                let y = mon_size.height as i32 - bar_h - (36.0 * scale) as i32;
+                let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+            }
+            let _ = window.set_ignore_cursor_events(false);
+        }
+        _ => {}
+    }
+    Ok(())
+}

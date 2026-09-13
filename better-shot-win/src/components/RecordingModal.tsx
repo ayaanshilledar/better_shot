@@ -70,8 +70,14 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   ]);
   const [isMicPickerOpen, setIsMicPickerOpen] = useState<boolean>(false);
 
+  const handleSetView = (nextView: 'launcher' | 'history') => {
+    setView(nextView);
+    invoke('set_window_mode', { mode: nextView }).catch(() => {});
+  };
+
   useEffect(() => {
     setView(initialView);
+    invoke('set_window_mode', { mode: initialView }).catch(() => {});
   }, [initialView, isOpen]);
 
   // Query actual microphone device names when available
@@ -104,7 +110,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         if (isMicPickerOpen) {
           setIsMicPickerOpen(false);
         } else if (view === 'history') {
-          setView('launcher');
+          handleSetView('launcher');
         } else {
           onClose();
         }
@@ -117,33 +123,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, view, isMicPickerOpen, source, micEnabled, systemAudioEnabled, selectedMic, savePath]);
 
-  // Dragging support
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
   if (!isOpen) return null;
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
 
   const handleToggleMic = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -237,50 +217,52 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 
   return (
     <div
-      className="modal-backdrop"
-      onClick={onClose}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      className="recording-modal-frame"
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        padding: '16px 20px',
+        background: 'var(--apple-surface-tile-1)',
+        backdropFilter: 'var(--apple-backdrop-blur)',
+        WebkitBackdropFilter: 'var(--apple-backdrop-blur)',
+        border: '1px solid var(--apple-hairline-dark)',
+        borderRadius: 'var(--apple-rounded-lg)',
+        boxShadow: 'var(--apple-modal-shadow)',
+        overflow: 'hidden',
+        pointerEvents: 'auto',
+      }}
     >
+      {/* Header */}
       <div
-        className="recording-modal"
-        style={{
-          width: view === 'history' ? 520 : 380,
-          maxHeight: '90vh',
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'default'
-        }}
-        onClick={(e) => e.stopPropagation()}
+        className="modal-header"
+        data-tauri-drag-region
+        style={{ cursor: 'grab' }}
       >
-        {/* Header */}
-        <div
-          className="modal-header"
-          data-tauri-drag-region
-          onMouseDown={handleMouseDown}
-          style={{ cursor: 'grab' }}
-        >
-          {view === 'history' ? (
-            <button
-              className="action-btn"
-              onClick={() => setView('launcher')}
-              style={{ padding: '4px 10px', fontSize: 11 }}
-            >
-              <ArrowLeft size={13} />
-              <span>Back</span>
-            </button>
-          ) : (
-            <div className="modal-title" data-tauri-drag-region>
-              <span className="record-dot-animated" />
-              <h3 data-tauri-drag-region>BetterShot</h3>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button className="icon-btn" onClick={onClose} title="Close (Esc)">
-              <X size={15} />
-            </button>
+        {view === 'history' ? (
+          <button
+            className="action-btn"
+            onClick={() => handleSetView('launcher')}
+            style={{ padding: '4px 10px', fontSize: 11 }}
+          >
+            <ArrowLeft size={13} />
+            <span>Back</span>
+          </button>
+        ) : (
+          <div className="modal-title" data-tauri-drag-region>
+            <span className="record-dot-animated" />
+            <h3 data-tauri-drag-region>BetterShot</h3>
           </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button className="icon-btn" onClick={onClose} title="Close (Esc)">
+            <X size={15} />
+          </button>
         </div>
+      </div>
 
         {/* ─── LAUNCHER VIEW ─────────────────────────────────────────────── */}
         {view === 'launcher' && (
@@ -435,7 +417,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
               <button
                 type="button"
                 className="history-link-btn"
-                onClick={() => setView('history')}
+                onClick={() => handleSetView('history')}
               >
                 <Clock size={13} />
                 <span>View Recordings {history.length > 0 && `(${history.length})`}</span>
@@ -456,7 +438,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                   <button
                     type="button"
                     className="action-btn primary"
-                    onClick={() => setView('launcher')}
+                    onClick={() => handleSetView('launcher')}
                     style={{ marginTop: 8 }}
                   >
                     Start Recording
@@ -558,14 +540,13 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 
               <button
                 className="action-btn primary"
-                onClick={() => setView('launcher')}
+                onClick={() => handleSetView('launcher')}
               >
                 New Recording
               </button>
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 };
