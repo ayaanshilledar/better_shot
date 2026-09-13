@@ -12,7 +12,6 @@ export function App() {
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState<boolean>(true);
   const [modalInitialView, setModalInitialView] = useState<'launcher' | 'history'>('launcher');
   const [recordedRegion, setRecordedRegion] = useState<Rect | null>(null);
-  const [recordingThumbnail, setRecordingThumbnail] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [recordingConfig, setRecordingConfig] = useState<RecordingConfig>({
@@ -82,30 +81,12 @@ export function App() {
     setIsRecordingModalOpen(true);
   };
 
-  // Countdown Complete -> Launch Native Backend Engine
+  // Countdown Complete -> Launch Native Backend Engine with Zero Start Latency
   const handleCountdownFinish = async () => {
     setRecorderState('recording');
 
     try {
       const region = recordedRegion;
-
-      // Capture a crisp initial frame for the recording history thumbnail
-      try {
-        let thumbUrl: string;
-        if (region) {
-          thumbUrl = await invoke<string>('capture_region', {
-            x: Math.round(region.x),
-            y: Math.round(region.y),
-            width: Math.round(region.width),
-            height: Math.round(region.height)
-          });
-        } else {
-          thumbUrl = await invoke<string>('capture_fullscreen');
-        }
-        setRecordingThumbnail(thumbUrl);
-      } catch (e) {
-        console.warn('Initial frame capture notice:', e);
-      }
 
       await invoke<string>('start_screen_recording', {
         x: region ? Math.round(region.x) : 0,
@@ -129,16 +110,24 @@ export function App() {
     }
   };
 
-  // Stop Recording -> Finalize and Save to History
+  // Stop Recording -> Finalize and Save to History (Async Thumbnail Extraction)
   const handleStopRecording = async (seconds: number) => {
     const currentRegion = recordedRegion;
-    const thumbToSave = recordingThumbnail;
     setRecorderState('saving');
 
     try {
       const outputPath = await invoke<string>('stop_screen_recording');
       if (outputPath) {
         const fileName = outputPath.split('\\').pop() || outputPath.split('/').pop() || 'Recording.mp4';
+        
+        // Generate crisp thumbnail asynchronously from video without blocking
+        let thumbUrl: string | undefined = undefined;
+        try {
+          thumbUrl = await invoke<string>('generate_video_thumbnail', { videoPath: outputPath });
+        } catch (e) {
+          console.warn('Async thumbnail extraction notice:', e);
+        }
+
         const newHistoryItem: RecordingHistoryItem = {
           id: Date.now().toString(),
           filePath: outputPath,
@@ -148,7 +137,7 @@ export function App() {
           mode: currentRegion ? 'region' : 'fullscreen',
           width: currentRegion ? Math.round(currentRegion.width) : window.screen.width,
           height: currentRegion ? Math.round(currentRegion.height) : window.screen.height,
-          thumbnailUrl: thumbToSave || undefined
+          thumbnailUrl: thumbUrl
         };
 
         setRecordingHistory((prev) => {
@@ -171,7 +160,6 @@ export function App() {
     }
 
     setRecordedRegion(null);
-    setRecordingThumbnail(null);
     setRecorderState('saved');
     setModalInitialView('history');
     setIsRecordingModalOpen(true);
@@ -181,7 +169,6 @@ export function App() {
   const handleDiscardRecording = async () => {
     setRecorderState('idle');
     setRecordedRegion(null);
-    setRecordingThumbnail(null);
 
     try {
       await invoke<string>('stop_screen_recording');

@@ -5,7 +5,9 @@ use std::io::Cursor;
 use std::io::Write;
 use std::process::{Child, Command as StdCommand, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
@@ -215,7 +217,7 @@ pub fn capture_fullscreen(window: tauri::Window) -> Result<String, String> {
     }
     let bounds = get_virtual_screen_bounds();
     let img = capture_screen_raw(bounds.x, bounds.y, bounds.width, bounds.height)?;
-    
+
     let mut bytes: Vec<u8> = Vec::new();
     let mut cursor = Cursor::new(&mut bytes);
     img.write_to(&mut cursor, ImageFormat::Png)
@@ -238,7 +240,7 @@ pub fn capture_region(window: tauri::Window, x: i32, y: i32, width: i32, height:
         return Err("Invalid region dimensions".to_string());
     }
     let img = capture_screen_raw(x, y, width, height)?;
-    
+
     let mut bytes: Vec<u8> = Vec::new();
     let mut cursor = Cursor::new(&mut bytes);
     img.write_to(&mut cursor, ImageFormat::Png)
@@ -252,7 +254,7 @@ pub fn copy_image_to_clipboard(base64_data: String) -> Result<(), String> {
     let clean_b64 = base64_data
         .strip_prefix("data:image/png;base64,")
         .unwrap_or(&base64_data);
-    
+
     let png_bytes = BASE64.decode(clean_b64).map_err(|e| e.to_string())?;
     let img = image::load_from_memory(&png_bytes).map_err(|e| e.to_string())?.to_rgba8();
 
@@ -340,7 +342,23 @@ fn round_even(val: i32) -> i32 {
     if v < 2 { 2 } else { v }
 }
 
-// ─── High-Performance Screen Recording via GDI Frame Pipeline & WASAPI Audio ──
+// ─── High-Performance Screen Recording via Decoupled Zero-Alloc Pipeline ────
+
+struct CursorCache {
+    last_handle: isize,
+    hotspot_x: i32,
+    hotspot_y: i32,
+}
+
+impl Default for CursorCache {
+    fn default() -> Self {
+        Self {
+            last_handle: -1,
+            hotspot_x: 0,
+            hotspot_y: 0,
+        }
+    }
+}
 
 fn spawn_system_audio_capture_thread(
     is_running: Arc<AtomicBool>,
@@ -409,12 +427,10 @@ fn spawn_system_audio_capture_thread(
 
         if let Ok(stream) = stream_res {
             if let Ok(()) = stream.play() {
-                eprintln!("[BetterShot Audio] System audio loopback capture active");
                 while is_running.load(Ordering::SeqCst) {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    std::thread::sleep(Duration::from_millis(50));
                 }
                 drop(stream);
-                eprintln!("[BetterShot Audio] System audio loopback capture finished");
             }
         }
     });
@@ -428,19 +444,25 @@ fn spawn_mic_audio_capture_thread(
     std::thread::spawn(move || {
         let host = cpal::default_host();
         let device = if let Some(ref target_name) = mic_name {
-            if target_name.trim().is_empty() || target_name == "Built-in Microphone" || target_name == "Default System Audio Device" {
+            if target_name.trim().is_empty()
+                || target_name == "Built-in Microphone"
+                || target_name == "Default System Audio Device"
+            {
                 host.default_input_device()
             } else {
-                host.input_devices().ok().and_then(|mut devs| {
-                    devs.find(|d| {
-                        if let Ok(name) = d.name() {
-                            name.to_lowercase().contains(&target_name.to_lowercase())
-                                || target_name.to_lowercase().contains(&name.to_lowercase())
-                        } else {
-                            false
-                        }
+                host.input_devices()
+                    .ok()
+                    .and_then(|mut devs| {
+                        devs.find(|d| {
+                            if let Ok(name) = d.name() {
+                                name.to_lowercase().contains(&target_name.to_lowercase())
+                                    || target_name.to_lowercase().contains(&name.to_lowercase())
+                            } else {
+                                false
+                            }
+                        })
                     })
-                }).or_else(|| host.default_input_device())
+                    .or_else(|| host.default_input_device())
             }
         } else {
             host.default_input_device()
@@ -507,12 +529,10 @@ fn spawn_mic_audio_capture_thread(
 
         if let Ok(stream) = stream_res {
             if let Ok(()) = stream.play() {
-                eprintln!("[BetterShot Audio] Microphone capture active");
                 while is_running.load(Ordering::SeqCst) {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    std::thread::sleep(Duration::from_millis(50));
                 }
                 drop(stream);
-                eprintln!("[BetterShot Audio] Microphone capture finished");
             }
         }
     });
@@ -583,6 +603,7 @@ pub fn start_screen_recording(
         (x, y, round_even(width), round_even(height))
     };
 
+    // Configure FFmpeg with zero-latency hardware/fast encoding
     let mut cmd = StdCommand::new("ffmpeg");
 
     cmd.arg("-f").arg("rawvideo")
@@ -590,8 +611,9 @@ pub fn start_screen_recording(
         .arg("-s").arg(format!("{}x{}", phys_w, phys_h))
         .arg("-r").arg("30")
         .arg("-i").arg("-")
-        .arg("-c:v").arg("libx264")
-        .arg("-preset").arg("ultrafast")
+        .arg("-c:v").arg("h264_mf")
+        .arg("-rate_control").arg("cbr")
+        .arg("-b:v").arg("6M")
         .arg("-pix_fmt").arg("yuv420p")
         .arg("-y")
         .arg(&video_record_file);
@@ -606,23 +628,93 @@ pub fn start_screen_recording(
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
-    let mut child = cmd.spawn().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "FFmpeg not found. Please install FFmpeg and add it to your system PATH.".to_string()
-        } else {
-            format!("Failed to start screen recording: {}", e)
+    // Spawn FFmpeg process with fallback to libx264 ultrafast zerolatency if h264_mf fails
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(_) => {
+            let stderr_file_fallback = std::fs::File::create(&stderr_log_path)
+                .map_err(|e| format!("Failed to create fallback ffmpeg log: {}", e))?;
+            let mut fallback_cmd = StdCommand::new("ffmpeg");
+            fallback_cmd
+                .arg("-f").arg("rawvideo")
+                .arg("-pix_fmt").arg("bgra")
+                .arg("-s").arg(format!("{}x{}", phys_w, phys_h))
+                .arg("-r").arg("30")
+                .arg("-i").arg("-")
+                .arg("-c:v").arg("libx264")
+                .arg("-preset").arg("ultrafast")
+                .arg("-tune").arg("zerolatency")
+                .arg("-pix_fmt").arg("yuv420p")
+                .arg("-y")
+                .arg(&video_record_file);
+
+            fallback_cmd
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::from(stderr_file_fallback));
+
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                fallback_cmd.creation_flags(0x08000000);
+            }
+
+            fallback_cmd.spawn().map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    "FFmpeg not found. Please install FFmpeg and add it to your system PATH.".to_string()
+                } else {
+                    format!("Failed to start screen recording: {}", e)
+                }
+            })?
         }
-    })?;
+    };
 
     let mut stdin = child.stdin.take().ok_or_else(|| "Failed to capture ffmpeg stdin".to_string())?;
 
     state.is_running.store(true, Ordering::SeqCst);
-    let is_running_clone = state.is_running.clone();
+    let is_running_capture = state.is_running.clone();
+    let is_running_encoder = state.is_running.clone();
 
-    // Spawn high-speed GDI frame capture thread
+    // Bounded zero-allocation frame pipeline: 4 recyclable frame buffers
+    let frame_buffer_size = (phys_w * phys_h * 4) as usize;
+    let (frame_tx, frame_rx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = sync_channel(4);
+    let (recycle_tx, recycle_rx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = sync_channel(4);
+
+    // Prepopulate recycling pool
+    for _ in 0..4 {
+        let _ = recycle_tx.send(vec![0u8; frame_buffer_size]);
+    }
+
+    // ─── Encoder Worker Thread (Reads from queue, writes to FFmpeg stdin) ───
     std::thread::spawn(move || {
-        let frame_interval = std::time::Duration::from_millis(33); // ~30 fps
-        
+        while is_running_encoder.load(Ordering::SeqCst) {
+            match frame_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(buf) => {
+                    let write_ok = stdin.write_all(&buf).is_ok();
+                    // Return recycled buffer to pool
+                    let _ = recycle_tx.try_send(buf);
+                    if !write_ok {
+                        break;
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        // Drain any remaining buffered frames
+        while let Ok(buf) = frame_rx.try_recv() {
+            let _ = stdin.write_all(&buf);
+        }
+
+        let _ = stdin.flush();
+        drop(stdin); // Closes stdin to finalize MP4 container
+    });
+
+    // ─── High-Speed GDI Capture Thread (Runs at steady 30 FPS deadline) ─────
+    std::thread::spawn(move || {
+        let frame_interval = Duration::from_nanos(33_333_333); // 30.000 FPS
+
         unsafe {
             let hdc_screen = GetDC(None);
             if hdc_screen.0.is_null() {
@@ -648,11 +740,11 @@ pub fn start_screen_recording(
                 bmiHeader: BITMAPINFOHEADER {
                     biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
                     biWidth: phys_w,
-                    biHeight: -phys_h, // top-down for BGRA rawvideo
+                    biHeight: -phys_h, // top-down for BGRA
                     biPlanes: 1,
                     biBitCount: 32,
                     biCompression: 0,
-                    biSizeImage: (phys_w * phys_h * 4) as u32,
+                    biSizeImage: frame_buffer_size as u32,
                     biXPelsPerMeter: 0,
                     biYPelsPerMeter: 0,
                     biClrUsed: 0,
@@ -661,52 +753,78 @@ pub fn start_screen_recording(
                 bmiColors: [windows::Win32::Graphics::Gdi::RGBQUAD::default()],
             };
 
-            let mut bgra_buf: Vec<u8> = vec![0; (phys_w * phys_h * 4) as usize];
+            let mut cursor_cache = CursorCache::default();
+            let mut next_frame_deadline = Instant::now();
 
-            while is_running_clone.load(Ordering::SeqCst) {
-                let start_time = std::time::Instant::now();
+            while is_running_capture.load(Ordering::SeqCst) {
+                // 1. Acquire recyclable buffer from pool (or allocate if dry)
+                let mut bgra_buf = match recycle_rx.try_recv() {
+                    Ok(b) if b.len() == frame_buffer_size => b,
+                    _ => vec![0u8; frame_buffer_size],
+                };
 
-                let bitblt_ok = BitBlt(hdc_mem, 0, 0, phys_w, phys_h, Some(hdc_screen), phys_x, phys_y, SRCCOPY);
+                // 2. Perform GDI screen blit
+                let bitblt_ok = BitBlt(
+                    hdc_mem,
+                    0,
+                    0,
+                    phys_w,
+                    phys_h,
+                    Some(hdc_screen),
+                    phys_x,
+                    phys_y,
+                    SRCCOPY,
+                );
+
                 if bitblt_ok.is_ok() {
-                    // Draw active mouse cursor onto frame
+                    // 3. Fast cached cursor stamping
                     let mut cursor_info = windows::Win32::UI::WindowsAndMessaging::CURSORINFO {
                         cbSize: std::mem::size_of::<windows::Win32::UI::WindowsAndMessaging::CURSORINFO>() as u32,
                         flags: windows::Win32::UI::WindowsAndMessaging::CURSORINFO_FLAGS(0),
                         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(std::ptr::null_mut()),
                         ptScreenPos: windows::Win32::Foundation::POINT { x: 0, y: 0 },
                     };
+
                     if windows::Win32::UI::WindowsAndMessaging::GetCursorInfo(&mut cursor_info).is_ok()
                         && cursor_info.flags == windows::Win32::UI::WindowsAndMessaging::CURSOR_SHOWING
                     {
-                        let mut icon_info = windows::Win32::UI::WindowsAndMessaging::ICONINFO::default();
-                        if windows::Win32::UI::WindowsAndMessaging::GetIconInfo(
-                            windows::Win32::UI::WindowsAndMessaging::HICON(cursor_info.hCursor.0),
-                            &mut icon_info,
-                        ).is_ok() {
-                            let cursor_x = cursor_info.ptScreenPos.x - phys_x - icon_info.xHotspot as i32;
-                            let cursor_y = cursor_info.ptScreenPos.y - phys_y - icon_info.yHotspot as i32;
-
-                            let _ = windows::Win32::UI::WindowsAndMessaging::DrawIconEx(
-                                hdc_mem,
-                                cursor_x,
-                                cursor_y,
+                        let current_handle = cursor_info.hCursor.0 as isize;
+                        if current_handle != cursor_cache.last_handle {
+                            let mut icon_info = windows::Win32::UI::WindowsAndMessaging::ICONINFO::default();
+                            if windows::Win32::UI::WindowsAndMessaging::GetIconInfo(
                                 windows::Win32::UI::WindowsAndMessaging::HICON(cursor_info.hCursor.0),
-                                0,
-                                0,
-                                0,
-                                None,
-                                windows::Win32::UI::WindowsAndMessaging::DI_NORMAL,
-                            );
+                                &mut icon_info,
+                            ).is_ok() {
+                                cursor_cache.last_handle = current_handle;
+                                cursor_cache.hotspot_x = icon_info.xHotspot as i32;
+                                cursor_cache.hotspot_y = icon_info.yHotspot as i32;
 
-                            if !icon_info.hbmMask.0.is_null() {
-                                let _ = windows::Win32::Graphics::Gdi::DeleteObject(icon_info.hbmMask.into());
-                            }
-                            if !icon_info.hbmColor.0.is_null() {
-                                let _ = windows::Win32::Graphics::Gdi::DeleteObject(icon_info.hbmColor.into());
+                                if !icon_info.hbmMask.0.is_null() {
+                                    let _ = DeleteObject(icon_info.hbmMask.into());
+                                }
+                                if !icon_info.hbmColor.0.is_null() {
+                                    let _ = DeleteObject(icon_info.hbmColor.into());
+                                }
                             }
                         }
+
+                        let cursor_x = cursor_info.ptScreenPos.x - phys_x - cursor_cache.hotspot_x;
+                        let cursor_y = cursor_info.ptScreenPos.y - phys_y - cursor_cache.hotspot_y;
+
+                        let _ = windows::Win32::UI::WindowsAndMessaging::DrawIconEx(
+                            hdc_mem,
+                            cursor_x,
+                            cursor_y,
+                            windows::Win32::UI::WindowsAndMessaging::HICON(cursor_info.hCursor.0),
+                            0,
+                            0,
+                            0,
+                            None,
+                            windows::Win32::UI::WindowsAndMessaging::DI_NORMAL,
+                        );
                     }
 
+                    // 4. Extract DIB bits directly into recyclable buffer
                     GetDIBits(
                         hdc_mem,
                         hbmp,
@@ -717,19 +835,22 @@ pub fn start_screen_recording(
                         DIB_RGB_COLORS,
                     );
 
-                    if stdin.write_all(&bgra_buf).is_err() {
-                        break;
+                    // 5. Send frame to encoder worker (controlled drop on backpressure)
+                    if let Err(TrySendError::Full(b)) = frame_tx.try_send(bgra_buf) {
+                        let _ = recycle_rx.try_recv(); // discard if pool full
+                        let _ = b;
                     }
                 }
 
-                let elapsed = start_time.elapsed();
-                if elapsed < frame_interval {
-                    std::thread::sleep(frame_interval - elapsed);
+                // 6. Precise 30.000 FPS frame scheduling
+                next_frame_deadline += frame_interval;
+                let now = Instant::now();
+                if next_frame_deadline > now {
+                    std::thread::sleep(next_frame_deadline - now);
+                } else if now.saturating_duration_since(next_frame_deadline) > Duration::from_millis(100) {
+                    next_frame_deadline = now;
                 }
             }
-
-            let _ = stdin.flush();
-            drop(stdin); // Closes ffmpeg stdin, finalizing the MP4 stream
 
             SelectObject(hdc_mem, old_bmp);
             let _ = DeleteObject(hbmp.into());
@@ -780,19 +901,25 @@ pub fn start_screen_recording(
         let mic_wav = format!("{}\\BetterShot_Mic_{}.wav", std::env::temp_dir().display(), timestamp);
         let host = cpal::default_host();
         let mic_dev = if let Some(ref target_name) = mic_name {
-            if target_name.trim().is_empty() || target_name == "Built-in Microphone" || target_name == "Default System Audio Device" {
+            if target_name.trim().is_empty()
+                || target_name == "Built-in Microphone"
+                || target_name == "Default System Audio Device"
+            {
                 host.default_input_device()
             } else {
-                host.input_devices().ok().and_then(|mut devs| {
-                    devs.find(|d| {
-                        if let Ok(name) = d.name() {
-                            name.to_lowercase().contains(&target_name.to_lowercase())
-                                || target_name.to_lowercase().contains(&name.to_lowercase())
-                        } else {
-                            false
-                        }
+                host.input_devices()
+                    .ok()
+                    .and_then(|mut devs| {
+                        devs.find(|d| {
+                            if let Ok(name) = d.name() {
+                                name.to_lowercase().contains(&target_name.to_lowercase())
+                                    || target_name.to_lowercase().contains(&name.to_lowercase())
+                            } else {
+                                false
+                            }
+                        })
                     })
-                }).or_else(|| host.default_input_device())
+                    .or_else(|| host.default_input_device())
             }
         } else {
             host.default_input_device()
@@ -823,7 +950,7 @@ pub fn stop_screen_recording(
     state.is_running.store(false, Ordering::SeqCst);
 
     // Give audio threads a moment to finish current block
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    std::thread::sleep(Duration::from_millis(150));
 
     // 2. Finalize WAV writers
     {
@@ -855,7 +982,7 @@ pub fn stop_screen_recording(
     if let Some(ref mut child) = *proc {
         // Wait up to 6 seconds for ffmpeg to finish writing the MP4 file
         for _ in 0..12 {
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(Duration::from_millis(500));
             match child.try_wait() {
                 Ok(Some(_)) => break,
                 _ => {}
@@ -896,21 +1023,20 @@ pub fn stop_screen_recording(
     }
 
     // Give filesystem a moment to flush file handles
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(150));
 
     let raw_video_file = raw_video.unwrap_or_else(|| output.clone());
 
     let has_sys = sys_audio.as_ref().map(|p| std::path::Path::new(p).exists()).unwrap_or(false);
     let has_mic = mic_audio.as_ref().map(|p| std::path::Path::new(p).exists()).unwrap_or(false);
 
-    eprintln!("[BetterShot Muxer] has_sys: {}, has_mic: {}", has_sys, has_mic);
-
     if has_sys && has_mic {
         let sys_path = sys_audio.as_ref().unwrap();
         let mic_path = mic_audio.as_ref().unwrap();
 
         let mut mux_cmd = StdCommand::new("ffmpeg");
-        mux_cmd.arg("-i").arg(&raw_video_file)
+        mux_cmd
+            .arg("-i").arg(&raw_video_file)
             .arg("-i").arg(sys_path)
             .arg("-i").arg(mic_path)
             .arg("-filter_complex").arg("[1:a][2:a]amix=inputs=2:duration=longest[aout]")
@@ -937,7 +1063,8 @@ pub fn stop_screen_recording(
         let sys_path = sys_audio.as_ref().unwrap();
 
         let mut mux_cmd = StdCommand::new("ffmpeg");
-        mux_cmd.arg("-i").arg(&raw_video_file)
+        mux_cmd
+            .arg("-i").arg(&raw_video_file)
             .arg("-i").arg(sys_path)
             .arg("-map").arg("0:v")
             .arg("-map").arg("1:a")
@@ -961,7 +1088,8 @@ pub fn stop_screen_recording(
         let mic_path = mic_audio.as_ref().unwrap();
 
         let mut mux_cmd = StdCommand::new("ffmpeg");
-        mux_cmd.arg("-i").arg(&raw_video_file)
+        mux_cmd
+            .arg("-i").arg(&raw_video_file)
             .arg("-i").arg(mic_path)
             .arg("-map").arg("0:v")
             .arg("-map").arg("1:a")
@@ -995,6 +1123,58 @@ pub fn stop_screen_recording(
         Err(_) => {
             Err("Recording output file was not created. Check FFmpeg installation.".to_string())
         }
+    }
+}
+
+#[tauri::command]
+pub fn generate_video_thumbnail(video_path: String) -> Result<String, String> {
+    if !std::path::Path::new(&video_path).exists() {
+        return Err("Video file does not exist".to_string());
+    }
+
+    let temp_thumb = format!("{}\\thumb_{}.jpg", std::env::temp_dir().display(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+
+    let mut cmd = StdCommand::new("ffmpeg");
+    cmd.arg("-ss").arg("00:00:00.500")
+        .arg("-i").arg(&video_path)
+        .arg("-vframes").arg("1")
+        .arg("-vf").arg("scale=320:-1")
+        .arg("-q:v").arg("3")
+        .arg("-y")
+        .arg(&temp_thumb);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let status = cmd.status().map_err(|e| e.to_string())?;
+    if !status.success() {
+        // Retry at 0.000 if video is very short (< 0.5s)
+        let mut retry_cmd = StdCommand::new("ffmpeg");
+        retry_cmd.arg("-ss").arg("00:00:00.000")
+            .arg("-i").arg(&video_path)
+            .arg("-vframes").arg("1")
+            .arg("-vf").arg("scale=320:-1")
+            .arg("-q:v").arg("3")
+            .arg("-y")
+            .arg(&temp_thumb);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            retry_cmd.creation_flags(0x08000000);
+        }
+        let _ = retry_cmd.status();
+    }
+
+    if std::path::Path::new(&temp_thumb).exists() {
+        let bytes = std::fs::read(&temp_thumb).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&temp_thumb);
+        Ok(format!("data:image/jpeg;base64,{}", BASE64.encode(&bytes)))
+    } else {
+        Err("Failed to generate thumbnail".to_string())
     }
 }
 

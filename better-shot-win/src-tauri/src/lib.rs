@@ -2,8 +2,9 @@ mod capture;
 
 use capture::{
     capture_fullscreen, capture_region, check_recording_alive, copy_image_to_clipboard,
-    delete_file, get_virtual_screen_bounds, open_file, save_image_to_disk, select_folder,
-    show_in_folder, start_screen_recording, stop_screen_recording, RecordingState,
+    delete_file, generate_video_thumbnail, get_virtual_screen_bounds, open_file,
+    save_image_to_disk, select_folder, show_in_folder, start_screen_recording,
+    stop_screen_recording, RecordingState,
 };
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -46,6 +47,7 @@ pub fn run() {
             select_folder,
             start_screen_recording,
             stop_screen_recording,
+            generate_video_thumbnail,
             check_recording_alive,
             open_file,
             show_in_folder,
