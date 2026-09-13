@@ -1270,6 +1270,13 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
         }
+        "editor" => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 1100.0, height: 740.0 }));
+            let _ = window.set_always_on_top(false);
+            let _ = window.center();
+            let _ = window.set_ignore_cursor_events(false);
+        }
         "area_selection" => {
             let _ = window.set_fullscreen(true);
             let _ = window.set_always_on_top(true);

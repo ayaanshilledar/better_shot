@@ -18,7 +18,8 @@ import {
   Check,
   ArrowLeft,
   Circle,
-  Settings
+  Settings,
+  Scissors
 } from 'lucide-react';
 import { AudioVisualizer } from './AudioVisualizer';
 import { CaptureSource, RecordingConfig, RecordingHistoryItem } from '../types/recorder';
@@ -31,6 +32,7 @@ interface RecordingModalProps {
   onDeleteHistoryItem: (id: string, filePath: string) => void;
   onClearHistory: () => void;
   onToast: (msg: string) => void;
+  onOpenInEditor?: (item: RecordingHistoryItem) => void;
   initialView?: 'launcher' | 'history' | 'settings';
 }
 
@@ -42,6 +44,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   onDeleteHistoryItem,
   onClearHistory,
   onToast,
+  onOpenInEditor,
   initialView = 'launcher'
 }) => {
   const [view, setView] = useState<'launcher' | 'history' | 'settings'>(initialView);
@@ -620,6 +623,15 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                         >
                           <Play size={13} fill="currentColor" />
                         </button>
+                        {onOpenInEditor && (
+                          <button
+                            className="icon-btn rec-action-btn"
+                            title="Open in Video Editor"
+                            onClick={() => onOpenInEditor(item)}
+                          >
+                            <Scissors size={13} />
+                          </button>
+                        )}
                         <button
                           className="icon-btn rec-action-btn"
                           title="Reveal in Explorer"

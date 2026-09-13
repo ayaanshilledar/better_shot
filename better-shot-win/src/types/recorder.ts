@@ -6,6 +6,7 @@ export type RecorderState =
   | 'recording'      // Recording active
   | 'saving'         // Finalizing and saving MP4
   | 'saved'          // Finalized and saved
+  | 'editor'         // Video editor view
   | 'error';         // Error state
 
 export type CaptureSource = 'fullscreen' | 'region';
