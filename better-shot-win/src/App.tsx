@@ -1,33 +1,27 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { RegionOverlay } from './components/RegionOverlay';
-import { CaptureDeck, CaptureItem } from './components/CaptureDeck';
-import { ImageEditor } from './components/ImageEditor';
-import { RecordingModal, RecordingConfig, RecordingHistoryItem } from './components/RecordingModal';
+import { RecordingModal } from './components/RecordingModal';
 import { RecordingSessionBar } from './components/RecordingSessionBar';
 import { CountdownOverlay } from './components/CountdownOverlay';
+import { RecorderState, RecordingConfig, RecordingHistoryItem, Rect } from './types/recorder';
 import './App.css';
 
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export function App() {
-  const [activeMode, setActiveMode] = useState<string>('idle');
+  const [recorderState, setRecorderState] = useState<RecorderState>('idle');
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState<boolean>(true);
-  const [isRecordingActive, setIsRecordingActive] = useState<boolean>(false);
-  const [isPendingRecording, setIsPendingRecording] = useState<boolean>(false);
-  const [isCountingDown, setIsCountingDown] = useState<boolean>(false);
+  const [modalInitialView, setModalInitialView] = useState<'launcher' | 'history'>('launcher');
   const [recordedRegion, setRecordedRegion] = useState<Rect | null>(null);
-  const [saveLocation, setSaveLocation] = useState<string>(() => {
-    return localStorage.getItem('bs_save_path') || 'C:\\Users\\Public\\Pictures';
-  });
+  const [recordingThumbnail, setRecordingThumbnail] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [captureItems, setCaptureItems] = useState<CaptureItem[]>([]);
-  const [selectedItemForEdit, setSelectedItemForEdit] = useState<CaptureItem | null>(null);
+
+  const [recordingConfig, setRecordingConfig] = useState<RecordingConfig>({
+    mode: 'fullscreen',
+    savePath: localStorage.getItem('bs_save_path') || 'C:\\Users\\Public\\Pictures',
+    micEnabled: localStorage.getItem('bs_mic_enabled') !== 'false',
+    systemAudioEnabled: localStorage.getItem('bs_system_audio_enabled') !== 'false',
+    selectedMic: localStorage.getItem('bs_selected_mic') || 'Built-in Microphone'
+  });
 
   const [recordingHistory, setRecordingHistory] = useState<RecordingHistoryItem[]>(() => {
     try {
@@ -38,15 +32,17 @@ export function App() {
     }
   });
 
+  // Health check polling during active recording to detect unexpected backend crashes
   useEffect(() => {
-    if (!isRecordingActive) return;
+    if (recorderState !== 'recording') return;
 
     const interval = setInterval(async () => {
       try {
         const isAlive = await invoke<boolean>('check_recording_alive');
-        if (!isAlive && isRecordingActive) {
-          setIsRecordingActive(false);
+        if (!isAlive && recorderState === 'recording') {
+          setRecorderState('error');
           setRecordedRegion(null);
+          setModalInitialView('launcher');
           setIsRecordingModalOpen(true);
           setToastMessage('Recording process terminated unexpectedly');
           setTimeout(() => setToastMessage(null), 6000);
@@ -57,103 +53,38 @@ export function App() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isRecordingActive]);
+  }, [recorderState]);
 
-  const handleRegionComplete = async (rect: Rect) => {
-    setActiveMode('idle');
-    if (isPendingRecording) {
-      setIsPendingRecording(false);
-      setRecordedRegion(rect);
-      setIsCountingDown(true);
-      return;
-    }
-
-    try {
-      const dataUrl = await invoke<string>('capture_region', {
-        x: Math.round(rect.x),
-        y: Math.round(rect.y),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height)
-      });
-      const newItem: CaptureItem = {
-        id: Date.now().toString(),
-        dataUrl,
-        timestamp: new Date()
-      };
-      setCaptureItems((prev) => [newItem, ...prev]);
-      setToastMessage('Region captured to deck');
-      setTimeout(() => setToastMessage(null), 3000);
-    } catch (err) {
-      console.error('Region capture error:', err);
-      setToastMessage(`Capture error: ${err}`);
-      setTimeout(() => setToastMessage(null), 5000);
-    }
-  };
-
-  const handleCopy = async (item: CaptureItem | string) => {
-    const dataUrl = typeof item === 'string' ? item : item.dataUrl;
-    try {
-      await invoke('copy_image_to_clipboard', { base64Data: dataUrl });
-      setToastMessage('Copied to clipboard');
-      setTimeout(() => setToastMessage(null), 3000);
-    } catch (err) {
-      console.error('Clipboard copy error:', err);
-      setToastMessage(`Clipboard error: ${err}`);
-      setTimeout(() => setToastMessage(null), 4000);
-    }
-  };
-
-  const handleSave = async (item: CaptureItem | string) => {
-    const dataUrl = typeof item === 'string' ? item : item.dataUrl;
-    try {
-      const cleanDir = saveLocation.endsWith('\\') || saveLocation.endsWith('/')
-        ? saveLocation.slice(0, -1)
-        : saveLocation;
-      const targetPath = `${cleanDir}\\BetterShot_${Date.now()}.png`;
-      await invoke('save_image_to_disk', { base64Data: dataUrl, targetPath });
-      setToastMessage(`Saved to: ${targetPath}`);
-      setTimeout(() => setToastMessage(null), 5000);
-    } catch (err) {
-      console.error('Save error:', err);
-      setToastMessage(`Save error: ${err}`);
-      setTimeout(() => setToastMessage(null), 5000);
-    }
-  };
-
-  const handleEdit = (item: CaptureItem) => {
-    setSelectedItemForEdit(item);
-    setActiveMode('editor');
-  };
-
-  const [recordingConfig, setRecordingConfig] = useState<RecordingConfig>({
-    mode: 'fullscreen',
-    savePath: localStorage.getItem('bs_save_path') || 'C:\\Users\\Public\\Pictures',
-    micEnabled: localStorage.getItem('bs_mic_enabled') !== 'false',
-    systemAudioEnabled: localStorage.getItem('bs_system_audio_enabled') !== 'false',
-    selectedMic: localStorage.getItem('bs_selected_mic') || 'Built-in Microphone'
-  });
-
-  const handleDismiss = (id: string) => {
-    setCaptureItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
+  // Primary Start Recording action from Launcher modal
   const handleStartRecording = (config: RecordingConfig) => {
-    setIsRecordingModalOpen(false);
-    setSaveLocation(config.savePath);
     setRecordingConfig(config);
+    setIsRecordingModalOpen(false);
+
     if (config.mode === 'region') {
-      setIsPendingRecording(true);
-      setActiveMode('region');
+      setRecorderState('area_selection');
     } else {
       setRecordedRegion(null);
-      setIsCountingDown(true);
+      setRecorderState('countdown');
     }
   };
 
-  const [recordingThumbnail, setRecordingThumbnail] = useState<string | null>(null);
+  // Area Selection Complete
+  const handleRegionComplete = (rect: Rect) => {
+    setRecordedRegion(rect);
+    setRecorderState('countdown');
+  };
 
+  // Area Selection Cancelled
+  const handleRegionCancel = () => {
+    setRecordedRegion(null);
+    setRecorderState('idle');
+    setModalInitialView('launcher');
+    setIsRecordingModalOpen(true);
+  };
+
+  // Countdown Complete -> Launch Native Backend Engine
   const handleCountdownFinish = async () => {
-    setIsCountingDown(false);
+    setRecorderState('recording');
 
     try {
       const region = recordedRegion;
@@ -181,30 +112,28 @@ export function App() {
         y: region ? Math.round(region.y) : 0,
         width: region ? Math.round(region.width) : 0,
         height: region ? Math.round(region.height) : 0,
-        savePath: saveLocation,
+        savePath: recordingConfig.savePath,
         isFullscreen: !region,
         micEnabled: recordingConfig.micEnabled,
         systemAudioEnabled: recordingConfig.systemAudioEnabled,
         micName: recordingConfig.selectedMic
       });
-      setIsRecordingActive(true);
     } catch (err) {
       console.error('Failed to start screen recording:', err);
-      setIsRecordingActive(false);
+      setRecorderState('error');
       setRecordedRegion(null);
+      setModalInitialView('launcher');
       setIsRecordingModalOpen(true);
-      setToastMessage(`Recording failed: ${err}`);
+      setToastMessage(`Recording start failed: ${err}`);
       setTimeout(() => setToastMessage(null), 7000);
     }
   };
 
+  // Stop Recording -> Finalize and Save to History
   const handleStopRecording = async (seconds: number) => {
     const currentRegion = recordedRegion;
     const thumbToSave = recordingThumbnail;
-    setIsRecordingActive(false);
-    setRecordedRegion(null);
-    setRecordingThumbnail(null);
-    setActiveMode('idle');
+    setRecorderState('saving');
 
     try {
       const outputPath = await invoke<string>('stop_screen_recording');
@@ -232,22 +161,27 @@ export function App() {
           return updated;
         });
 
-        setToastMessage(`Auto-saved to: ${outputPath}`);
+        setToastMessage(`Saved to: ${outputPath}`);
         setTimeout(() => setToastMessage(null), 5000);
       }
     } catch (err) {
       console.error('Stop recording error:', err);
-      setToastMessage(`Recording error: ${err}`);
+      setToastMessage(`Recording save error: ${err}`);
       setTimeout(() => setToastMessage(null), 6000);
     }
 
+    setRecordedRegion(null);
+    setRecordingThumbnail(null);
+    setRecorderState('saved');
+    setModalInitialView('history');
     setIsRecordingModalOpen(true);
   };
 
+  // Discard Recording
   const handleDiscardRecording = async () => {
-    setIsRecordingActive(false);
+    setRecorderState('idle');
     setRecordedRegion(null);
-    setActiveMode('idle');
+    setRecordingThumbnail(null);
 
     try {
       await invoke<string>('stop_screen_recording');
@@ -255,9 +189,11 @@ export function App() {
       console.error('Discard recording error:', err);
     }
 
+    setModalInitialView('launcher');
     setIsRecordingModalOpen(true);
   };
 
+  // Delete Item from History
   const handleDeleteHistoryItem = async (id: string, filePath: string) => {
     try {
       await invoke('delete_file', { path: filePath });
@@ -275,10 +211,11 @@ export function App() {
       return updated;
     });
 
-    setToastMessage('Recording removed');
+    setToastMessage('Recording deleted');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Clear All History
   const handleClearHistory = () => {
     setRecordingHistory([]);
     try {
@@ -292,38 +229,54 @@ export function App() {
 
   return (
     <div className="app-container">
-      <div className="workspace">
-        {activeMode === 'editor' && selectedItemForEdit && (
-          <ImageEditor
-            imageSrc={selectedItemForEdit.dataUrl}
-            onCopy={(editedUrl) => handleCopy(editedUrl)}
-            onSave={(editedUrl) => handleSave(editedUrl)}
-            onClose={() => setActiveMode('idle')}
-          />
-        )}
-      </div>
-
-      {isCountingDown && (
+      {/* 1. Countdown Overlay */}
+      {recorderState === 'countdown' && (
         <CountdownOverlay initialCount={3} onFinish={handleCountdownFinish} />
       )}
 
+      {/* 2. Area Selection Overlay */}
+      {recorderState === 'area_selection' && (
+        <RegionOverlay
+          onComplete={handleRegionComplete}
+          onCancel={handleRegionCancel}
+        />
+      )}
+
+      {/* 3. Saving State Indicator */}
+      {recorderState === 'saving' && (
+        <div className="saving-overlay">
+          <div className="saving-card">
+            <div className="saving-spinner" />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
+              Saving recording...
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--apple-ink-muted-48)' }}>
+              Finalizing MP4 file
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Recording Setup & History Modal */}
       <RecordingModal
-        isOpen={isRecordingModalOpen}
+        isOpen={isRecordingModalOpen && recorderState !== 'recording' && recorderState !== 'countdown' && recorderState !== 'area_selection' && recorderState !== 'saving'}
         onClose={() => setIsRecordingModalOpen(false)}
         onStartRecord={handleStartRecording}
         history={recordingHistory}
         onDeleteHistoryItem={handleDeleteHistoryItem}
         onClearHistory={handleClearHistory}
+        initialView={modalInitialView}
         onToast={(msg) => {
           setToastMessage(msg);
           setTimeout(() => setToastMessage(null), 4000);
         }}
       />
 
-      {isRecordingActive && (
+      {/* 5. Live Recording Session Bar & Bounds Indicator */}
+      {recorderState === 'recording' && (
         <>
           <RecordingSessionBar
-            isRecording={isRecordingActive}
+            isRecording={true}
             initialMicActive={recordingConfig.micEnabled}
             onStop={handleStopRecording}
             onDiscard={handleDiscardRecording}
@@ -364,26 +317,7 @@ export function App() {
         </>
       )}
 
-      {activeMode !== 'editor' && !isRecordingActive && (
-        <CaptureDeck
-          items={captureItems}
-          onCopy={handleCopy}
-          onSave={handleSave}
-          onEdit={handleEdit}
-          onDismiss={handleDismiss}
-        />
-      )}
-
-      {activeMode === 'region' && (
-        <RegionOverlay
-          onComplete={handleRegionComplete}
-          onCancel={() => {
-            setActiveMode('idle');
-            setIsPendingRecording(false);
-          }}
-        />
-      )}
-
+      {/* 6. Toast Notification */}
       {toastMessage && (
         <div className="toast-notification">
           <span style={{ fontSize: 15 }}>
@@ -399,7 +333,7 @@ export function App() {
             }}>
               {toastMessage.includes('failed') || toastMessage.includes('error') || toastMessage.includes('terminated')
                 ? 'System Alert'
-                : 'BetterShot Action'}
+                : 'BetterShot'}
             </span>
             <span style={{ fontSize: 11, color: 'var(--apple-ink-muted-48)', fontFamily: 'var(--apple-font-mono)', wordBreak: 'break-all' }}>
               {toastMessage.replace('Auto-saved to: ', '').replace('Saved to: ', '')}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Square, Pause, Play, Mic, MicOff, Camera, CameraOff, Trash2, GripVertical } from 'lucide-react';
+import { Square, Pause, Play, Mic, MicOff, Trash2, GripVertical } from 'lucide-react';
 
 interface RecordingSessionBarProps {
   isRecording: boolean;
@@ -17,7 +17,6 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
   const [seconds, setSeconds] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [micActive, setMicActive] = useState<boolean>(initialMicActive);
-  const [cameraActive, setCameraActive] = useState<boolean>(false);
 
   useEffect(() => {
     if (isRecording) {
@@ -150,14 +149,6 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
         onClick={() => setMicActive(!micActive)}
       >
         {micActive ? <Mic size={15} color="var(--apple-primary-on-dark)" /> : <MicOff size={15} color="var(--apple-ink-muted-48)" />}
-      </button>
-
-      <button
-        className="icon-btn"
-        title={cameraActive ? 'Disable Camera' : 'Enable Camera'}
-        onClick={() => setCameraActive(!cameraActive)}
-      >
-        {cameraActive ? <Camera size={15} color="var(--apple-primary-on-dark)" /> : <CameraOff size={15} color="var(--apple-ink-muted-48)" />}
       </button>
 
       <div className="divider-vertical" />

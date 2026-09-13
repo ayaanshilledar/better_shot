@@ -5,8 +5,6 @@ import {
   Crop,
   Play,
   X,
-  Settings,
-  Folder,
   Clock,
   Video,
   FolderOpen,
@@ -16,28 +14,12 @@ import {
   Volume2,
   ChevronRight,
   ChevronDown,
-  Check
+  Check,
+  ArrowLeft,
+  Circle
 } from 'lucide-react';
-
-export interface RecordingHistoryItem {
-  id: string;
-  filePath: string;
-  fileName: string;
-  durationSeconds: number;
-  timestamp: string;
-  mode: 'fullscreen' | 'region';
-  width?: number;
-  height?: number;
-  thumbnailUrl?: string;
-}
-
-export interface RecordingConfig {
-  mode: 'fullscreen' | 'region';
-  savePath: string;
-  micEnabled: boolean;
-  systemAudioEnabled: boolean;
-  selectedMic: string;
-}
+import { AudioVisualizer } from './AudioVisualizer';
+import { CaptureSource, RecordingConfig, RecordingHistoryItem } from '../types/recorder';
 
 interface RecordingModalProps {
   isOpen: boolean;
@@ -47,6 +29,7 @@ interface RecordingModalProps {
   onDeleteHistoryItem: (id: string, filePath: string) => void;
   onClearHistory: () => void;
   onToast: (msg: string) => void;
+  initialView?: 'launcher' | 'history';
 }
 
 export const RecordingModal: React.FC<RecordingModalProps> = ({
@@ -56,11 +39,12 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   history,
   onDeleteHistoryItem,
   onClearHistory,
-  onToast
+  onToast,
+  initialView = 'launcher'
 }) => {
-  const [activeTab, setActiveTab] = useState<'record' | 'history' | 'settings'>('record');
-  const [mode, setMode] = useState<'fullscreen' | 'region'>('fullscreen');
-  const [savePath, setSavePath] = useState<string>(() => {
+  const [view, setView] = useState<'launcher' | 'history'>(initialView);
+  const [source, setSource] = useState<CaptureSource>('fullscreen');
+  const [savePath] = useState<string>(() => {
     return localStorage.getItem('bs_save_path') || 'C:\\Users\\Public\\Pictures';
   });
 
@@ -68,13 +52,16 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     const saved = localStorage.getItem('bs_mic_enabled');
     return saved !== null ? saved === 'true' : true;
   });
+
   const [systemAudioEnabled, setSystemAudioEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem('bs_system_audio_enabled');
     return saved !== null ? saved === 'true' : true;
   });
+
   const [selectedMic, setSelectedMic] = useState<string>(() => {
     return localStorage.getItem('bs_selected_mic') || 'Built-in Microphone';
   });
+
   const [availableMics, setAvailableMics] = useState<string[]>([
     'Built-in Microphone',
     'External Microphone (Realtek Audio)',
@@ -83,6 +70,11 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   ]);
   const [isMicPickerOpen, setIsMicPickerOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView, isOpen]);
+
+  // Query actual microphone device names when available
   useEffect(() => {
     async function enumerateAudioDevices() {
       try {
@@ -103,6 +95,29 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     enumerateAudioDevices();
   }, []);
 
+  // Keyboard navigation: Enter to start, Escape to close/back
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isMicPickerOpen) {
+          setIsMicPickerOpen(false);
+        } else if (view === 'history') {
+          setView('launcher');
+        } else {
+          onClose();
+        }
+      } else if (e.key === 'Enter' && view === 'launcher' && !isMicPickerOpen) {
+        handleStart();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, view, isMicPickerOpen, source, micEnabled, systemAudioEnabled, selectedMic, savePath]);
+
+  // Dragging support
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -151,7 +166,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     setSelectedMic(micName);
     localStorage.setItem('bs_selected_mic', micName);
     setIsMicPickerOpen(false);
-    onToast(`Selected Microphone: ${micName}`);
+    onToast(`Microphone: ${micName}`);
   };
 
   const handleStart = () => {
@@ -160,24 +175,12 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     localStorage.setItem('bs_system_audio_enabled', String(systemAudioEnabled));
     localStorage.setItem('bs_selected_mic', selectedMic);
     onStartRecord({
-      mode,
+      mode: source,
       savePath,
       micEnabled,
       systemAudioEnabled,
       selectedMic
     });
-  };
-
-  const handleChooseFolder = async () => {
-    try {
-      const selected = await invoke<string | null>('select_folder');
-      if (selected) {
-        setSavePath(selected);
-        localStorage.setItem('bs_save_path', selected);
-      }
-    } catch (err) {
-      console.error('Failed to select folder:', err);
-    }
   };
 
   const handlePlayRecording = async (path: string) => {
@@ -242,82 +245,77 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
       <div
         className="recording-modal"
         style={{
-          width: activeTab === 'history' ? 560 : 440,
+          width: view === 'history' ? 520 : 380,
           maxHeight: '90vh',
           transform: `translate(${position.x}px, ${position.y}px)`,
           cursor: isDragging ? 'grabbing' : 'default'
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div
           className="modal-header"
           data-tauri-drag-region
           onMouseDown={handleMouseDown}
           style={{ cursor: 'grab' }}
         >
-          <div className="modal-title" data-tauri-drag-region>
-            <span className="record-dot-animated" />
-            <h3 data-tauri-drag-region>
-              {activeTab === 'history' ? 'Recording History' : activeTab === 'settings' ? 'Settings' : 'Screen Recording'}
-            </h3>
-          </div>
+          {view === 'history' ? (
+            <button
+              className="action-btn"
+              onClick={() => setView('launcher')}
+              style={{ padding: '4px 10px', fontSize: 11 }}
+            >
+              <ArrowLeft size={13} />
+              <span>Back</span>
+            </button>
+          ) : (
+            <div className="modal-title" data-tauri-drag-region>
+              <span className="record-dot-animated" />
+              <h3 data-tauri-drag-region>BetterShot</h3>
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button className="icon-btn" onClick={onClose} title="Close">
-              <X size={16} />
+            <button className="icon-btn" onClick={onClose} title="Close (Esc)">
+              <X size={15} />
             </button>
           </div>
         </div>
 
-        <div className="segmented-nav">
-          <button
-            className={`segmented-btn ${activeTab === 'record' ? 'active' : ''}`}
-            onClick={() => setActiveTab('record')}
-          >
-            <Video size={13} />
-            <span>Record</span>
-          </button>
-          <button
-            className={`segmented-btn ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <Clock size={13} />
-            <span>History {history.length > 0 && `(${history.length})`}</span>
-          </button>
-          <button
-            className={`segmented-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={13} />
-            <span>Settings</span>
-          </button>
-        </div>
+        {/* ─── LAUNCHER VIEW ─────────────────────────────────────────────── */}
+        {view === 'launcher' && (
+          <div className="launcher-container">
+            {/* Hero Message */}
+            <div className="launcher-hero">
+              <h2 className="launcher-heading">Ready to record?</h2>
+              <p className="launcher-subheading">Capture your screen in seconds.</p>
+            </div>
 
-        {activeTab === 'record' && (
-          <>
+            {/* Source Selection */}
             <div className="modal-section">
-              <label className="section-label">Capture Area</label>
-              <div className="scope-selector">
-                <div
-                  className={`scope-card ${mode === 'fullscreen' ? 'active' : ''}`}
-                  onClick={() => setMode('fullscreen')}
+              <label className="section-label">Capture</label>
+              <div className="launcher-source-grid">
+                <button
+                  type="button"
+                  className={`launcher-source-btn ${source === 'fullscreen' ? 'active' : ''}`}
+                  onClick={() => setSource('fullscreen')}
                 >
-                  <Monitor size={24} color={mode === 'fullscreen' ? 'var(--apple-primary-on-dark)' : 'currentColor'} />
+                  <Monitor size={18} color={source === 'fullscreen' ? 'var(--apple-primary-on-dark)' : 'currentColor'} />
                   <span>Full Screen</span>
-                  <span className="subtext">Primary Display</span>
-                </div>
+                </button>
 
-                <div
-                  className={`scope-card ${mode === 'region' ? 'active' : ''}`}
-                  onClick={() => setMode('region')}
+                <button
+                  type="button"
+                  className={`launcher-source-btn ${source === 'region' ? 'active' : ''}`}
+                  onClick={() => setSource('region')}
                 >
-                  <Crop size={24} color={mode === 'region' ? 'var(--apple-primary-on-dark)' : 'currentColor'} />
-                  <span>Selected Region</span>
-                  <span className="subtext">Custom Rect</span>
-                </div>
+                  <Crop size={18} color={source === 'region' ? 'var(--apple-primary-on-dark)' : 'currentColor'} />
+                  <span>Select Area</span>
+                </button>
               </div>
             </div>
 
+            {/* Audio Settings */}
             <div className="modal-section">
               <label className="section-label">Audio</label>
               <div className="audio-card">
@@ -332,7 +330,9 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                     </div>
                     <span className="audio-label">Microphone</span>
                   </div>
+
                   <div className="audio-row-right" onClick={(e) => e.stopPropagation()}>
+                    <AudioVisualizer enabled={micEnabled} />
                     <button
                       type="button"
                       role="switch"
@@ -340,13 +340,14 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                       className={`apple-toggle-switch ${micEnabled ? 'checked' : ''}`}
                       onClick={handleToggleMic}
                       title={micEnabled ? 'Disable Microphone' : 'Enable Microphone'}
+                      style={{ marginLeft: 8 }}
                     >
                       <span className="apple-toggle-thumb" />
                     </button>
                   </div>
                 </div>
 
-                {/* If microphone is ON: */}
+                {/* Microphone Device Picker sub-row when ON */}
                 {micEnabled && (
                   <div className="mic-device-container">
                     <div
@@ -399,6 +400,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                     </div>
                     <span className="audio-label">System Audio</span>
                   </div>
+
                   <div className="audio-row-right" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
@@ -415,26 +417,50 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
               </div>
             </div>
 
-            <div className="modal-actions">
-              <button className="action-btn" onClick={onClose}>
-                Cancel
-              </button>
-              <button className="action-btn record-start-btn" onClick={handleStart}>
-                <Play size={14} fill="currentColor" />
+            {/* Dominant Primary CTA Button */}
+            <div className="launcher-action-container">
+              <button
+                type="button"
+                className="dominant-start-btn"
+                onClick={handleStart}
+                autoFocus
+              >
+                <Circle size={10} fill="currentColor" />
                 <span>Start Recording</span>
               </button>
             </div>
-          </>
+
+            {/* Footer Navigation to History */}
+            <div className="launcher-footer">
+              <button
+                type="button"
+                className="history-link-btn"
+                onClick={() => setView('history')}
+              >
+                <Clock size={13} />
+                <span>View Recordings {history.length > 0 && `(${history.length})`}</span>
+              </button>
+            </div>
+          </div>
         )}
 
-        {activeTab === 'history' && (
-          <>
+        {/* ─── HISTORY VIEW ─────────────────────────────────────────────── */}
+        {view === 'history' && (
+          <div className="history-view-container">
             <div className="modal-section">
               {history.length === 0 ? (
                 <div className="history-empty">
-                  <Video size={32} opacity={0.3} />
+                  <Video size={36} opacity={0.3} />
                   <span>No recordings yet</span>
-                  <p>Your screen and region recordings will appear here.</p>
+                  <p>Your screen recordings will appear here.</p>
+                  <button
+                    type="button"
+                    className="action-btn primary"
+                    onClick={() => setView('launcher')}
+                    style={{ marginTop: 8 }}
+                  >
+                    Start Recording
+                  </button>
                 </div>
               ) : (
                 <div className="history-list">
@@ -486,28 +512,28 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                       <div className="rec-card-actions">
                         <button
                           className="icon-btn rec-action-btn"
-                          title="Play / Open with Default Player"
+                          title="Play / Open"
                           onClick={() => handlePlayRecording(item.filePath)}
                         >
                           <Play size={13} fill="currentColor" />
                         </button>
                         <button
                           className="icon-btn rec-action-btn"
-                          title="Reveal in File Explorer"
+                          title="Reveal in Explorer"
                           onClick={() => handleShowInFolder(item.filePath)}
                         >
                           <FolderOpen size={13} />
                         </button>
                         <button
                           className="icon-btn rec-action-btn"
-                          title="Copy File Path"
+                          title="Copy Path"
                           onClick={() => handleCopyPath(item.filePath)}
                         >
                           <Copy size={13} />
                         </button>
                         <button
                           className="icon-btn rec-action-btn delete-btn"
-                          title="Delete Recording"
+                          title="Delete"
                           onClick={() => onDeleteHistoryItem(item.id, item.filePath)}
                         >
                           <Trash2 size={13} color="var(--apple-system-red)" />
@@ -519,7 +545,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
               )}
             </div>
 
-            <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+            <div className="modal-actions" style={{ justifyContent: 'space-between', marginTop: 8 }}>
               {history.length > 0 ? (
                 <button
                   className="action-btn"
@@ -529,67 +555,15 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                   Clear History
                 </button>
               ) : <div />}
-              <button className="action-btn primary" onClick={() => setActiveTab('record')}>
+
+              <button
+                className="action-btn primary"
+                onClick={() => setView('launcher')}
+              >
                 New Recording
               </button>
             </div>
-          </>
-        )}
-
-        {activeTab === 'settings' && (
-          <>
-            <div className="modal-section" style={{ marginTop: 4 }}>
-              <label className="section-label">File Destination</label>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  padding: '8px 10px',
-                  borderRadius: 'var(--apple-rounded-md)',
-                  border: '1px solid var(--apple-hairline-dark)'
-                }}
-              >
-                <Folder size={16} color="var(--apple-primary-on-dark)" />
-                <input
-                  type="text"
-                  value={savePath}
-                  onChange={(e) => {
-                    setSavePath(e.target.value);
-                    localStorage.setItem('bs_save_path', e.target.value);
-                  }}
-                  placeholder="Select destination folder"
-                  style={{
-                    flex: 1,
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    color: 'var(--apple-body-on-dark)',
-                    fontSize: 12,
-                    fontFamily: 'var(--apple-font-mono)'
-                  }}
-                />
-                <button
-                  className="action-btn"
-                  onClick={handleChooseFolder}
-                  style={{ padding: '4px 12px', fontSize: 11 }}
-                >
-                  Browse...
-                </button>
-              </div>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 12 }}>
-              <button
-                className="action-btn primary"
-                onClick={() => setActiveTab('record')}
-                style={{ padding: '7px 20px' }}
-              >
-                Done
-              </button>
-            </div>
-          </>
+          </div>
         )}
       </div>
     </div>
