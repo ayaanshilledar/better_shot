@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
-    GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS,
-    SRCCOPY,
+    GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, CAPTUREBLT,
+    DIB_RGB_COLORS, ROP_CODE, SRCCOPY,
 };
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
@@ -138,7 +138,7 @@ pub fn capture_screen_raw(x: i32, y: i32, width: i32, height: i32) -> Result<Rgb
 
         let old_bmp = SelectObject(hdc_mem, hbmp.into());
 
-        let bitblt_res = BitBlt(hdc_mem, 0, 0, width, height, Some(hdc_screen), x, y, SRCCOPY);
+        let bitblt_res = BitBlt(hdc_mem, 0, 0, width, height, Some(hdc_screen), x, y, ROP_CODE(SRCCOPY.0 | CAPTUREBLT.0));
         if bitblt_res.is_err() {
             SelectObject(hdc_mem, old_bmp);
             let _ = DeleteObject(hbmp.into());
@@ -773,7 +773,7 @@ pub fn start_screen_recording(
                     Some(hdc_screen),
                     phys_x,
                     phys_y,
-                    SRCCOPY,
+                    ROP_CODE(SRCCOPY.0 | CAPTUREBLT.0),
                 );
 
                 if bitblt_ok.is_ok() {
