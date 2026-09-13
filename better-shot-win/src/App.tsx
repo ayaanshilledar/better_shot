@@ -182,7 +182,10 @@ export function App() {
         width: region ? Math.round(region.width) : 0,
         height: region ? Math.round(region.height) : 0,
         savePath: saveLocation,
-        isFullscreen: !region
+        isFullscreen: !region,
+        micEnabled: recordingConfig.micEnabled,
+        systemAudioEnabled: recordingConfig.systemAudioEnabled,
+        micName: recordingConfig.selectedMic
       });
       setIsRecordingActive(true);
     } catch (err) {

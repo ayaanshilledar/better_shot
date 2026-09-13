@@ -30,7 +30,12 @@ pub fn run() {
             process: Mutex::new(None),
             is_running: Arc::new(AtomicBool::new(false)),
             output_path: Mutex::new(None),
+            raw_video_path: Mutex::new(None),
             stderr_log: Mutex::new(None),
+            sys_audio_path: Mutex::new(None),
+            mic_audio_path: Mutex::new(None),
+            sys_wav_writer: Arc::new(Mutex::new(None)),
+            mic_wav_writer: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             get_virtual_screen_bounds,

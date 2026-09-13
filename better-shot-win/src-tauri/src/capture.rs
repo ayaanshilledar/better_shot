@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use image::{ImageFormat, RgbaImage};
 use std::io::Cursor;
 use std::io::Write;
@@ -20,11 +21,89 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
+pub struct WavWriter {
+    file: std::fs::File,
+    data_bytes_written: u32,
+    sample_rate: u32,
+    channels: u16,
+}
+
+impl WavWriter {
+    pub fn create(path: &str, sample_rate: u32, channels: u16) -> Result<Self, String> {
+        let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+        let header = [0u8; 44];
+        file.write_all(&header).map_err(|e| e.to_string())?;
+        Ok(Self {
+            file,
+            data_bytes_written: 0,
+            sample_rate,
+            channels,
+        })
+    }
+
+    pub fn write_samples_f32(&mut self, samples: &[f32]) -> Result<(), String> {
+        let mut buf = Vec::with_capacity(samples.len() * 2);
+        for &s in samples {
+            let clamped = s.clamp(-1.0, 1.0);
+            let val = (clamped * 32767.0) as i16;
+            buf.extend_from_slice(&val.to_le_bytes());
+        }
+        self.file.write_all(&buf).map_err(|e| e.to_string())?;
+        self.data_bytes_written += buf.len() as u32;
+        Ok(())
+    }
+
+    pub fn write_samples_i16(&mut self, samples: &[i16]) -> Result<(), String> {
+        let mut buf = Vec::with_capacity(samples.len() * 2);
+        for &s in samples {
+            buf.extend_from_slice(&s.to_le_bytes());
+        }
+        self.file.write_all(&buf).map_err(|e| e.to_string())?;
+        self.data_bytes_written += buf.len() as u32;
+        Ok(())
+    }
+
+    pub fn finalize(&mut self) -> Result<(), String> {
+        use std::io::Seek;
+        use std::io::SeekFrom;
+
+        let total_file_size = 44 + self.data_bytes_written;
+        let riff_chunk_size = if total_file_size >= 8 { total_file_size - 8 } else { 0 };
+        let byte_rate = self.sample_rate * (self.channels as u32) * 2;
+        let block_align = self.channels * 2;
+
+        let mut header = [0u8; 44];
+        header[0..4].copy_from_slice(b"RIFF");
+        header[4..8].copy_from_slice(&riff_chunk_size.to_le_bytes());
+        header[8..12].copy_from_slice(b"WAVE");
+        header[12..16].copy_from_slice(b"fmt ");
+        header[16..20].copy_from_slice(&16u32.to_le_bytes());
+        header[20..22].copy_from_slice(&1u16.to_le_bytes());
+        header[22..24].copy_from_slice(&self.channels.to_le_bytes());
+        header[24..28].copy_from_slice(&self.sample_rate.to_le_bytes());
+        header[28..32].copy_from_slice(&byte_rate.to_le_bytes());
+        header[32..34].copy_from_slice(&block_align.to_le_bytes());
+        header[34..36].copy_from_slice(&16u16.to_le_bytes());
+        header[36..40].copy_from_slice(b"data");
+        header[40..44].copy_from_slice(&self.data_bytes_written.to_le_bytes());
+
+        self.file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+        self.file.write_all(&header).map_err(|e| e.to_string())?;
+        self.file.flush().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
 pub struct RecordingState {
     pub process: Mutex<Option<Child>>,
     pub is_running: Arc<AtomicBool>,
     pub output_path: Mutex<Option<String>>,
+    pub raw_video_path: Mutex<Option<String>>,
     pub stderr_log: Mutex<Option<String>>,
+    pub sys_audio_path: Mutex<Option<String>>,
+    pub mic_audio_path: Mutex<Option<String>>,
+    pub sys_wav_writer: Arc<Mutex<Option<WavWriter>>>,
+    pub mic_wav_writer: Arc<Mutex<Option<WavWriter>>>,
 }
 
 #[derive(serde::Serialize)]
@@ -261,7 +340,183 @@ fn round_even(val: i32) -> i32 {
     if v < 2 { 2 } else { v }
 }
 
-// ─── High-Performance Screen Recording via GDI Frame Pipeline ────────────────
+// ─── High-Performance Screen Recording via GDI Frame Pipeline & WASAPI Audio ──
+
+fn spawn_system_audio_capture_thread(
+    is_running: Arc<AtomicBool>,
+    wav_writer: Arc<Mutex<Option<WavWriter>>>,
+) {
+    std::thread::spawn(move || {
+        let host = cpal::default_host();
+        let device = match host.default_output_device() {
+            Some(d) => d,
+            None => {
+                eprintln!("[BetterShot Audio] No default output device found for system audio loopback");
+                return;
+            }
+        };
+
+        let config = match device.default_output_config() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[BetterShot Audio] Failed to get default output config: {}", e);
+                return;
+            }
+        };
+
+        let sample_format = config.sample_format();
+        let writer_clone = wav_writer.clone();
+        let is_running_clone = is_running.clone();
+
+        let stream_res = match sample_format {
+            cpal::SampleFormat::F32 => device.build_input_stream(
+                &config.into(),
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    if is_running_clone.load(Ordering::SeqCst) {
+                        if let Ok(mut guard) = writer_clone.lock() {
+                            if let Some(ref mut w) = *guard {
+                                let _ = w.write_samples_f32(data);
+                            }
+                        }
+                    }
+                },
+                move |err| {
+                    eprintln!("[BetterShot Audio] System audio loopback stream error: {}", err);
+                },
+                None,
+            ),
+            cpal::SampleFormat::I16 => device.build_input_stream(
+                &config.into(),
+                move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                    if is_running_clone.load(Ordering::SeqCst) {
+                        if let Ok(mut guard) = writer_clone.lock() {
+                            if let Some(ref mut w) = *guard {
+                                let _ = w.write_samples_i16(data);
+                            }
+                        }
+                    }
+                },
+                move |err| {
+                    eprintln!("[BetterShot Audio] System audio loopback stream error: {}", err);
+                },
+                None,
+            ),
+            _ => {
+                eprintln!("[BetterShot Audio] Unsupported system audio format: {:?}", sample_format);
+                return;
+            }
+        };
+
+        if let Ok(stream) = stream_res {
+            if let Ok(()) = stream.play() {
+                eprintln!("[BetterShot Audio] System audio loopback capture active");
+                while is_running.load(Ordering::SeqCst) {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                drop(stream);
+                eprintln!("[BetterShot Audio] System audio loopback capture finished");
+            }
+        }
+    });
+}
+
+fn spawn_mic_audio_capture_thread(
+    mic_name: Option<String>,
+    is_running: Arc<AtomicBool>,
+    wav_writer: Arc<Mutex<Option<WavWriter>>>,
+) {
+    std::thread::spawn(move || {
+        let host = cpal::default_host();
+        let device = if let Some(ref target_name) = mic_name {
+            if target_name.trim().is_empty() || target_name == "Built-in Microphone" || target_name == "Default System Audio Device" {
+                host.default_input_device()
+            } else {
+                host.input_devices().ok().and_then(|mut devs| {
+                    devs.find(|d| {
+                        if let Ok(name) = d.name() {
+                            name.to_lowercase().contains(&target_name.to_lowercase())
+                                || target_name.to_lowercase().contains(&name.to_lowercase())
+                        } else {
+                            false
+                        }
+                    })
+                }).or_else(|| host.default_input_device())
+            }
+        } else {
+            host.default_input_device()
+        };
+
+        let device = match device {
+            Some(d) => d,
+            None => {
+                eprintln!("[BetterShot Audio] No microphone device found");
+                return;
+            }
+        };
+
+        let config = match device.default_input_config() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[BetterShot Audio] Failed to get mic input config: {}", e);
+                return;
+            }
+        };
+
+        let sample_format = config.sample_format();
+        let writer_clone = wav_writer.clone();
+        let is_running_clone = is_running.clone();
+
+        let stream_res = match sample_format {
+            cpal::SampleFormat::F32 => device.build_input_stream(
+                &config.into(),
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    if is_running_clone.load(Ordering::SeqCst) {
+                        if let Ok(mut guard) = writer_clone.lock() {
+                            if let Some(ref mut w) = *guard {
+                                let _ = w.write_samples_f32(data);
+                            }
+                        }
+                    }
+                },
+                move |err| {
+                    eprintln!("[BetterShot Audio] Mic stream error: {}", err);
+                },
+                None,
+            ),
+            cpal::SampleFormat::I16 => device.build_input_stream(
+                &config.into(),
+                move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                    if is_running_clone.load(Ordering::SeqCst) {
+                        if let Ok(mut guard) = writer_clone.lock() {
+                            if let Some(ref mut w) = *guard {
+                                let _ = w.write_samples_i16(data);
+                            }
+                        }
+                    }
+                },
+                move |err| {
+                    eprintln!("[BetterShot Audio] Mic stream error: {}", err);
+                },
+                None,
+            ),
+            _ => {
+                eprintln!("[BetterShot Audio] Unsupported mic sample format: {:?}", sample_format);
+                return;
+            }
+        };
+
+        if let Ok(stream) = stream_res {
+            if let Ok(()) = stream.play() {
+                eprintln!("[BetterShot Audio] Microphone capture active");
+                while is_running.load(Ordering::SeqCst) {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                drop(stream);
+                eprintln!("[BetterShot Audio] Microphone capture finished");
+            }
+        }
+    });
+}
 
 #[tauri::command]
 pub fn start_screen_recording(
@@ -272,6 +527,9 @@ pub fn start_screen_recording(
     height: i32,
     save_path: String,
     is_fullscreen: bool,
+    mic_enabled: Option<bool>,
+    system_audio_enabled: Option<bool>,
+    mic_name: Option<String>,
     state: tauri::State<'_, RecordingState>,
 ) -> Result<String, String> {
     if let Ok(hwnd) = window.hwnd() {
@@ -303,6 +561,12 @@ pub fn start_screen_recording(
     let _ = std::fs::create_dir_all(clean_dir);
 
     let output_file = format!("{}\\BetterShot_Record_{}.mp4", clean_dir, timestamp);
+    let with_audio = mic_enabled.unwrap_or(false) || system_audio_enabled.unwrap_or(false);
+    let video_record_file = if with_audio {
+        format!("{}\\BetterShot_RawVideo_{}.mp4", std::env::temp_dir().display(), timestamp)
+    } else {
+        output_file.clone()
+    };
 
     let stderr_log_path = format!("{}\\BetterShot_ffmpeg_{}.log", std::env::temp_dir().display(), timestamp);
     let stderr_file = std::fs::File::create(&stderr_log_path)
@@ -330,7 +594,7 @@ pub fn start_screen_recording(
         .arg("-preset").arg("ultrafast")
         .arg("-pix_fmt").arg("yuv420p")
         .arg("-y")
-        .arg(&output_file);
+        .arg(&video_record_file);
 
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -485,8 +749,66 @@ pub fn start_screen_recording(
     }
 
     {
+        let mut raw_path = state.raw_video_path.lock().map_err(|e| e.to_string())?;
+        *raw_path = Some(video_record_file.clone());
+    }
+
+    {
         let mut log = state.stderr_log.lock().map_err(|e| e.to_string())?;
         *log = Some(stderr_log_path.clone());
+    }
+
+    // 1. Initialize System Audio Loopback
+    if system_audio_enabled.unwrap_or(false) {
+        let sys_wav = format!("{}\\BetterShot_Sys_{}.wav", std::env::temp_dir().display(), timestamp);
+        let host = cpal::default_host();
+        if let Some(dev) = host.default_output_device() {
+            if let Ok(cfg) = dev.default_output_config() {
+                let sample_rate = cfg.sample_rate().0;
+                let channels = cfg.channels();
+                if let Ok(writer) = WavWriter::create(&sys_wav, sample_rate, channels) {
+                    *state.sys_wav_writer.lock().map_err(|e| e.to_string())? = Some(writer);
+                    *state.sys_audio_path.lock().map_err(|e| e.to_string())? = Some(sys_wav.clone());
+                    spawn_system_audio_capture_thread(state.is_running.clone(), state.sys_wav_writer.clone());
+                }
+            }
+        }
+    }
+
+    // 2. Initialize Microphone Capture
+    if mic_enabled.unwrap_or(false) {
+        let mic_wav = format!("{}\\BetterShot_Mic_{}.wav", std::env::temp_dir().display(), timestamp);
+        let host = cpal::default_host();
+        let mic_dev = if let Some(ref target_name) = mic_name {
+            if target_name.trim().is_empty() || target_name == "Built-in Microphone" || target_name == "Default System Audio Device" {
+                host.default_input_device()
+            } else {
+                host.input_devices().ok().and_then(|mut devs| {
+                    devs.find(|d| {
+                        if let Ok(name) = d.name() {
+                            name.to_lowercase().contains(&target_name.to_lowercase())
+                                || target_name.to_lowercase().contains(&name.to_lowercase())
+                        } else {
+                            false
+                        }
+                    })
+                }).or_else(|| host.default_input_device())
+            }
+        } else {
+            host.default_input_device()
+        };
+
+        if let Some(dev) = mic_dev {
+            if let Ok(cfg) = dev.default_input_config() {
+                let sample_rate = cfg.sample_rate().0;
+                let channels = cfg.channels();
+                if let Ok(writer) = WavWriter::create(&mic_wav, sample_rate, channels) {
+                    *state.mic_wav_writer.lock().map_err(|e| e.to_string())? = Some(writer);
+                    *state.mic_audio_path.lock().map_err(|e| e.to_string())? = Some(mic_wav.clone());
+                    spawn_mic_audio_capture_thread(mic_name, state.is_running.clone(), state.mic_wav_writer.clone());
+                }
+            }
+        }
     }
 
     eprintln!("[BetterShot] Screen recording active → {}", output_file);
@@ -497,8 +819,27 @@ pub fn start_screen_recording(
 pub fn stop_screen_recording(
     state: tauri::State<'_, RecordingState>,
 ) -> Result<String, String> {
-    // 1. Signal capture thread to stop feeding frames and close stdin
+    // 1. Signal all frame & audio threads to stop
     state.is_running.store(false, Ordering::SeqCst);
+
+    // Give audio threads a moment to finish current block
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // 2. Finalize WAV writers
+    {
+        let mut sys_w = state.sys_wav_writer.lock().map_err(|e| e.to_string())?;
+        if let Some(ref mut w) = *sys_w {
+            let _ = w.finalize();
+        }
+        *sys_w = None;
+    }
+    {
+        let mut mic_w = state.mic_wav_writer.lock().map_err(|e| e.to_string())?;
+        if let Some(ref mut w) = *mic_w {
+            let _ = w.finalize();
+        }
+        *mic_w = None;
+    }
 
     let output = {
         let path = state.output_path.lock().map_err(|e| e.to_string())?;
@@ -543,6 +884,10 @@ pub fn stop_screen_recording(
         *path = None;
     }
 
+    let raw_video = state.raw_video_path.lock().map_err(|e| e.to_string())?.take();
+    let sys_audio = state.sys_audio_path.lock().map_err(|e| e.to_string())?.take();
+    let mic_audio = state.mic_audio_path.lock().map_err(|e| e.to_string())?.take();
+
     if let Ok(mut log) = state.stderr_log.lock() {
         if let Some(ref log_path) = *log {
             let _ = std::fs::remove_file(log_path);
@@ -552,6 +897,91 @@ pub fn stop_screen_recording(
 
     // Give filesystem a moment to flush file handles
     std::thread::sleep(std::time::Duration::from_millis(200));
+
+    let raw_video_file = raw_video.unwrap_or_else(|| output.clone());
+
+    let has_sys = sys_audio.as_ref().map(|p| std::path::Path::new(p).exists()).unwrap_or(false);
+    let has_mic = mic_audio.as_ref().map(|p| std::path::Path::new(p).exists()).unwrap_or(false);
+
+    eprintln!("[BetterShot Muxer] has_sys: {}, has_mic: {}", has_sys, has_mic);
+
+    if has_sys && has_mic {
+        let sys_path = sys_audio.as_ref().unwrap();
+        let mic_path = mic_audio.as_ref().unwrap();
+
+        let mut mux_cmd = StdCommand::new("ffmpeg");
+        mux_cmd.arg("-i").arg(&raw_video_file)
+            .arg("-i").arg(sys_path)
+            .arg("-i").arg(mic_path)
+            .arg("-filter_complex").arg("[1:a][2:a]amix=inputs=2:duration=longest[aout]")
+            .arg("-map").arg("0:v")
+            .arg("-map").arg("[aout]")
+            .arg("-c:v").arg("copy")
+            .arg("-c:a").arg("aac")
+            .arg("-b:a").arg("192k")
+            .arg("-shortest")
+            .arg("-y")
+            .arg(&output);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            mux_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        let _ = mux_cmd.output();
+        let _ = std::fs::remove_file(&raw_video_file);
+        let _ = std::fs::remove_file(sys_path);
+        let _ = std::fs::remove_file(mic_path);
+    } else if has_sys {
+        let sys_path = sys_audio.as_ref().unwrap();
+
+        let mut mux_cmd = StdCommand::new("ffmpeg");
+        mux_cmd.arg("-i").arg(&raw_video_file)
+            .arg("-i").arg(sys_path)
+            .arg("-map").arg("0:v")
+            .arg("-map").arg("1:a")
+            .arg("-c:v").arg("copy")
+            .arg("-c:a").arg("aac")
+            .arg("-b:a").arg("192k")
+            .arg("-shortest")
+            .arg("-y")
+            .arg(&output);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            mux_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        let _ = mux_cmd.output();
+        let _ = std::fs::remove_file(&raw_video_file);
+        let _ = std::fs::remove_file(sys_path);
+    } else if has_mic {
+        let mic_path = mic_audio.as_ref().unwrap();
+
+        let mut mux_cmd = StdCommand::new("ffmpeg");
+        mux_cmd.arg("-i").arg(&raw_video_file)
+            .arg("-i").arg(mic_path)
+            .arg("-map").arg("0:v")
+            .arg("-map").arg("1:a")
+            .arg("-c:v").arg("copy")
+            .arg("-c:a").arg("aac")
+            .arg("-b:a").arg("192k")
+            .arg("-shortest")
+            .arg("-y")
+            .arg(&output);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            mux_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        let _ = mux_cmd.output();
+        let _ = std::fs::remove_file(&raw_video_file);
+        let _ = std::fs::remove_file(mic_path);
+    }
 
     match std::fs::metadata(&output) {
         Ok(meta) if meta.len() > 0 => {
