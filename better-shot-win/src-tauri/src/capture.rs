@@ -1287,3 +1287,8 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn close_app_window(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}

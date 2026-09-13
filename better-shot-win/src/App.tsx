@@ -258,7 +258,13 @@ export function App() {
       {isRecordingModalOpen && recorderState !== 'recording' && recorderState !== 'countdown' && recorderState !== 'area_selection' && (
         <RecordingModal
           isOpen={isRecordingModalOpen}
-          onClose={() => setIsRecordingModalOpen(false)}
+          onClose={async () => {
+            try {
+              await invoke('close_app_window');
+            } catch {
+              setIsRecordingModalOpen(false);
+            }
+          }}
           onStartRecord={handleStartRecording}
           history={recordingHistory}
           onDeleteHistoryItem={handleDeleteHistoryItem}
