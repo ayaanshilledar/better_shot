@@ -50,6 +50,10 @@ button:focus-visible, input:focus-visible {
   pointer-events: none;
 }
 
+.app-container.recording-bar-active {
+  pointer-events: auto !important;
+}
+
 @keyframes appleSlideDown {
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -511,7 +515,15 @@ button:focus-visible, input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 2px;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.launcher-footer-dot {
+  color: var(--apple-ink-muted-48);
+  font-size: 10px;
+  opacity: 0.4;
+  user-select: none;
 }
 
 .history-link-btn {

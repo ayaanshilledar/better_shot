@@ -9,7 +9,7 @@ import './App.css';
 export function App() {
   const [recorderState, setRecorderState] = useState<RecorderState>('idle');
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState<boolean>(true);
-  const [modalInitialView, setModalInitialView] = useState<'launcher' | 'history'>('launcher');
+  const [modalInitialView, setModalInitialView] = useState<'launcher' | 'history' | 'settings'>('launcher');
   const [recordedRegion, setRecordedRegion] = useState<Rect | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -77,6 +77,7 @@ export function App() {
     return () => clearTimeout(timer);
   }, [countdownSeconds]);
 
+  // Invokes native Windows screen recording engine
   const launchRecordingEngine = async () => {
     setRecorderState('recording');
 
@@ -117,8 +118,13 @@ export function App() {
     } else {
       setRecordedRegion(null);
       await invoke('set_window_mode', { mode: 'recording' }).catch(() => {});
-      setRecorderState('countdown');
-      setCountdownSeconds(3);
+      const countdownOn = localStorage.getItem('bs_countdown_enabled') !== 'false';
+      if (countdownOn) {
+        setRecorderState('countdown');
+        setCountdownSeconds(3);
+      } else {
+        launchRecordingEngine();
+      }
     }
   };
 
@@ -126,8 +132,13 @@ export function App() {
   const handleRegionComplete = async (rect: Rect) => {
     setRecordedRegion(rect);
     await invoke('set_window_mode', { mode: 'recording' }).catch(() => {});
-    setRecorderState('countdown');
-    setCountdownSeconds(3);
+    const countdownOn = localStorage.getItem('bs_countdown_enabled') !== 'false';
+    if (countdownOn) {
+      setRecorderState('countdown');
+      setCountdownSeconds(3);
+    } else {
+      launchRecordingEngine();
+    }
   };
 
   // Area Selection Cancelled -> restore launcher window
@@ -245,7 +256,7 @@ export function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${recorderState === 'recording' || recorderState === 'countdown' ? 'recording-bar-active' : ''}`}>
       {/* 1. Fullscreen Region Selection (Only active during drag selection) */}
       {recorderState === 'area_selection' && (
         <RegionOverlay

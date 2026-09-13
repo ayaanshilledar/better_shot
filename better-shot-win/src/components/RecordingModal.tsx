@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   Monitor,
   Crop,
@@ -16,7 +17,8 @@ import {
   ChevronDown,
   Check,
   ArrowLeft,
-  Circle
+  Circle,
+  Settings
 } from 'lucide-react';
 import { AudioVisualizer } from './AudioVisualizer';
 import { CaptureSource, RecordingConfig, RecordingHistoryItem } from '../types/recorder';
@@ -29,7 +31,7 @@ interface RecordingModalProps {
   onDeleteHistoryItem: (id: string, filePath: string) => void;
   onClearHistory: () => void;
   onToast: (msg: string) => void;
-  initialView?: 'launcher' | 'history';
+  initialView?: 'launcher' | 'history' | 'settings';
 }
 
 export const RecordingModal: React.FC<RecordingModalProps> = ({
@@ -42,9 +44,9 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   onToast,
   initialView = 'launcher'
 }) => {
-  const [view, setView] = useState<'launcher' | 'history'>(initialView);
+  const [view, setView] = useState<'launcher' | 'history' | 'settings'>(initialView);
   const [source, setSource] = useState<CaptureSource>('fullscreen');
-  const [savePath] = useState<string>(() => {
+  const [savePath, setSavePath] = useState<string>(() => {
     return localStorage.getItem('bs_save_path') || 'C:\\Users\\Public\\Pictures';
   });
 
@@ -62,6 +64,10 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     return localStorage.getItem('bs_selected_mic') || 'Built-in Microphone';
   });
 
+  const [countdownEnabled, setCountdownEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('bs_countdown_enabled') !== 'false';
+  });
+
   const [availableMics, setAvailableMics] = useState<string[]>([
     'Built-in Microphone',
     'External Microphone (Realtek Audio)',
@@ -70,9 +76,29 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   ]);
   const [isMicPickerOpen, setIsMicPickerOpen] = useState<boolean>(false);
 
-  const handleSetView = (nextView: 'launcher' | 'history') => {
+  const handleSetView = (nextView: 'launcher' | 'history' | 'settings') => {
     setView(nextView);
     invoke('set_window_mode', { mode: nextView }).catch(() => {});
+  };
+
+  const handleToggleCountdown = () => {
+    const next = !countdownEnabled;
+    setCountdownEnabled(next);
+    localStorage.setItem('bs_countdown_enabled', String(next));
+    onToast(next ? 'Countdown enabled (3s)' : 'Countdown disabled (starts immediately)');
+  };
+
+  const handleChangeFolder = async () => {
+    try {
+      const selected = await invoke<string | null>('select_folder');
+      if (selected) {
+        setSavePath(selected);
+        localStorage.setItem('bs_save_path', selected);
+        onToast(`Save destination: ${selected}`);
+      }
+    } catch (e) {
+      console.error('Folder selection error:', e);
+    }
   };
 
   useEffect(() => {
@@ -109,7 +135,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
       if (e.key === 'Escape') {
         if (isMicPickerOpen) {
           setIsMicPickerOpen(false);
-        } else if (view === 'history') {
+        } else if (view !== 'launcher') {
           handleSetView('launcher');
         } else {
           onClose();
@@ -239,17 +265,33 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
       <div
         className="modal-header"
         data-tauri-drag-region
+        onMouseDown={async (e) => {
+          if (e.button === 0 && !(e.target as HTMLElement).closest('button, input, a')) {
+            try {
+              await invoke('drag_window');
+            } catch {
+              try {
+                await getCurrentWindow().startDragging();
+              } catch {}
+            }
+          }
+        }}
         style={{ cursor: 'grab' }}
       >
-        {view === 'history' ? (
-          <button
-            className="action-btn"
-            onClick={() => handleSetView('launcher')}
-            style={{ padding: '4px 10px', fontSize: 11 }}
-          >
-            <ArrowLeft size={13} />
-            <span>Back</span>
-          </button>
+        {view !== 'launcher' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              className="action-btn"
+              onClick={() => handleSetView('launcher')}
+              style={{ padding: '4px 10px', fontSize: 11 }}
+            >
+              <ArrowLeft size={13} />
+              <span>Back</span>
+            </button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+              {view === 'history' ? 'Recording History' : 'Settings'}
+            </span>
+          </div>
         ) : (
           <div className="modal-title" data-tauri-drag-region>
             <span className="record-dot-animated" />
@@ -258,6 +300,74 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {view === 'launcher' && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={() => handleSetView('history')}
+                title={`Recording History (${history.length})`}
+                style={{ position: 'relative' }}
+              >
+                <Clock size={15} />
+                {history.length > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--apple-primary, #0071e3)',
+                    }}
+                  />
+                )}
+              </button>
+
+              <button
+                className="icon-btn"
+                onClick={() => handleSetView('settings')}
+                title="Settings"
+              >
+                <Settings size={15} />
+              </button>
+            </>
+          )}
+
+          {view === 'history' && (
+            <button
+              className="icon-btn"
+              onClick={() => handleSetView('settings')}
+              title="Settings"
+            >
+              <Settings size={15} />
+            </button>
+          )}
+
+          {view === 'settings' && (
+            <button
+              className="icon-btn"
+              onClick={() => handleSetView('history')}
+              title={`Recording History (${history.length})`}
+              style={{ position: 'relative' }}
+            >
+              <Clock size={15} />
+              {history.length > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--apple-primary, #0071e3)',
+                  }}
+                />
+              )}
+            </button>
+          )}
+
           <button className="icon-btn" onClick={onClose} title="Close (Esc)">
             <X size={15} />
           </button>
@@ -412,15 +522,26 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
               </button>
             </div>
 
-            {/* Footer Navigation to History */}
+            {/* Footer Navigation: History & Settings */}
             <div className="launcher-footer">
               <button
                 type="button"
                 className="history-link-btn"
                 onClick={() => handleSetView('history')}
+                title="View recording history"
               >
                 <Clock size={13} />
-                <span>View Recordings {history.length > 0 && `(${history.length})`}</span>
+                <span>History {history.length > 0 ? `(${history.length})` : ''}</span>
+              </button>
+              <span className="launcher-footer-dot">•</span>
+              <button
+                type="button"
+                className="history-link-btn"
+                onClick={() => handleSetView('settings')}
+                title="Open settings"
+              >
+                <Settings size={13} />
+                <span>Settings</span>
               </button>
             </div>
           </div>
@@ -543,6 +664,153 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                 onClick={() => handleSetView('launcher')}
               >
                 New Recording
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── SETTINGS VIEW ─────────────────────────────────────────────── */}
+        {view === 'settings' && (
+          <div className="settings-container" style={{ display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingRight: 4, marginTop: 4 }}>
+            {/* Storage Section */}
+            <div className="modal-section">
+              <label className="section-label">Save Destination</label>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--apple-hairline-dark)',
+                  borderRadius: 'var(--apple-rounded-md)',
+                  gap: 10
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: 10, color: 'var(--apple-ink-muted-48)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Folder</span>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-on-dark)', fontFamily: 'var(--apple-font-mono)', wordBreak: 'break-all' }}>
+                    {savePath}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={handleChangeFolder}
+                  style={{ flexShrink: 0, padding: '5px 12px', fontSize: 11 }}
+                >
+                  <FolderOpen size={13} />
+                  <span>Browse</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Preferences Section */}
+            <div className="modal-section">
+              <label className="section-label">Preferences</label>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--apple-hairline-dark)',
+                  borderRadius: 'var(--apple-rounded-md)',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-on-dark)', fontWeight: 500 }}>
+                    3-Second Countdown
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--apple-ink-muted-48)' }}>
+                    {countdownEnabled ? 'Brief countdown before recording starts' : 'Recording starts immediately'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={countdownEnabled}
+                  className={`apple-toggle-switch ${countdownEnabled ? 'checked' : ''}`}
+                  onClick={handleToggleCountdown}
+                  title={countdownEnabled ? 'Disable countdown' : 'Enable 3s countdown'}
+                >
+                  <span className="apple-toggle-thumb" />
+                </button>
+              </div>
+            </div>
+
+            {/* Hardware & Pipeline Info */}
+            <div className="modal-section">
+              <label className="section-label">Recording Engine</label>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--apple-hairline-dark)',
+                  borderRadius: 'var(--apple-rounded-md)',
+                  padding: '10px 12px',
+                  gap: 8
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-muted)' }}>Hardware Acceleration</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--apple-font-mono)', color: 'var(--apple-system-green, #34c759)', fontWeight: 600 }}>
+                    Active (H.264 MFT)
+                  </span>
+                </div>
+                <div style={{ height: 1, background: 'var(--apple-divider-dark)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-muted)' }}>Framerate</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--apple-font-mono)', color: 'var(--apple-body-on-dark)' }}>
+                    30 FPS (Fluid Deadline)
+                  </span>
+                </div>
+                <div style={{ height: 1, background: 'var(--apple-divider-dark)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-muted)' }}>Capture Pipeline</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--apple-font-mono)', color: 'var(--apple-body-on-dark)' }}>
+                    GDI + CAPTUREBLT
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Keyboard Shortcuts */}
+            <div className="modal-section">
+              <label className="section-label">Shortcuts</label>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--apple-hairline-dark)',
+                  borderRadius: 'var(--apple-rounded-md)',
+                  padding: '10px 12px',
+                  gap: 8
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-muted)' }}>Start Recording</span>
+                  <span className="shortcut-tag">Enter</span>
+                </div>
+                <div style={{ height: 1, background: 'var(--apple-divider-dark)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--apple-body-muted)' }}>Cancel / Back / Close</span>
+                  <span className="shortcut-tag">Esc</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Action */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+              <button
+                type="button"
+                className="action-btn primary"
+                onClick={() => handleSetView('launcher')}
+              >
+                Done
               </button>
             </div>
           </div>

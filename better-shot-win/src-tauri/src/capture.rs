@@ -1263,6 +1263,13 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
         }
+        "settings" => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 440.0, height: 580.0 }));
+            let _ = window.set_always_on_top(true);
+            let _ = window.center();
+            let _ = window.set_ignore_cursor_events(false);
+        }
         "area_selection" => {
             let _ = window.set_fullscreen(true);
             let _ = window.set_always_on_top(true);
@@ -1292,3 +1299,9 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
 pub fn close_app_window(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn drag_window(window: tauri::Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
