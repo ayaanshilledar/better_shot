@@ -1392,12 +1392,30 @@ button:focus-visible, input:focus-visible {
   background: var(--apple-surface-tile-1);
   backdrop-filter: var(--apple-backdrop-blur);
   -webkit-backdrop-filter: var(--apple-backdrop-blur);
-  border: 1px solid var(--apple-hairline-dark);
-  border-radius: var(--apple-rounded-lg);
-  box-shadow: var(--apple-modal-shadow);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
   pointer-events: auto;
   user-select: none;
+}
+
+.desktop-win-ctrl {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 4px !important;
+  color: var(--apple-ink-muted-48) !important;
+  transition: background 0.1s ease, color 0.1s ease !important;
+}
+
+.desktop-win-ctrl:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.desktop-win-ctrl.close-ctrl:hover {
+  background: var(--apple-system-red) !important;
+  color: #ffffff !important;
 }
 
 .editor-header {
@@ -1603,7 +1621,7 @@ button:focus-visible, input:focus-visible {
 
 .editor-video-element {
   max-width: 100%;
-  max-height: 380px;
+  max-height: calc(100vh - 270px);
   width: auto;
   height: auto;
   display: block;

@@ -15,7 +15,9 @@ import {
   Video,
   Layers,
   Scissors,
-  Download
+  Download,
+  Minus,
+  Square
 } from 'lucide-react';
 import { RecordingHistoryItem } from '../types/recorder';
 
@@ -122,6 +124,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
         className="editor-header"
         data-tauri-drag-region
         onMouseDown={handleHeaderMouseDown}
+        onDoubleClick={async () => {
+          try {
+            await invoke('toggle_maximize_window');
+          } catch {}
+        }}
       >
         {/* Left: Back to Launcher & Title */}
         <div className="editor-header-left">
@@ -150,7 +157,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions & Close */}
+        {/* Right: Actions & Desktop Window Controls */}
         <div className="editor-header-right">
           <button
             type="button"
@@ -189,9 +196,41 @@ export const EditorView: React.FC<EditorViewProps> = ({
             <span>Export</span>
           </button>
 
+          {/* Desktop Window Controls Separator */}
+          <div className="divider-vertical" style={{ height: 16, margin: '0 2px', opacity: 0.3 }} />
+
+          {/* Minimize */}
           <button
             type="button"
-            className="icon-btn"
+            className="icon-btn desktop-win-ctrl"
+            onClick={async () => {
+              try {
+                await invoke('minimize_window');
+              } catch {}
+            }}
+            title="Minimize"
+          >
+            <Minus size={13} />
+          </button>
+
+          {/* Maximize / Restore */}
+          <button
+            type="button"
+            className="icon-btn desktop-win-ctrl"
+            onClick={async () => {
+              try {
+                await invoke('toggle_maximize_window');
+              } catch {}
+            }}
+            title="Maximize / Restore"
+          >
+            <Square size={10} />
+          </button>
+
+          {/* Close Window */}
+          <button
+            type="button"
+            className="icon-btn desktop-win-ctrl close-ctrl"
             onClick={async () => {
               try {
                 await invoke('close_app_window');
@@ -199,9 +238,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
                 onBack();
               }
             }}
-            title="Close Window"
+            title="Close BetterShot"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       </div>

@@ -3,9 +3,9 @@ mod capture;
 use capture::{
     capture_fullscreen, capture_region, check_recording_alive, close_app_window,
     copy_image_to_clipboard, delete_file, drag_window, generate_video_thumbnail,
-    get_virtual_screen_bounds, open_file, save_image_to_disk, select_folder,
+    get_virtual_screen_bounds, minimize_window, open_file, save_image_to_disk, select_folder,
     set_window_mode, show_in_folder, start_screen_recording, stop_screen_recording,
-    RecordingState,
+    toggle_maximize_window, RecordingState,
 };
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -56,6 +56,8 @@ pub fn run() {
             set_window_mode,
             close_app_window,
             drag_window,
+            toggle_maximize_window,
+            minimize_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

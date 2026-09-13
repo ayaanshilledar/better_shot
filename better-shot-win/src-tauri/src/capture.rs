@@ -1250,6 +1250,7 @@ pub fn delete_file(path: String) -> Result<(), String> {
 pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String> {
     match mode.as_str() {
         "launcher" => {
+            let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
             let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 420.0, height: 560.0 }));
             let _ = window.set_always_on_top(true);
@@ -1257,6 +1258,7 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.set_ignore_cursor_events(false);
         }
         "history" => {
+            let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
             let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 540.0, height: 600.0 }));
             let _ = window.set_always_on_top(true);
@@ -1264,6 +1266,7 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.set_ignore_cursor_events(false);
         }
         "settings" => {
+            let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
             let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 440.0, height: 580.0 }));
             let _ = window.set_always_on_top(true);
@@ -1272,10 +1275,17 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
         }
         "editor" => {
             let _ = window.set_fullscreen(false);
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 1100.0, height: 740.0 }));
             let _ = window.set_always_on_top(false);
-            let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
+            if let Ok(Some(monitor)) = window.primary_monitor() {
+                let mon_size = monitor.size();
+                let scale = monitor.scale_factor();
+                let w = mon_size.width as f64 / scale;
+                let h = mon_size.height as f64 / scale;
+                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: w, height: h }));
+                let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: 0.0, y: 0.0 }));
+            }
+            let _ = window.maximize();
         }
         "area_selection" => {
             let _ = window.set_fullscreen(true);
@@ -1283,6 +1293,7 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.set_ignore_cursor_events(false);
         }
         "recording" => {
+            let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
             let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 380.0, height: 74.0 }));
             let _ = window.set_always_on_top(true);
@@ -1310,5 +1321,24 @@ pub fn close_app_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub fn drag_window(window: tauri::Window) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn toggle_maximize_window(window: tauri::Window) -> Result<(), String> {
+    if let Ok(is_max) = window.is_maximized() {
+        if is_max {
+            let _ = window.unmaximize();
+        } else {
+            let _ = window.maximize();
+        }
+    } else {
+        let _ = window.maximize();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn minimize_window(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
 }
 
