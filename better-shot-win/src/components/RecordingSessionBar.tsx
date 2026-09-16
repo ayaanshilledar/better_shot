@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Square, Pause, Play, Mic, MicOff, Trash2, GripVertical } from 'lucide-react';
+import { Square, Pause, Play, Mic, MicOff, Trash2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -79,7 +79,6 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '0 8px',
         boxSizing: 'border-box',
         pointerEvents: 'auto',
         cursor: 'grab'
@@ -88,109 +87,94 @@ export const RecordingSessionBar: React.FC<RecordingSessionBarProps> = ({
       <div
         data-tauri-drag-region
         onMouseDown={handleStartDrag}
+        className="recording-session-bar"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 8,
-          padding: '5px 12px',
-          borderRadius: 'var(--apple-rounded-pill)',
-          background: 'rgba(20, 20, 22, 0.94)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
+          gap: 10,
+          padding: '6px 14px',
+          borderRadius: '9999px',
+          background: '#161618',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
           userSelect: 'none',
           pointerEvents: 'auto',
           cursor: 'grab'
         }}
       >
-        {/* Drag Grip */}
-        <div
-          data-tauri-drag-region
-          onMouseDown={handleStartDrag}
-          title="Drag to reposition"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            opacity: 0.45,
-            cursor: 'grab',
-            padding: '2px',
-            marginRight: -2
-          }}
-        >
-          <GripVertical size={14} color="#ffffff" />
-        </div>
-
         {countdownSeconds !== null && countdownSeconds > 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 8px' }}>
             <span className="record-dot-animated" />
             <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 13, fontWeight: 700, color: '#ffffff' }}>
-              {countdownSeconds}s
+              {countdownSeconds}
             </span>
           </div>
         ) : (
           <>
-            {/* Timer */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2 }}>
+            {/* Live Recording Dot & Monospace Timer */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 4 }}>
               <span className="record-dot-animated" />
-              <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 12, fontWeight: 700, color: '#ffffff', letterSpacing: '0.04em' }}>
+              <span style={{ fontFamily: 'var(--apple-font-mono)', fontSize: 13, fontWeight: 600, color: '#ffffff', letterSpacing: '0.04em' }}>
                 {formatTime(seconds)}
               </span>
             </div>
 
-            <div className="divider-vertical" style={{ height: 14, opacity: 0.3 }} />
+            <div style={{ width: 1, height: 14, background: 'var(--apple-divider-dark)', margin: '0 2px' }} />
 
-            {/* Pause / Resume */}
+            {/* Pause / Resume Button */}
             <button
+              type="button"
               className="icon-btn"
               title={isPaused ? 'Resume' : 'Pause'}
               onClick={() => setIsPaused(!isPaused)}
-              style={{ width: 26, height: 26, padding: 0 }}
+              style={{ width: 28, height: 28, borderRadius: '50%' }}
             >
-              {isPaused ? <Play size={13} fill="currentColor" /> : <Pause size={13} />}
+              {isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} />}
             </button>
 
-            {/* Mic Mute / Unmute */}
+            {/* Mic Toggle Button */}
             <button
+              type="button"
               className="icon-btn"
               title={micActive ? 'Mute Microphone' : 'Unmute Microphone'}
               onClick={() => setMicActive(!micActive)}
-              style={{ width: 26, height: 26, padding: 0 }}
+              style={{ width: 28, height: 28, borderRadius: '50%' }}
             >
               {micActive ? <Mic size={13} color="var(--apple-primary-on-dark)" /> : <MicOff size={13} color="var(--apple-ink-muted-48)" />}
             </button>
 
-            <div className="divider-vertical" style={{ height: 14, opacity: 0.3 }} />
-
-            {/* Minimal Stop & Save (Clean red circle with white square, no text) */}
+            {/* Stop & Save Action Button */}
             <button
+              type="button"
               title="Stop & Save Recording"
               onClick={() => onStop(seconds)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 24,
-                height: 24,
+                width: 26,
+                height: 26,
                 borderRadius: '50%',
-                background: 'var(--apple-system-red, #ff3b30)',
+                background: 'var(--apple-system-red)',
                 border: 'none',
                 color: '#ffffff',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(255, 59, 48, 0.45)',
+                boxShadow: '0 2px 10px rgba(255, 59, 48, 0.45)',
                 transition: 'var(--apple-transition-micro)',
-                flexShrink: 0
+                flexShrink: 0,
+                marginLeft: 2
               }}
             >
-              <Square size={9} fill="#ffffff" color="#ffffff" />
+              <Square size={10} fill="#ffffff" color="#ffffff" />
             </button>
 
-            {/* Discard */}
+            {/* Discard / Delete Action Button */}
             <button
+              type="button"
               className="icon-btn"
               title="Discard Recording"
               onClick={onDiscard}
-              style={{ width: 26, height: 26, padding: 0 }}
+              style={{ width: 28, height: 28, borderRadius: '50%' }}
             >
               <Trash2 size={13} color="var(--apple-system-red)" />
             </button>

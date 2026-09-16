@@ -30,9 +30,9 @@ interface RecordingModalProps {
   onStartRecord: (config: RecordingConfig) => void;
   history: RecordingHistoryItem[];
   onDeleteHistoryItem: (id: string, filePath: string) => void;
+  onEditHistoryItem?: (item: RecordingHistoryItem) => void;
   onClearHistory: () => void;
   onToast: (msg: string) => void;
-  onOpenInEditor?: (item: RecordingHistoryItem) => void;
   initialView?: 'launcher' | 'history' | 'settings';
 }
 
@@ -42,9 +42,9 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   onStartRecord,
   history,
   onDeleteHistoryItem,
+  onEditHistoryItem,
   onClearHistory,
   onToast,
-  onOpenInEditor,
   initialView = 'launcher'
 }) => {
   const [view, setView] = useState<'launcher' | 'history' | 'settings'>(initialView);
@@ -247,13 +247,25 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   return (
     <div
       className="recording-modal-frame"
+      data-tauri-drag-region
+      onMouseDown={async (e) => {
+        if (e.button === 0 && !(e.target as HTMLElement).closest('button, input, a, select, [role="switch"]')) {
+          try {
+            await invoke('drag_window');
+          } catch {
+            try {
+              await getCurrentWindow().startDragging();
+            } catch {}
+          }
+        }
+      }}
       style={{
         width: '100%',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
-        padding: '16px 20px',
+        padding: '14px 18px',
         background: 'var(--apple-surface-tile-1)',
         backdropFilter: 'var(--apple-backdrop-blur)',
         WebkitBackdropFilter: 'var(--apple-backdrop-blur)',
@@ -262,6 +274,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         boxShadow: 'var(--apple-modal-shadow)',
         overflow: 'hidden',
         pointerEvents: 'auto',
+        cursor: 'grab'
       }}
     >
       {/* Header */}
@@ -379,11 +392,11 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 
         {/* ─── LAUNCHER VIEW ─────────────────────────────────────────────── */}
         {view === 'launcher' && (
-          <div className="launcher-container">
+          <div className="launcher-container" data-tauri-drag-region>
             {/* Hero Message */}
-            <div className="launcher-hero">
-              <h2 className="launcher-heading">Ready to record?</h2>
-              <p className="launcher-subheading">Capture your screen in seconds.</p>
+            <div className="launcher-hero" data-tauri-drag-region>
+              <h2 className="launcher-heading" data-tauri-drag-region>Ready to record?</h2>
+              <p className="launcher-subheading" data-tauri-drag-region>Capture your screen in seconds.</p>
             </div>
 
             {/* Source Selection */}
@@ -553,7 +566,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         {/* ─── HISTORY VIEW ─────────────────────────────────────────────── */}
         {view === 'history' && (
           <div className="history-view-container">
-            <div className="modal-section">
+            <div className="modal-section" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               {history.length === 0 ? (
                 <div className="history-empty">
                   <Video size={36} opacity={0.3} />
@@ -614,8 +627,17 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                         </div>
                       </div>
 
-                      {/* 3. Actions (Play/Open, Reveal in Explorer, Copy path, Delete) */}
+                      {/* 3. Actions (Edit Video, Play/Open, Reveal in Explorer, Copy path, Delete) */}
                       <div className="rec-card-actions">
+                        {onEditHistoryItem && (
+                          <button
+                            className="icon-btn rec-action-btn edit-btn"
+                            title="Edit Video"
+                            onClick={() => onEditHistoryItem(item)}
+                          >
+                            <Scissors size={13} color="var(--apple-primary, #0071e3)" />
+                          </button>
+                        )}
                         <button
                           className="icon-btn rec-action-btn"
                           title="Play / Open"
@@ -623,15 +645,6 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
                         >
                           <Play size={13} fill="currentColor" />
                         </button>
-                        {onOpenInEditor && (
-                          <button
-                            className="icon-btn rec-action-btn"
-                            title="Open in Video Editor"
-                            onClick={() => onOpenInEditor(item)}
-                          >
-                            <Scissors size={13} />
-                          </button>
-                        )}
                         <button
                           className="icon-btn rec-action-btn"
                           title="Reveal in Explorer"
@@ -683,7 +696,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 
         {/* ─── SETTINGS VIEW ─────────────────────────────────────────────── */}
         {view === 'settings' && (
-          <div className="settings-container" style={{ display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingRight: 4, marginTop: 4 }}>
+          <div className="settings-container">
             {/* Storage Section */}
             <div className="modal-section">
               <label className="section-label">Save Destination</label>

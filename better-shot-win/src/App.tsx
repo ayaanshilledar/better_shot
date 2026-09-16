@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { RegionOverlay } from './components/RegionOverlay';
 import { RecordingModal } from './components/RecordingModal';
 import { RecordingSessionBar } from './components/RecordingSessionBar';
-import { EditorView } from './components/EditorView';
+import { VideoEditor } from './components/VideoEditor';
 import { RecorderState, RecordingConfig, RecordingHistoryItem, Rect } from './types/recorder';
 import './App.css';
 
@@ -14,7 +14,7 @@ export function App() {
   const [recordedRegion, setRecordedRegion] = useState<Rect | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [activeEditorItem, setActiveEditorItem] = useState<RecordingHistoryItem | null>(null);
+  const [currentEditingItem, setCurrentEditingItem] = useState<RecordingHistoryItem | null>(null);
 
   const [recordingConfig, setRecordingConfig] = useState<RecordingConfig>({
     mode: 'fullscreen',
@@ -152,10 +152,9 @@ export function App() {
     await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
   };
 
-  // Stop Recording -> Finalize, generate async thumbnail, open history window
+  // Stop Recording -> Finalize, save, and update history/editor
   const handleStopRecording = async (seconds: number) => {
     const currentRegion = recordedRegion;
-    setRecorderState('saving');
 
     try {
       const outputPath = await invoke<string>('stop_screen_recording');
@@ -191,43 +190,32 @@ export function App() {
           return updated;
         });
 
-        setToastMessage(`Saved to: ${outputPath}`);
-        setTimeout(() => setToastMessage(null), 5000);
-
-        // Open Editor view directly with the recorded video
+        // Finish recording -> Redirect directly to Video Editor
         setRecordedRegion(null);
-        setActiveEditorItem(newHistoryItem);
-        setRecorderState('editor');
+        setCurrentEditingItem(newHistoryItem);
         setIsRecordingModalOpen(false);
+        setRecorderState('editor');
         await invoke('set_window_mode', { mode: 'editor' }).catch(() => {});
         return;
       }
     } catch (err) {
       console.error('Stop recording error:', err);
-      setToastMessage(`Recording save error: ${err}`);
-      setTimeout(() => setToastMessage(null), 6000);
     }
-
-    setRecordedRegion(null);
-    setRecorderState('saved');
-    setModalInitialView('history');
-    setIsRecordingModalOpen(true);
-    await invoke('set_window_mode', { mode: 'history' }).catch(() => {});
   };
 
-  // Open any item in Video Editor
-  const handleOpenInEditor = async (item: RecordingHistoryItem) => {
-    setActiveEditorItem(item);
+  // Open Video Editor from History
+  const handleOpenEditor = async (item: RecordingHistoryItem) => {
+    setCurrentEditingItem(item);
     setIsRecordingModalOpen(false);
     setRecorderState('editor');
     await invoke('set_window_mode', { mode: 'editor' }).catch(() => {});
   };
 
-  // Return from Video Editor back to Launcher
-  const handleBackFromEditor = async () => {
-    setActiveEditorItem(null);
+  // Return from Video Editor to Launcher
+  const handleCloseEditor = async () => {
+    setCurrentEditingItem(null);
     setRecorderState('idle');
-    setModalInitialView('launcher');
+    setModalInitialView('history');
     setIsRecordingModalOpen(true);
     await invoke('set_window_mode', { mode: 'launcher' }).catch(() => {});
   };
@@ -283,7 +271,7 @@ export function App() {
   };
 
   return (
-    <div className={`app-container ${recorderState === 'recording' || recorderState === 'countdown' ? 'recording-bar-active' : ''} ${recorderState === 'editor' ? 'editor-active' : ''}`}>
+    <div className={`app-container ${recorderState === 'recording' || recorderState === 'countdown' ? 'recording-bar-active' : ''}`}>
       {/* 1. Fullscreen Region Selection (Only active during drag selection) */}
       {recorderState === 'area_selection' && (
         <RegionOverlay
@@ -306,8 +294,8 @@ export function App() {
           onStartRecord={handleStartRecording}
           history={recordingHistory}
           onDeleteHistoryItem={handleDeleteHistoryItem}
+          onEditHistoryItem={handleOpenEditor}
           onClearHistory={handleClearHistory}
-          onOpenInEditor={handleOpenInEditor}
           initialView={modalInitialView}
           onToast={(msg) => {
             setToastMessage(msg);
@@ -316,7 +304,7 @@ export function App() {
         />
       )}
 
-      {/* 3. Compact Bottom-Pinned Recording Bar (Only 380x74px window - rest of desktop is 100% free) */}
+      {/* 3. Compact Bottom-Pinned Recording Bar (Only 380x74px window) */}
       {(recorderState === 'recording' || recorderState === 'countdown') && (
         <RecordingSessionBar
           isRecording={recorderState === 'recording'}
@@ -327,38 +315,11 @@ export function App() {
         />
       )}
 
-      {/* 4. Saving State Indicator */}
-      {recorderState === 'saving' && (
-        <div className="saving-card" style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}>
-          <div className="saving-spinner" />
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
-            Saving recording...
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--apple-ink-muted-48)' }}>
-            Opening Editor...
-          </span>
-        </div>
-      )}
-
-      {/* 5. Video Editor View (Opened automatically after recording or from History) */}
-      {recorderState === 'editor' && activeEditorItem && (
-        <EditorView
-          item={activeEditorItem}
-          onBack={handleBackFromEditor}
-          onRevealInExplorer={async (path) => {
-            try {
-              await invoke('show_in_folder', { path });
-            } catch (err) {
-              setToastMessage(`Could not reveal folder: ${err}`);
-            }
-          }}
-          onPlayNative={async (path) => {
-            try {
-              await invoke('open_file', { path });
-            } catch (err) {
-              setToastMessage(`Could not open file: ${err}`);
-            }
-          }}
+      {/* 4. Video Editor Page */}
+      {recorderState === 'editor' && currentEditingItem && (
+        <VideoEditor
+          item={currentEditingItem}
+          onBack={handleCloseEditor}
           onToast={(msg) => {
             setToastMessage(msg);
             setTimeout(() => setToastMessage(null), 4000);
@@ -366,28 +327,10 @@ export function App() {
         />
       )}
 
-      {/* 5. Toast Notification */}
+      {/* 5. Toast Notification Banner */}
       {toastMessage && (
         <div className="toast-notification">
-          <span style={{ fontSize: 15 }}>
-            {toastMessage.includes('failed') || toastMessage.includes('error') || toastMessage.includes('terminated') ? '⚠️' : '⚡'}
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{
-              fontWeight: 600,
-              fontSize: 12,
-              color: toastMessage.includes('failed') || toastMessage.includes('error') || toastMessage.includes('terminated')
-                ? 'var(--apple-system-red)'
-                : 'var(--apple-primary-on-dark)'
-            }}>
-              {toastMessage.includes('failed') || toastMessage.includes('error') || toastMessage.includes('terminated')
-                ? 'System Alert'
-                : 'BetterShot'}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--apple-ink-muted-48)', fontFamily: 'var(--apple-font-mono)', wordBreak: 'break-all' }}>
-              {toastMessage.replace('Auto-saved to: ', '').replace('Saved to: ', '')}
-            </span>
-          </div>
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

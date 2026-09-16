@@ -603,7 +603,7 @@ pub fn start_screen_recording(
         (x, y, round_even(width), round_even(height))
     };
 
-    // Configure FFmpeg with zero-latency hardware/fast encoding
+    // Configure FFmpeg with zero-latency hardware/fast encoding & faststart moov placement
     let mut cmd = StdCommand::new("ffmpeg");
 
     cmd.arg("-f").arg("rawvideo")
@@ -615,6 +615,7 @@ pub fn start_screen_recording(
         .arg("-rate_control").arg("cbr")
         .arg("-b:v").arg("6M")
         .arg("-pix_fmt").arg("yuv420p")
+        .arg("-movflags").arg("+faststart")
         .arg("-y")
         .arg(&video_record_file);
 
@@ -645,6 +646,7 @@ pub fn start_screen_recording(
                 .arg("-preset").arg("ultrafast")
                 .arg("-tune").arg("zerolatency")
                 .arg("-pix_fmt").arg("yuv420p")
+                .arg("-movflags").arg("+faststart")
                 .arg("-y")
                 .arg(&video_record_file);
 
@@ -1045,6 +1047,7 @@ pub fn stop_screen_recording(
             .arg("-c:v").arg("copy")
             .arg("-c:a").arg("aac")
             .arg("-b:a").arg("192k")
+            .arg("-movflags").arg("+faststart")
             .arg("-shortest")
             .arg("-y")
             .arg(&output);
@@ -1071,6 +1074,7 @@ pub fn stop_screen_recording(
             .arg("-c:v").arg("copy")
             .arg("-c:a").arg("aac")
             .arg("-b:a").arg("192k")
+            .arg("-movflags").arg("+faststart")
             .arg("-shortest")
             .arg("-y")
             .arg(&output);
@@ -1096,6 +1100,7 @@ pub fn stop_screen_recording(
             .arg("-c:v").arg("copy")
             .arg("-c:a").arg("aac")
             .arg("-b:a").arg("192k")
+            .arg("-movflags").arg("+faststart")
             .arg("-shortest")
             .arg("-y")
             .arg(&output);
@@ -1132,11 +1137,16 @@ pub fn generate_video_thumbnail(video_path: String) -> Result<String, String> {
         return Err("Video file does not exist".to_string());
     }
 
-    let temp_thumb = format!("{}\\thumb_{}.jpg", std::env::temp_dir().display(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let temp_thumb_path = std::env::temp_dir().join(format!("thumb_{}.jpg", timestamp));
+    let temp_thumb = temp_thumb_path.to_string_lossy().to_string();
 
     let mut cmd = StdCommand::new("ffmpeg");
-    cmd.arg("-ss").arg("00:00:00.500")
-        .arg("-i").arg(&video_path)
+    cmd.arg("-i").arg(&video_path)
+        .arg("-ss").arg("00:00:00.100")
         .arg("-vframes").arg("1")
         .arg("-vf").arg("scale=320:-1")
         .arg("-q:v").arg("3")
@@ -1150,11 +1160,10 @@ pub fn generate_video_thumbnail(video_path: String) -> Result<String, String> {
     }
 
     let status = cmd.status().map_err(|e| e.to_string())?;
-    if !status.success() {
-        // Retry at 0.000 if video is very short (< 0.5s)
+    if !status.success() || !temp_thumb_path.exists() {
+        // Retry without -ss seek if clip is very short (< 100ms)
         let mut retry_cmd = StdCommand::new("ffmpeg");
-        retry_cmd.arg("-ss").arg("00:00:00.000")
-            .arg("-i").arg(&video_path)
+        retry_cmd.arg("-i").arg(&video_path)
             .arg("-vframes").arg("1")
             .arg("-vf").arg("scale=320:-1")
             .arg("-q:v").arg("3")
@@ -1169,9 +1178,9 @@ pub fn generate_video_thumbnail(video_path: String) -> Result<String, String> {
         let _ = retry_cmd.status();
     }
 
-    if std::path::Path::new(&temp_thumb).exists() {
-        let bytes = std::fs::read(&temp_thumb).map_err(|e| e.to_string())?;
-        let _ = std::fs::remove_file(&temp_thumb);
+    if temp_thumb_path.exists() {
+        let bytes = std::fs::read(&temp_thumb_path).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&temp_thumb_path);
         Ok(format!("data:image/jpeg;base64,{}", BASE64.encode(&bytes)))
     } else {
         Err("Failed to generate thumbnail".to_string())
@@ -1248,11 +1257,26 @@ pub fn delete_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String> {
+    let _ = window.show();
+    let _ = window.set_focus();
+
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE};
+        if let Ok(hwnd) = window.hwnd() {
+            let affinity = if mode == "editor" { WDA_NONE } else { WDA_EXCLUDEFROMCAPTURE };
+            unsafe {
+                let _ = SetWindowDisplayAffinity(HWND(hwnd.0 as *mut _), affinity);
+            }
+        }
+    }
+
     match mode.as_str() {
         "launcher" => {
             let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 420.0, height: 560.0 }));
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 420.0, height: 410.0 }));
             let _ = window.set_always_on_top(true);
             let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
@@ -1260,7 +1284,7 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
         "history" => {
             let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 540.0, height: 600.0 }));
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 520.0, height: 440.0 }));
             let _ = window.set_always_on_top(true);
             let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
@@ -1268,24 +1292,10 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
         "settings" => {
             let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 440.0, height: 580.0 }));
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 420.0, height: 430.0 }));
             let _ = window.set_always_on_top(true);
             let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
-        }
-        "editor" => {
-            let _ = window.set_fullscreen(false);
-            let _ = window.set_always_on_top(false);
-            let _ = window.set_ignore_cursor_events(false);
-            if let Ok(Some(monitor)) = window.primary_monitor() {
-                let mon_size = monitor.size();
-                let scale = monitor.scale_factor();
-                let w = mon_size.width as f64 / scale;
-                let h = mon_size.height as f64 / scale;
-                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: w, height: h }));
-                let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: 0.0, y: 0.0 }));
-            }
-            let _ = window.maximize();
         }
         "area_selection" => {
             let _ = window.set_fullscreen(true);
@@ -1306,6 +1316,14 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
                 let y = mon_size.height as i32 - bar_h - (36.0 * scale) as i32;
                 let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
             }
+            let _ = window.set_ignore_cursor_events(false);
+        }
+        "editor" => {
+            let _ = window.unmaximize();
+            let _ = window.set_fullscreen(false);
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 960.0, height: 640.0 }));
+            let _ = window.set_always_on_top(false);
+            let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
         }
         _ => {}

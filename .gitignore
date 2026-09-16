@@ -2,6 +2,26 @@
 node_modules/
 **/node_modules/
 
+# Planning, GSD & Agent Metadata
+.planning/
+.agents/
+.gsd/
+*.gsd
+gsd_*.json
+gsd.json
+
+# Media & Temp Recording Files
+*.mp4
+*.mkv
+*.avi
+*.webm
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+thumb_*.jpg
+
 # Production build artifacts
 dist/
 **/dist/
@@ -16,17 +36,17 @@ src-tauri/target/
 # Tauri schema
 **/gen/schemas
 
-# Logs
+# Logs & Scratch
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+scratch/
 
 # Editor / OS files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 .DS_Store
 *.local
@@ -35,3 +55,4 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+

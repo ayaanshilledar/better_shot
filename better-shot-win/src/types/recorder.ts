@@ -6,7 +6,7 @@ export type RecorderState =
   | 'recording'      // Recording active
   | 'saving'         // Finalizing and saving MP4
   | 'saved'          // Finalized and saved
-  | 'editor'         // Video editor view
+  | 'editor'         // Editing recorded video
   | 'error';         // Error state
 
 export type CaptureSource = 'fullscreen' | 'region';
@@ -29,6 +29,14 @@ export interface RecordingHistoryItem {
   width?: number;
   height?: number;
   thumbnailUrl?: string;
+}
+
+export interface VideoEditConfig {
+  isMuted: boolean;
+  trimStartSeconds: number;
+  trimEndSeconds: number;
+  durationSeconds: number;
+  volume: number;
 }
 
 export interface Rect {
