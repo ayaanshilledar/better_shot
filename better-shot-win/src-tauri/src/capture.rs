@@ -1114,6 +1114,30 @@ pub fn stop_screen_recording(
         let _ = mux_cmd.output();
         let _ = std::fs::remove_file(&raw_video_file);
         let _ = std::fs::remove_file(mic_path);
+    } else {
+        if std::path::Path::new(&raw_video_file).exists() {
+            if raw_video_file != output {
+                let mut mux_cmd = StdCommand::new("ffmpeg");
+                mux_cmd
+                    .arg("-i").arg(&raw_video_file)
+                    .arg("-c").arg("copy")
+                    .arg("-movflags").arg("+faststart")
+                    .arg("-y")
+                    .arg(&output);
+
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    mux_cmd.creation_flags(0x08000000);
+                }
+
+                if mux_cmd.output().map(|o| o.status.success()).unwrap_or(false) && std::path::Path::new(&output).exists() {
+                    let _ = std::fs::remove_file(&raw_video_file);
+                } else {
+                    let _ = std::fs::rename(&raw_video_file, &output);
+                }
+            }
+        }
     }
 
     match std::fs::metadata(&output) {
@@ -1319,11 +1343,9 @@ pub fn set_window_mode(window: tauri::Window, mode: String) -> Result<(), String
             let _ = window.set_ignore_cursor_events(false);
         }
         "editor" => {
-            let _ = window.unmaximize();
             let _ = window.set_fullscreen(false);
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 960.0, height: 640.0 }));
+            let _ = window.maximize();
             let _ = window.set_always_on_top(false);
-            let _ = window.center();
             let _ = window.set_ignore_cursor_events(false);
         }
         _ => {}

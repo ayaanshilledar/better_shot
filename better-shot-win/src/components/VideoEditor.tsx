@@ -26,7 +26,8 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({ item, onBack, onToast 
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Convert OS local file path to Tauri Webview asset URL safely
-  const videoSrc = convertFileSrc(item.filePath);
+  const normalizedPath = item.filePath ? item.filePath.replace(/\\/g, '/') : '';
+  const videoSrc = convertFileSrc(normalizedPath);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(item.durationSeconds || 0);
@@ -230,9 +231,11 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({ item, onBack, onToast 
               ref={videoRef}
               src={videoSrc}
               className="video-element"
+              playsInline
               onLoadedMetadata={handleLoadedMetadata}
               onTimeUpdate={handleTimeUpdate}
               onEnded={() => setIsPlaying(false)}
+              onError={(e) => console.error('Video player load error:', e, 'videoSrc:', videoSrc)}
               onClick={togglePlay}
             />
 
