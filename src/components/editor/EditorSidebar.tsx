@@ -100,6 +100,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     onUpdateBackground({
                       presetId: preset.id,
                       gradient: preset.cssValue,
+                      customImageUrl: preset.url || '',
                       type: 'wallpaper'
                     })
                   }

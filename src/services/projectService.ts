@@ -22,6 +22,7 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       type: 'wallpaper',
       presetId: defaultPreset.id,
       gradient: defaultPreset.cssValue,
+      customImageUrl: defaultPreset.url || '',
       color: '#101216',
       blurAmount: 0
     },

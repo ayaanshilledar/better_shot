@@ -1,13 +1,66 @@
 import { WallpaperPreset } from '../types/editor'
 
+import macAsset3 from '../public/wallpaper/mac-asset-3.jpg'
+import macAsset5 from '../public/wallpaper/mac-asset-5.jpg'
+import macAsset6 from '../public/wallpaper/mac-asset-6.jpeg'
+import macAsset8 from '../public/wallpaper/mac-asset-8.jpg'
+import macAsset9 from '../public/wallpaper/mac-asset-9.jpg'
+import macAsset10 from '../public/wallpaper/mac-asset-10.jpg'
+
 export const WALLPAPER_PRESETS: WallpaperPreset[] = [
   {
-    id: 'cosmic-cat',
-    name: 'Cosmic Ocean',
+    id: 'mac-tahoe-blue',
+    name: 'Tahoe Blue',
     type: 'wallpaper',
-    thumbnail: 'radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%)',
-    cssValue: 'radial-gradient(circle at 50% 50%, #1d4ed8 0%, #090d16 80%)',
+    thumbnail: `url(${macAsset10}) center/cover no-repeat`,
+    cssValue: `url(${macAsset10}) center/cover no-repeat`,
+    url: macAsset10,
     dark: true
+  },
+  {
+    id: 'mac-monterey-waves',
+    name: 'Monterey Waves',
+    type: 'wallpaper',
+    thumbnail: `url(${macAsset6}) center/cover no-repeat`,
+    cssValue: `url(${macAsset6}) center/cover no-repeat`,
+    url: macAsset6,
+    dark: true
+  },
+  {
+    id: 'mac-sunset-flow',
+    name: 'Sunset Flow',
+    type: 'wallpaper',
+    thumbnail: `url(${macAsset3}) center/cover no-repeat`,
+    cssValue: `url(${macAsset3}) center/cover no-repeat`,
+    url: macAsset3,
+    dark: true
+  },
+  {
+    id: 'mac-ventura-dunes',
+    name: 'Ventura Dunes',
+    type: 'wallpaper',
+    thumbnail: `url(${macAsset5}) center/cover no-repeat`,
+    cssValue: `url(${macAsset5}) center/cover no-repeat`,
+    url: macAsset5,
+    dark: true
+  },
+  {
+    id: 'mac-chroma-dark',
+    name: 'Chroma Dark',
+    type: 'wallpaper',
+    thumbnail: `url(${macAsset8}) center/cover no-repeat`,
+    cssValue: `url(${macAsset8}) center/cover no-repeat`,
+    url: macAsset8,
+    dark: true
+  },
+  {
+    id: 'mac-horizon-drift',
+    name: 'Horizon Drift',
+    type: 'wallpaper',
+    thumbnail: `url(${macAsset9}) center/cover no-repeat`,
+    cssValue: `url(${macAsset9}) center/cover no-repeat`,
+    url: macAsset9,
+    dark: false
   },
   {
     id: 'aurora-borealis',
@@ -23,46 +76,6 @@ export const WALLPAPER_PRESETS: WallpaperPreset[] = [
     type: 'gradient',
     thumbnail: 'linear-gradient(135deg, #f43f5e 0%, #8b5cf6 50%, #0f172a 100%)',
     cssValue: 'linear-gradient(135deg, #f43f5e 0%, #8b5cf6 50%, #0f172a 100%)',
-    dark: true
-  },
-  {
-    id: 'deep-space',
-    name: 'Deep Space Nebula',
-    type: 'wallpaper',
-    thumbnail: 'radial-gradient(circle at top right, #6366f1 0%, #1e1b4b 60%, #020617 100%)',
-    cssValue: 'radial-gradient(circle at top right, #6366f1 0%, #1e1b4b 50%, #020617 100%)',
-    dark: true
-  },
-  {
-    id: 'pastel-dream',
-    name: 'Pastel Dream',
-    type: 'gradient',
-    thumbnail: 'linear-gradient(135deg, #a5b4fc 0%, #f472b6 50%, #38bdf8 100%)',
-    cssValue: 'linear-gradient(135deg, #a5b4fc 0%, #f472b6 50%, #38bdf8 100%)',
-    dark: false
-  },
-  {
-    id: 'minimal-dark',
-    name: 'Studio Dark',
-    type: 'color',
-    thumbnail: '#12151c',
-    cssValue: '#12151c',
-    dark: true
-  },
-  {
-    id: 'slate-mesh',
-    name: 'Slate Mesh',
-    type: 'gradient',
-    thumbnail: 'linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%)',
-    cssValue: 'linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%)',
-    dark: true
-  },
-  {
-    id: 'emerald-abyss',
-    name: 'Emerald Abyss',
-    type: 'gradient',
-    thumbnail: 'linear-gradient(135deg, #064e3b 0%, #022c22 50%, #0f172a 100%)',
-    cssValue: 'linear-gradient(135deg, #064e3b 0%, #022c22 50%, #0f172a 100%)',
     dark: true
   }
 ]

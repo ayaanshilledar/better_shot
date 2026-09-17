@@ -98,5 +98,6 @@ export interface WallpaperPreset {
   type: 'wallpaper' | 'gradient' | 'color'
   thumbnail: string
   cssValue: string
+  url?: string
   dark?: boolean
 }
