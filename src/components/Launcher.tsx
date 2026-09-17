@@ -8,14 +8,7 @@ import {
   MicOff,
   Volume2,
   VolumeX,
-  Camera,
   ChevronDown,
-  Zap,
-  Film,
-  Image as ImageIcon,
-  HelpCircle,
-  Settings,
-  Bell,
   Minus,
   X,
   Play
@@ -71,21 +64,8 @@ export const Launcher: React.FC<LauncherProps> = ({
           </span>
         </div>
 
-        {/* Right tools & window actions */}
+        {/* Right window actions */}
         <div className="flex items-center gap-1.5 no-drag">
-          {/* Quick mode pill */}
-          <div className="flex items-center bg-[#20232b] p-1 rounded-xl border border-white/5 mr-1">
-            <button className="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/50" title="Quick Record">
-              <Zap className="w-3.5 h-3.5" />
-            </button>
-            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Video Library">
-              <Film className="w-3.5 h-3.5" />
-            </button>
-            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Screenshots">
-              <ImageIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
           <button
             onClick={handleMinimize}
             className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -105,23 +85,6 @@ export const Launcher: React.FC<LauncherProps> = ({
 
       {/* Main Content Body */}
       <div className="p-4 flex-1 flex flex-col gap-3.5 overflow-y-auto">
-        {/* Top utility subheader */}
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <button className="p-1 text-gray-400 hover:text-white transition-colors" title="Help & Docs">
-              <HelpCircle className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="p-1 text-gray-400 hover:text-white transition-colors" title="Settings">
-              <Settings className="w-4 h-4" />
-            </button>
-            <button className="p-1 text-gray-400 hover:text-white transition-colors relative" title="Notifications">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500" />
-            </button>
-          </div>
-        </div>
 
         {/* 2x2 Capture Source Grid */}
         <div className="grid grid-cols-2 gap-2.5">
@@ -200,27 +163,8 @@ export const Launcher: React.FC<LauncherProps> = ({
           </div>
         </div>
 
-        {/* Audio & Video Source Toggles */}
+        {/* Audio Source Toggles */}
         <div className="flex flex-col gap-2 pt-1">
-          {/* Camera toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-3">
-              <Camera className={`w-4 h-4 ${enableCamera ? 'text-blue-400' : 'text-gray-400'}`} />
-              <span className="text-xs font-semibold text-white">
-                {enableCamera ? 'Camera' : 'No Camera'}
-              </span>
-            </div>
-            <button
-              onClick={() => setEnableCamera(!enableCamera)}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                enableCamera
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                  : 'bg-[#2a2e38] text-gray-400 hover:text-white'
-              }`}
-            >
-              {enableCamera ? 'On' : 'Off'}
-            </button>
-          </div>
 
           {/* Microphone toggle */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
