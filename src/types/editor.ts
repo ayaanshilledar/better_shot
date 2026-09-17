@@ -28,11 +28,20 @@ export interface BackgroundConfig {
   blurAmount: number // 0 to 100%
 }
 
+export interface CropRegionData {
+  x: number
+  y: number
+  width: number
+  height: number
+  aspectRatio: string
+}
+
 export interface LayoutConfig {
   padding: number // 0% to 50%
   cornerRadius: number // 0px to 48px
   shadow: ShadowType
   aspectRatio: AspectRatioType
+  cropRegion?: CropRegionData
 }
 
 export interface ExportSettings {

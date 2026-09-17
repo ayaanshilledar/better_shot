@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { StudioProject, StudioRuntimeState } from '../../types/editor'
+import { StudioProject, StudioRuntimeState, CropRegionData } from '../../types/editor'
 import { createDefaultProject } from '../../services/projectService'
 import { EditorTopBar } from './EditorTopBar'
 import { StudioCanvas } from './StudioCanvas'
 import { EditorSidebar } from './EditorSidebar'
 import { EditorTimeline } from './EditorTimeline'
+import { CropModal } from './CropModal'
 
 interface StudioEditorProps {
   recordingFilePath?: string
@@ -15,6 +16,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
   recordingFilePath,
   onCloseEditor
 }) => {
+  const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false)
   const defaultPath = recordingFilePath || 'c:\\Users\\ayaan\\Videos\\BetterShot\\BetterShot_demo.webm'
   const defaultFileName = defaultPath.split(/[\\/]/).pop() || 'recording.webm'
 
@@ -188,16 +190,17 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
   }
 
   const handleToggleCrop = () => {
-    const cycles: Record<string, 'auto' | '16:9' | '1:1' | '9:16'> = {
-      'auto': '16:9',
-      '16:9': '1:1',
-      '1:1': '9:16',
-      '9:16': 'auto'
-    }
-    const nextRatio = cycles[project.layout.aspectRatio] || 'auto'
+    setIsCropModalOpen(true)
+  }
+
+  const handleApplyCrop = (cropData: CropRegionData) => {
     updateProject((p) => ({
       ...p,
-      layout: { ...p.layout, aspectRatio: nextRatio }
+      layout: {
+        ...p.layout,
+        aspectRatio: cropData.aspectRatio as any,
+        cropRegion: cropData
+      }
     }))
   }
 
@@ -214,7 +217,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
   }
 
   return (
-    <div className="w-screen h-screen bg-[#0d0d11] text-white flex flex-col overflow-hidden font-sans select-none">
+    <div className="w-screen h-screen bg-[#0d0d11] text-white flex flex-col overflow-hidden font-sans select-none relative">
       {/* Top Navigation & Action Header */}
       <EditorTopBar
         project={project}
@@ -247,25 +250,6 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           onTogglePlay={handleTogglePlay}
           onTimeUpdate={(t) => setRuntime((r) => ({ ...r, currentTime: t }))}
           onSeek={handleSeek}
-          onZoomChange={(scale) =>
-            updateProject((p) => ({
-              ...p,
-              timeline: {
-                ...p.timeline,
-                zoomEvents: [
-                  {
-                    id: 'zoom_active',
-                    startTime: 0,
-                    duration: p.media.duration || 10,
-                    x: 50,
-                    y: 50,
-                    scale,
-                    easing: 'ease-in-out'
-                  }
-                ]
-              }
-            }))
-          }
         />
 
         <EditorSidebar
@@ -289,6 +273,14 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
 
       {/* Bottom Timeline Section */}
       <EditorTimeline project={project} runtime={runtime} onSeek={handleSeek} />
+
+      {/* Crop Modal Dialog */}
+      <CropModal
+        isOpen={isCropModalOpen}
+        onClose={() => setIsCropModalOpen(false)}
+        project={project}
+        onApplyCrop={handleApplyCrop}
+      />
     </div>
   )
 }
