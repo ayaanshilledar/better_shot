@@ -4,8 +4,9 @@ import fs from 'fs'
 import os from 'os'
 import { fileURLToPath } from 'url'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const _dirname = typeof __dirname !== 'undefined'
+  ? __dirname
+  : path.dirname(fileURLToPath(import.meta.url))
 
 let launcherWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
@@ -23,7 +24,7 @@ function createLauncherWindow() {
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(_dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false // allow media streams & local asset previews
@@ -33,7 +34,7 @@ function createLauncherWindow() {
   if (process.env.VITE_DEV_SERVER_URL) {
     launcherWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#launcher`)
   } else {
-    launcherWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'launcher' })
+    launcherWindow.loadFile(path.join(_dirname, '../dist/index.html'), { hash: 'launcher' })
   }
 
   launcherWindow.once('ready-to-show', () => {
@@ -57,7 +58,7 @@ function createOverlayWindow() {
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(_dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false
@@ -72,7 +73,7 @@ function createOverlayWindow() {
   if (process.env.VITE_DEV_SERVER_URL) {
     overlayWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#overlay`)
   } else {
-    overlayWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'overlay' })
+    overlayWindow.loadFile(path.join(_dirname, '../dist/index.html'), { hash: 'overlay' })
   }
 
   overlayWindow.on('closed', () => {
