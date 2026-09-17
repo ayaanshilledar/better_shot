@@ -23,20 +23,42 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false)
   const [isMuted, setIsMuted] = useState<boolean>(false)
   const [audioLevel, setAudioLevel] = useState<number>(0)
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   useEffect(() => {
-    // Listen for live timer relay from main process (recording engine in launcherWindow)
+    // Listen for live timer relay from main process
     if (window.electronAPI?.onTimerUpdate) {
       const unsubTimer = window.electronAPI.onTimerUpdate((sec) => {
         setSeconds(sec)
+        // Reset countdown when active recording timer starts
+        setCountdown(null)
       })
       const unsubAudio = window.electronAPI.onAudioLevelUpdate?.((level) => {
         setAudioLevel(level)
       })
+      const unsubPaused = window.electronAPI.onPausedStateUpdate?.((paused) => {
+        setIsPaused(paused)
+      })
+      const unsubMuted = window.electronAPI.onMutedStateUpdate?.((muted) => {
+        setIsMuted(muted)
+      })
       return () => {
         unsubTimer()
         if (unsubAudio) unsubAudio()
+        if (unsubPaused) unsubPaused()
+        if (unsubMuted) unsubMuted()
       }
+    }
+  }, [])
+
+  // Listen for countdown updates from main process
+  useEffect(() => {
+    if (window.electronAPI?.onCountdownUpdate) {
+      const unsub = window.electronAPI.onCountdownUpdate((val) => {
+        console.log('[BetterShot:Overlay] Countdown value received:', val)
+        setCountdown(val > 0 ? val : null)
+      })
+      return () => unsub()
     }
   }, [])
 
@@ -49,11 +71,11 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
   const handleTogglePause = () => {
     if (isPaused) {
       console.log('[BetterShot:Overlay] Resume button clicked -> IPC relay')
-      window.electronAPI?.sendOverlayCommand('resume')
+      window.electronAPI?.sendOverlayControl('resume')
       setIsPaused(false)
     } else {
       console.log('[BetterShot:Overlay] Pause button clicked -> IPC relay')
-      window.electronAPI?.sendOverlayCommand('pause')
+      window.electronAPI?.sendOverlayControl('pause')
       setIsPaused(true)
     }
   }
@@ -62,12 +84,12 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
     const nextMuted = !isMuted
     console.log(`[BetterShot:Overlay] Mic mute toggle clicked -> IPC relay (${nextMuted ? 'MUTE' : 'UNMUTE'})`)
     setIsMuted(nextMuted)
-    window.electronAPI?.sendOverlayCommand(nextMuted ? 'mute-mic' : 'unmute-mic')
+    window.electronAPI?.sendOverlayControl(nextMuted ? 'mute-mic' : 'unmute-mic')
   }
 
   const handleStopRecording = () => {
     console.log('[BetterShot:Overlay] Stop & Save Recording clicked -> IPC relay')
-    window.electronAPI?.sendOverlayCommand('stop')
+    window.electronAPI?.sendOverlayControl('stop')
     if (onStop) onStop()
   }
 
@@ -75,13 +97,25 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
     console.log('[BetterShot:Overlay] Restart Recording clicked -> IPC relay')
     setSeconds(0)
     setIsPaused(false)
-    window.electronAPI?.sendOverlayCommand('restart')
+    window.electronAPI?.sendOverlayControl('restart')
   }
 
   const handleDiscardRecording = () => {
     console.log('[BetterShot:Overlay] Discard Recording clicked -> IPC relay')
-    window.electronAPI?.sendOverlayCommand('discard')
+    window.electronAPI?.sendOverlayControl('discard')
     if (onCancel) onCancel()
+  }
+
+  if (countdown !== null && countdown > 0) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-transparent select-none font-sans pointer-events-none">
+        <div className="w-28 h-28 rounded-3xl bg-[#101216]/90 border border-white/20 backdrop-blur-2xl flex items-center justify-center shadow-2xl animate-in zoom-in-75 duration-150">
+          <span className="text-5xl font-black text-white tracking-tighter drop-shadow-lg">
+            {countdown}
+          </span>
+        </div>
+      </div>
+    )
   }
 
   return (

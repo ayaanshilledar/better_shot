@@ -50,7 +50,11 @@ const electronAPI = {
   },
   setOverlayDraggable: (draggable: boolean) => ipcRenderer.send('set-overlay-draggable', draggable),
 
-  // Multi-Window State Relay
+  // Overlay Window Bounds Mode
+  setOverlayMode: (mode: 'countdown' | 'recording'): Promise<boolean> =>
+    ipcRenderer.invoke('set-overlay-mode', mode),
+
+  // Status Relay (Launcher -> Overlay)
   sendTimerUpdate: (seconds: number) => ipcRenderer.send('relay-timer-update', seconds),
   onTimerUpdate: (callback: (seconds: number) => void): (() => void) => {
     const subscription = (_event: any, val: number) => callback(val)
@@ -67,12 +71,38 @@ const electronAPI = {
       ipcRenderer.removeListener('recording-audio-level-update', subscription)
     }
   },
-  sendOverlayCommand: (cmd: string) => ipcRenderer.send('relay-overlay-command', cmd),
-  onOverlayCommand: (callback: (cmd: string) => void): (() => void) => {
-    const subscription = (_event: any, cmd: string) => callback(cmd)
-    ipcRenderer.on('overlay-command', subscription)
+  sendPausedState: (isPaused: boolean) => ipcRenderer.send('relay-paused-state', isPaused),
+  onPausedStateUpdate: (callback: (isPaused: boolean) => void): (() => void) => {
+    const subscription = (_event: any, val: boolean) => callback(val)
+    ipcRenderer.on('recording-paused-update', subscription)
     return () => {
-      ipcRenderer.removeListener('overlay-command', subscription)
+      ipcRenderer.removeListener('recording-paused-update', subscription)
+    }
+  },
+  sendMutedState: (isMuted: boolean) => ipcRenderer.send('relay-muted-state', isMuted),
+  onMutedStateUpdate: (callback: (isMuted: boolean) => void): (() => void) => {
+    const subscription = (_event: any, val: boolean) => callback(val)
+    ipcRenderer.on('recording-muted-update', subscription)
+    return () => {
+      ipcRenderer.removeListener('recording-muted-update', subscription)
+    }
+  },
+  sendCountdownUpdate: (val: number) => ipcRenderer.send('relay-countdown-update', val),
+  onCountdownUpdate: (callback: (val: number) => void): (() => void) => {
+    const subscription = (_event: any, val: number) => callback(val)
+    ipcRenderer.on('recording-countdown-update', subscription)
+    return () => {
+      ipcRenderer.removeListener('recording-countdown-update', subscription)
+    }
+  },
+
+  // Controls Relay (Overlay -> Launcher)
+  sendOverlayControl: (cmd: string) => ipcRenderer.send('relay-overlay-control', cmd),
+  onLauncherControl: (callback: (cmd: string) => void): (() => void) => {
+    const subscription = (_event: any, cmd: string) => callback(cmd)
+    ipcRenderer.on('launcher-control-command', subscription)
+    return () => {
+      ipcRenderer.removeListener('launcher-control-command', subscription)
     }
   },
 

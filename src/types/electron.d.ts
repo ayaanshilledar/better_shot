@@ -15,14 +15,23 @@ declare global {
       minimizeLauncher: () => void
       closeLauncher: () => void
       setOverlayDraggable: (draggable: boolean) => void
+      setOverlayMode: (mode: 'countdown' | 'recording') => Promise<boolean>
 
       // State Relay
       sendTimerUpdate: (seconds: number) => void
       onTimerUpdate: (callback: (seconds: number) => void) => () => void
       sendAudioLevelUpdate: (level: number) => void
       onAudioLevelUpdate: (callback: (level: number) => void) => () => void
-      sendOverlayCommand: (cmd: string) => void
-      onOverlayCommand: (callback: (cmd: string) => void) => () => void
+      sendPausedState: (isPaused: boolean) => void
+      onPausedStateUpdate: (callback: (isPaused: boolean) => void) => () => void
+      sendMutedState: (isMuted: boolean) => void
+      onMutedStateUpdate: (callback: (isMuted: boolean) => void) => () => void
+      sendCountdownUpdate: (val: number) => void
+      onCountdownUpdate: (callback: (val: number) => void) => () => void
+
+      // Controls Relay
+      sendOverlayControl: (cmd: string) => void
+      onLauncherControl: (callback: (cmd: string) => void) => () => void
 
       // Recordings Manager
       getRecordings: () => Promise<RecordedFile[]>

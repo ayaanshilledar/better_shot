@@ -75,25 +75,31 @@ export const App: React.FC = () => {
     })
   }, [])
 
-  // Listen for incoming commands from overlayWindow in launcherWindow
+  // Listen for incoming control commands from overlayWindow in launcherWindow
   useEffect(() => {
-    if (window.electronAPI?.onOverlayCommand) {
-      const unsub = window.electronAPI.onOverlayCommand((cmd) => {
-        console.log('[BetterShot:App] Received overlay command in launcherWindow:', cmd)
+    if (window.electronAPI?.onLauncherControl) {
+      const unsub = window.electronAPI.onLauncherControl(async (cmd) => {
+        console.log('[BetterShot:App] Received overlay control command in launcherWindow:', cmd)
         if (cmd === 'stop') {
-          handleStopRecording()
+          await handleStopRecording()
         } else if (cmd === 'cancel' || cmd === 'discard') {
-          handleCancelRecording()
+          await handleCancelRecording()
         } else if (cmd === 'pause') {
           recorderService.pauseRecording()
+          window.electronAPI?.sendPausedState(true)
         } else if (cmd === 'resume') {
           recorderService.resumeRecording()
+          window.electronAPI?.sendPausedState(false)
         } else if (cmd === 'mute-mic') {
           recorderService.toggleMicMute(true)
+          window.electronAPI?.sendMutedState(true)
         } else if (cmd === 'unmute-mic') {
           recorderService.toggleMicMute(false)
+          window.electronAPI?.sendMutedState(false)
         } else if (cmd === 'restart') {
-          recorderService.restartRecording()
+          await recorderService.restartRecording()
+          window.electronAPI?.sendPausedState(false)
+          window.electronAPI?.sendTimerUpdate(0)
         }
       })
       return () => {
@@ -101,6 +107,28 @@ export const App: React.FC = () => {
       }
     }
   }, [])
+
+  const runCountdownSequence = async (): Promise<boolean> => {
+    if (window.electronAPI?.startRecordingMode) {
+      await window.electronAPI.startRecordingMode()
+    }
+    if (window.electronAPI?.setOverlayMode) {
+      await window.electronAPI.setOverlayMode('countdown')
+    }
+
+    // Minimal 3 -> 2 -> 1 centered countdown
+    for (let count = 3; count >= 1; count--) {
+      console.log(`[BetterShot:App] Countdown step: ${count}`)
+      window.electronAPI?.sendCountdownUpdate(count)
+      await new Promise((res) => setTimeout(res, 1000))
+    }
+
+    window.electronAPI?.sendCountdownUpdate(0)
+    if (window.electronAPI?.setOverlayMode) {
+      await window.electronAPI.setOverlayMode('recording')
+    }
+    return true
+  }
 
   const startAreaRecordingWithRegion = async (cropRegion: CropRegion) => {
     console.log('[BetterShot:App] Starting area recording with region:', cropRegion)
@@ -127,10 +155,8 @@ export const App: React.FC = () => {
     }
 
     try {
+      await runCountdownSequence()
       await recorderService.startRecording(config)
-      if (window.electronAPI?.startRecordingMode) {
-        await window.electronAPI.startRecordingMode()
-      }
     } catch (err) {
       console.error('[BetterShot:App] Error starting area recording:', err)
       alert(`Could not start area recording: ${err instanceof Error ? err.message : String(err)}`)
@@ -173,10 +199,8 @@ export const App: React.FC = () => {
     }
 
     try {
+      await runCountdownSequence()
       await recorderService.startRecording(config)
-      if (window.electronAPI?.startRecordingMode) {
-        await window.electronAPI.startRecordingMode()
-      }
     } catch (err) {
       console.error('[BetterShot:App] Error initiating recording:', err)
       alert(`Could not start recording: ${err instanceof Error ? err.message : String(err)}`)

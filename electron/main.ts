@@ -346,7 +346,32 @@ ipcMain.on('set-overlay-draggable', (_event, draggable: boolean) => {
   }
 })
 
-// IPC Multi-Window State Relay
+ipcMain.handle('set-overlay-mode', (_event, mode: 'countdown' | 'recording') => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenW, height: screenH } = primaryDisplay.bounds
+
+  if (mode === 'countdown') {
+    overlayWindow.setBounds({
+      x: 0,
+      y: 0,
+      width: screenW,
+      height: screenH
+    })
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver')
+  } else {
+    overlayWindow.setBounds({
+      x: Math.round((screenW - 270) / 2),
+      y: 30,
+      width: 270,
+      height: 48
+    })
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver')
+  }
+  return true
+})
+
+// IPC Multi-Window State Relay (Launcher -> Overlay)
 ipcMain.on('relay-timer-update', (_event, seconds: number) => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('recording-timer-update', seconds)
@@ -359,9 +384,28 @@ ipcMain.on('relay-audio-level', (_event, level: number) => {
   }
 })
 
-ipcMain.on('relay-overlay-command', (_event, command: string) => {
+ipcMain.on('relay-paused-state', (_event, isPaused: boolean) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('recording-paused-update', isPaused)
+  }
+})
+
+ipcMain.on('relay-muted-state', (_event, isMuted: boolean) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('recording-muted-update', isMuted)
+  }
+})
+
+ipcMain.on('relay-countdown-update', (_event, val: number) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('recording-countdown-update', val)
+  }
+})
+
+// IPC Multi-Window Controls Relay (Overlay -> Launcher)
+ipcMain.on('relay-overlay-control', (_event, command: string) => {
   if (launcherWindow && !launcherWindow.isDestroyed()) {
-    launcherWindow.webContents.send('overlay-command', command)
+    launcherWindow.webContents.send('launcher-control-command', command)
   }
 })
 

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "start": "electron .",
+    "start": "npm run build && electron .",
     "smoke:electron": "npm run build && node scripts/electron-launch-smoke.mjs",
     "preview": "vite preview"
   },
