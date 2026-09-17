@@ -1,7 +1,8 @@
 import React from 'react'
 import {
   Image,
-  Sliders
+  Sliders,
+  Ban
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, ShadowType } from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
@@ -37,8 +38,8 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   return (
     <aside className="w-80 bg-[#12141a] border-l border-white/10 flex flex-col select-none z-20">
       {/* Top Sidebar Navigation Tabs */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-[#161922]">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-3 py-2 bg-[#161922]">
+        <div className="flex items-center gap-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = runtime.selectedTab === tab.id
@@ -46,14 +47,14 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id as any)}
-                className={`p-2 rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-md'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
-                title={tab.label}
               >
                 <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
               </button>
             )
           })}
@@ -62,63 +63,64 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
       {/* Main Settings Panel Content */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar">
-        {/* Background Tab Content - Single Wallpapers Section */}
+        {/* Background Tab Content - Wallpapers Grid with None option */}
         {runtime.selectedTab === 'background' && (
-          <div className="flex flex-col gap-4">
-            {/* Header & Reset Action */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Wallpapers</span>
-              <button
-                onClick={() => {
-                  onUpdateBackground({ type: 'none', presetId: 'none', gradient: '', color: 'transparent', blurAmount: 0 })
-                  onUpdateLayout({ padding: 0 })
-                }}
-                className={`text-[11px] font-semibold transition-colors cursor-pointer ${
-                  project.background.type === 'none' ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                ✕ None
-              </button>
-            </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* "None" Wallpaper Option Card */}
+            <button
+              onClick={() => {
+                onUpdateBackground({ type: 'none', presetId: 'none', gradient: '', color: 'transparent', blurAmount: 0 })
+                onUpdateLayout({ padding: 0 })
+              }}
+              className={`h-24 rounded-xl relative overflow-hidden transition-all border-2 text-left group cursor-pointer flex flex-col items-center justify-center gap-1.5 bg-[#181b24] ${
+                project.background.type === 'none'
+                  ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-lg scale-[1.02]'
+                  : 'border-white/5 hover:border-white/20'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 group-hover:text-white transition-colors">
+                <Ban className="w-4 h-4" />
+              </div>
+              <span className="text-[11px] font-semibold text-gray-300">
+                None
+              </span>
+            </button>
 
             {/* Wallpaper Presets Gallery Grid */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {WALLPAPER_PRESETS.map((preset) => {
-                const isSelected = project.background.presetId === preset.id && project.background.type !== 'none'
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() =>
-                      onUpdateBackground({
-                        presetId: preset.id,
-                        gradient: preset.cssValue,
-                        type: 'wallpaper'
-                      })
-                    }
-                    className={`h-24 rounded-xl relative overflow-hidden transition-all border-2 text-left group cursor-pointer ${
-                      isSelected
-                        ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-lg scale-[1.02]'
-                        : 'border-white/5 hover:border-white/20'
-                    }`}
-                    style={{ background: preset.thumbnail }}
-                  >
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-white drop-shadow-md truncate">
-                        {preset.name}
-                      </span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            {WALLPAPER_PRESETS.map((preset) => {
+              const isSelected = project.background.presetId === preset.id && project.background.type !== 'none'
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() =>
+                    onUpdateBackground({
+                      presetId: preset.id,
+                      gradient: preset.cssValue,
+                      type: 'wallpaper'
+                    })
+                  }
+                  className={`h-24 rounded-xl relative overflow-hidden transition-all border-2 text-left group cursor-pointer ${
+                    isSelected
+                      ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-lg scale-[1.02]'
+                      : 'border-white/5 hover:border-white/20'
+                  }`}
+                  style={{ background: preset.thumbnail }}
+                >
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-white drop-shadow-md truncate">
+                      {preset.name}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
 
         {/* Layout & Framing Controls (Only shown when Layout tab is selected) */}
         {runtime.selectedTab === 'layout' && (
           <div className="flex flex-col gap-5">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Layout & Framing</span>
 
             {/* Blur Slider */}
             <div className="flex flex-col gap-2">
