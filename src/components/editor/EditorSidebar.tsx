@@ -3,7 +3,9 @@ import {
   Image,
   Sliders,
   Ban,
-  Download
+  Download,
+  Volume2,
+  VolumeX
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, ShadowType } from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
@@ -28,6 +30,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const tabs = [
     { id: 'background', label: 'Background', icon: Image },
     { id: 'layout', label: 'Layout', icon: Sliders },
+    { id: 'audio', label: 'Audio', icon: Volume2 },
     { id: 'export', label: 'Export', icon: Download }
   ] as const
 
@@ -43,7 +46,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     <aside className="w-80 bg-[#12141a] border-l border-white/10 flex flex-col select-none z-20">
       {/* Smooth Segmented Tab Switcher Bar */}
       <div className="p-3 bg-[#161922]">
-        <div className="grid grid-cols-3 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
+        <div className="grid grid-cols-4 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = runtime.selectedTab === tab.id
@@ -51,7 +54,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id as any)}
-                className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`py-1.5 px-1 rounded-lg flex items-center justify-center gap-1 text-[11px] font-semibold transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -195,6 +198,55 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Audio Controls Tab Content */}
+        {runtime.selectedTab === 'audio' && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between text-xs pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2 font-semibold text-gray-200">
+                {project.layout.isMuted ? (
+                  <VolumeX className="w-4 h-4 text-red-400" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-blue-400" />
+                )}
+                <span>Video Track Audio</span>
+              </div>
+              <button
+                onClick={() => onUpdateLayout({ isMuted: !project.layout.isMuted })}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  project.layout.isMuted
+                    ? 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
+                    : 'bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30'
+                }`}
+              >
+                {project.layout.isMuted ? 'Unmute' : 'Mute'}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-300">Volume Level</span>
+                <span className="font-mono text-blue-400 font-semibold">
+                  {project.layout.isMuted ? 'Muted' : `${Math.round(project.layout.volume ?? 100)}%`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={project.layout.isMuted ? 0 : (project.layout.volume ?? 100)}
+                onChange={(e) => {
+                  const newVol = parseInt(e.target.value, 10)
+                  onUpdateLayout({
+                    volume: newVol,
+                    isMuted: newVol === 0
+                  })
+                }}
+                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+              />
             </div>
           </div>
         )}

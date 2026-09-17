@@ -33,7 +33,9 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       aspectRatio: 'auto',
       x: 0,
       y: 0,
-      scale: 1
+      scale: 1,
+      volume: 100,
+      isMuted: false
     },
     timeline: {
       clips: [],

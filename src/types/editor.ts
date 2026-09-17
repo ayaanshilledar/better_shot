@@ -47,6 +47,8 @@ export interface LayoutConfig {
   width?: number
   height?: number
   scale?: number
+  volume?: number // 0 to 100
+  isMuted?: boolean
 }
 
 export interface ExportSettings {
@@ -84,7 +86,7 @@ export interface StudioRuntimeState {
   errorMessage?: string
   currentTime: number
   isPlaying: boolean
-  selectedTab: 'background' | 'layout' | 'export'
+  selectedTab: 'background' | 'layout' | 'audio' | 'export'
   selectedClipId: string | null
   previewScale: 'full' | 'half' | 'quarter'
   timelineZoom?: number

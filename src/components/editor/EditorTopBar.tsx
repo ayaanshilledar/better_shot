@@ -109,29 +109,31 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         )}
       </div>
 
-      {/* Center Section: Preview Scale Selector */}
-      <div className="flex items-center gap-1 bg-[#161922] p-0.5 rounded-lg border border-white/5 no-drag">
-        {(['full', 'half', 'quarter'] as const).map((scale) => {
-          const labels = { full: '100% Full', half: '50% Half', quarter: '25% Quarter' }
-          const isActive = currentScale === scale
-          return (
-            <button
-              key={scale}
-              onClick={() => onScaleChange && onScaleChange(scale)}
-              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {labels[scale]}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Right Section: Export & Window Controls */}
+      {/* Right Section: Preview Scale Selector + Window Controls */}
       <div className="flex items-center gap-3 no-drag">
+        {/* Preview Scale Selector (Right Aligned) */}
+        <div className="flex items-center gap-1 bg-[#161922] p-0.5 rounded-lg border border-white/5">
+          {(['full', 'half', 'quarter'] as const).map((scale) => {
+            const labels = { full: '100% Full', half: '50% Half', quarter: '25% Quarter' }
+            const isActive = currentScale === scale
+            return (
+              <button
+                key={scale}
+                onClick={() => onScaleChange && onScaleChange(scale)}
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {labels[scale]}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="h-4 w-px bg-white/10" />
+
         {/* Window controls */}
         <div className="flex items-center gap-1">
           <button

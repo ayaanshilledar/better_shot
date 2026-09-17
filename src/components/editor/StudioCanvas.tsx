@@ -128,6 +128,16 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     }
   }, [project.layout.width, project.layout.height, project.media.width, project.media.height])
 
+  // Synchronize audio volume & muted state with video element
+  useEffect(() => {
+    if (videoRef.current) {
+      const isMuted = Boolean(project.layout.isMuted)
+      const vol = (project.layout.volume ?? 100) / 100
+      videoRef.current.muted = isMuted
+      videoRef.current.volume = isMuted ? 0 : Math.max(0, Math.min(1, vol))
+    }
+  }, [project.layout.volume, project.layout.isMuted, videoRef.current])
+
   // Mouse Down Drag Handler on Video Element
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return
