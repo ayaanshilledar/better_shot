@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Check, X, Move } from 'lucide-react'
+import { Move } from 'lucide-react'
 import { CropRegion } from '../../electron/preload'
 
 export const AreaSelectorOverlay: React.FC = () => {
@@ -14,14 +14,11 @@ export const AreaSelectorOverlay: React.FC = () => {
       if (e.key === 'Escape') {
         console.log('[BetterShot:AreaSelector] Cancelled via Escape key')
         window.electronAPI?.cancelAreaSelection()
-      } else if (e.key === 'Enter' && selection && selection.width > 10 && selection.height > 10) {
-        console.log('[BetterShot:AreaSelector] Confirmed via Enter key')
-        handleConfirm()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selection])
+  }, [])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const x = e.clientX
@@ -47,32 +44,30 @@ export const AreaSelectorOverlay: React.FC = () => {
     setSelection({ x: left, y: top, width, height })
   }
 
-  const handleMouseUp = () => {
-    if (isDragging && selection) {
-      console.log(`[BetterShot:AreaSelector] Selection finished: x=${selection.x}, y=${selection.y}, w=${selection.width}, h=${selection.height}`)
-    }
-    setIsDragging(false)
-  }
-
-  const handleConfirm = () => {
-    if (!selection || selection.width < 10 || selection.height < 10) return
+  const confirmRegion = (sel: { x: number; y: number; width: number; height: number }) => {
+    if (sel.width < 10 || sel.height < 10) return
 
     const cropRegion: CropRegion = {
-      x: selection.x,
-      y: selection.y,
-      width: selection.width,
-      height: selection.height,
+      x: sel.x,
+      y: sel.y,
+      width: sel.width,
+      height: sel.height,
       screenWidth: window.innerWidth,
       screenHeight: window.innerHeight
     }
 
-    console.log('[BetterShot:AreaSelector] Confirming area selection region:', cropRegion)
+    console.log('[BetterShot:AreaSelector] Auto-confirming area selection region:', cropRegion)
     window.electronAPI?.confirmAreaSelection(cropRegion)
   }
 
-  const handleCancel = () => {
-    console.log('[BetterShot:AreaSelector] Cancelled via button click')
-    window.electronAPI?.cancelAreaSelection()
+  const handleMouseUp = () => {
+    if (isDragging && selection) {
+      console.log(`[BetterShot:AreaSelector] Selection finished: x=${selection.x}, y=${selection.y}, w=${selection.width}, h=${selection.height}`)
+      if (selection.width > 20 && selection.height > 20) {
+        confirmRegion(selection)
+      }
+    }
+    setIsDragging(false)
   }
 
   return (
@@ -94,7 +89,7 @@ export const AreaSelectorOverlay: React.FC = () => {
       {/* Selection Box Render */}
       {selection && (
         <div
-          className="absolute border-2 border-blue-500 bg-blue-500/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-auto flex flex-col justify-between"
+          className="absolute border-2 border-blue-500 bg-blue-500/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none flex flex-col justify-between"
           style={{
             left: `${selection.x}px`,
             top: `${selection.y}px`,
@@ -106,33 +101,6 @@ export const AreaSelectorOverlay: React.FC = () => {
           <div className="absolute -top-7 left-0 bg-blue-600 text-white text-[11px] font-mono font-bold px-2 py-0.5 rounded shadow">
             {Math.round(selection.width)} × {Math.round(selection.height)} px
           </div>
-
-          {/* Action Toolbar on Mouse Up */}
-          {!isDragging && selection.width > 20 && selection.height > 20 && (
-            <div className="absolute -bottom-10 right-0 flex items-center gap-1.5 bg-[#12141a] border border-white/15 p-1 rounded-xl shadow-xl z-50">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleCancel()
-                }}
-                className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
-                title="Cancel (Esc)"
-              >
-                <X className="w-4 h-4 text-rose-400" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleConfirm()
-                }}
-                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/30 transition-all cursor-pointer"
-                title="Confirm Area Selection (Enter)"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Start Recording</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

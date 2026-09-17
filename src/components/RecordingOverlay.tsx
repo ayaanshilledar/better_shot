@@ -142,14 +142,12 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
   if (countdown !== null && countdown > 0) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-transparent select-none font-sans pointer-events-none">
-        <div
+        <span
           key={countdown}
-          className="w-32 h-32 rounded-3xl bg-[#101216]/90 border border-white/20 backdrop-blur-2xl flex items-center justify-center shadow-[0_0_60px_rgba(0,0,0,0.6)] animate-in zoom-in-50 fade-in duration-200"
+          className="text-8xl font-black text-white drop-shadow-[0_10px_25px_rgba(0,0,0,0.85)] animate-in zoom-in-50 fade-in duration-200 font-sans"
         >
-          <span className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-gray-300 tracking-tighter drop-shadow-xl font-sans">
-            {countdown}
-          </span>
-        </div>
+          {countdown}
+        </span>
       </div>
     )
   }
