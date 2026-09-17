@@ -111,7 +111,7 @@ function createLauncherWindow() {
 
 function createOverlayWindow() {
   overlayWindow = new BrowserWindow({
-    width: 270,
+    width: 290,
     height: 48,
     resizable: false,
     frame: false,
@@ -130,8 +130,11 @@ function createOverlayWindow() {
   })
 
   const primaryDisplay = screen.getPrimaryDisplay()
-  const { width } = primaryDisplay.workAreaSize
-  overlayWindow.setPosition(Math.round((width - 270) / 2), 30)
+  const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
+  overlayWindow.setPosition(
+    displayX + Math.round((screenW - 290) / 2),
+    displayY + screenH - 48 - 30
+  )
 
   observeSmokeWindow('overlay', overlayWindow)
 
@@ -348,21 +351,22 @@ ipcMain.on('set-overlay-draggable', (_event, draggable: boolean) => {
 ipcMain.handle('set-overlay-mode', (_event, mode: 'countdown' | 'recording') => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return false
   const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenW, height: screenH } = primaryDisplay.bounds
+  const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
 
   if (mode === 'countdown') {
+    const { width: fullW, height: fullH, x: fullX, y: fullY } = primaryDisplay.bounds
     overlayWindow.setBounds({
-      x: 0,
-      y: 0,
-      width: screenW,
-      height: screenH
+      x: fullX,
+      y: fullY,
+      width: fullW,
+      height: fullH
     })
     overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   } else {
     overlayWindow.setBounds({
-      x: Math.round((screenW - 270) / 2),
-      y: 30,
-      width: 270,
+      x: displayX + Math.round((screenW - 290) / 2),
+      y: displayY + screenH - 48 - 30,
+      width: 290,
       height: 48
     })
     overlayWindow.setAlwaysOnTop(true, 'screen-saver')

@@ -10,10 +10,8 @@ import {
   X,
   Play,
   History,
-  FolderOpen,
   Film,
   Clock,
-  RefreshCw,
   Trash2
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
@@ -53,6 +51,16 @@ export const Launcher: React.FC<LauncherProps> = ({
       handleOpenHistory()
     }
   }, [autoOpenHistory])
+
+  // Auto-refresh recordings list every 2 seconds while history modal is open
+  useEffect(() => {
+    if (!isHistoryOpen) return
+    loadRecordings()
+    const interval = setInterval(() => {
+      loadRecordings()
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isHistoryOpen])
 
   const handleModeClick = (mode: CaptureMode) => {
     console.log(`[BetterShot:Launcher] Capture mode changed to: ${mode}`)
@@ -276,22 +284,9 @@ export const Launcher: React.FC<LauncherProps> = ({
             </h3>
             <div className="flex items-center gap-1">
               <button
-                onClick={loadRecordings}
-                className="p-1 text-gray-400 hover:text-white rounded transition-colors"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingHistory ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={handleOpenFolder}
-                className="p-1 text-gray-400 hover:text-white rounded transition-colors"
-                title="Open Folder"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
-              </button>
-              <button
                 onClick={() => setIsHistoryOpen(false)}
                 className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                title="Close"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

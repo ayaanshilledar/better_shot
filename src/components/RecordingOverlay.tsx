@@ -6,7 +6,8 @@ import {
   Pause,
   Play,
   RotateCcw,
-  Trash2
+  Trash2,
+  GripVertical
 } from 'lucide-react'
 import { recorderService } from '../services/recorder'
 
@@ -155,7 +156,18 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
 
   return (
     <div className="drag-region w-full h-full flex items-center justify-center select-none font-sans">
-      <div className="no-drag bg-[#101216]/95 backdrop-blur-xl border border-white/10 px-3.5 py-1.5 rounded-xl flex items-center gap-2.5 shadow-2xl text-white">
+      <div className="drag-region bg-[#101216]/95 backdrop-blur-xl border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-2xl text-white hover:border-white/20 transition-colors">
+        {/* Draggable Grip Handle */}
+        <div
+          className="drag-region flex items-center justify-center text-gray-400 hover:text-white cursor-grab active:cursor-grabbing px-0.5"
+          title="Drag to reposition toolbar"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </div>
+
+        {/* Vertical Divider */}
+        <div className="w-[1px] h-3.5 bg-white/15 drag-region" />
+
         {/* Stop Recording & Live Timer */}
         <button
           onClick={handleStopRecording}
