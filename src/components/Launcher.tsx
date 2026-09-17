@@ -18,9 +18,12 @@ import {
   Bell,
   Minus,
   X,
-  Play
+  Play,
+  Target
 } from 'lucide-react'
 import { DesktopSource } from '../../electron/preload'
+import { APP_CONFIG } from '../config/appConfig'
+import { DeviceInfo } from '../hooks/useMediaDevices'
 
 interface LauncherProps {
   onStartRecording: (mode: 'display' | 'window' | 'area' | 'camera') => void
@@ -32,6 +35,12 @@ interface LauncherProps {
   setEnableMic: (val: boolean) => void
   enableSystemAudio: boolean
   setEnableSystemAudio: (val: boolean) => void
+  cameras: DeviceInfo[]
+  mics: DeviceInfo[]
+  selectedCameraId: string
+  setSelectedCameraId: (id: string) => void
+  selectedMicId: string
+  setSelectedMicId: (id: string) => void
 }
 
 export const Launcher: React.FC<LauncherProps> = ({
@@ -43,21 +52,28 @@ export const Launcher: React.FC<LauncherProps> = ({
   enableMic,
   setEnableMic,
   enableSystemAudio,
-  setEnableSystemAudio
+  setEnableSystemAudio,
+  cameras,
+  mics,
+  selectedCameraId,
+  setSelectedCameraId,
+  selectedMicId,
+  setSelectedMicId
 }) => {
   const [activeCaptureMode, setActiveCaptureMode] = useState<'display' | 'window' | 'area' | 'camera'>('display')
+  const [showMicMenu, setShowMicMenu] = useState<boolean>(false)
+  const [showCamMenu, setShowCamMenu] = useState<boolean>(false)
 
   const handleMinimize = () => {
-    if (window.electronAPI?.minimizeLauncher) {
-      window.electronAPI.minimizeLauncher()
-    }
+    window.electronAPI?.minimizeLauncher()
   }
 
   const handleClose = () => {
-    if (window.electronAPI?.closeLauncher) {
-      window.electronAPI.closeLauncher()
-    }
+    window.electronAPI?.closeLauncher()
   }
+
+  const currentMicLabel = mics.find(m => m.deviceId === selectedMicId)?.label || 'Microphone'
+  const currentCamLabel = cameras.find(c => c.deviceId === selectedCameraId)?.label || 'Webcam Camera'
 
   return (
     <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none">
@@ -65,12 +81,12 @@ export const Launcher: React.FC<LauncherProps> = ({
       <div className="drag-region px-4 py-3 flex items-center justify-between border-b border-white/5 bg-[#14171d]/80">
         {/* Left branding */}
         <div className="flex items-center gap-2.5 no-drag">
-          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-white/10">
-            <div className="w-4 h-4 rounded-full border-2 border-black" />
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
+            <Target className="w-4 h-4 text-white" />
           </div>
-          <span className="text-xl font-extrabold tracking-tight text-white">Cap</span>
-          <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-full border border-white/10">
-            Personal
+          <span className="text-lg font-extrabold tracking-tight text-white">{APP_CONFIG.appName}</span>
+          <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-full border border-white/10">
+            {APP_CONFIG.workspaceLabel}
           </span>
         </div>
 
@@ -78,13 +94,13 @@ export const Launcher: React.FC<LauncherProps> = ({
         <div className="flex items-center gap-1.5 no-drag">
           {/* Quick mode pill */}
           <div className="flex items-center bg-[#20232b] p-1 rounded-xl border border-white/5 mr-1">
-            <button className="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/50">
+            <button className="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/50" title="Quick Record">
               <Zap className="w-3.5 h-3.5" />
             </button>
-            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors">
+            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Video Library">
               <Film className="w-3.5 h-3.5" />
             </button>
-            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors">
+            <button className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Screenshots">
               <ImageIcon className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -111,17 +127,17 @@ export const Launcher: React.FC<LauncherProps> = ({
         {/* Top utility subheader */}
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <button className="p-1 text-gray-400 hover:text-white transition-colors">
+            <button className="p-1 text-gray-400 hover:text-white transition-colors" title="Help & Docs">
               <HelpCircle className="w-4 h-4" />
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-1 text-gray-400 hover:text-white transition-colors">
+            <button className="p-1 text-gray-400 hover:text-white transition-colors" title="Settings">
               <Settings className="w-4 h-4" />
             </button>
-            <button className="p-1 text-gray-400 hover:text-white transition-colors relative">
+            <button className="p-1 text-gray-400 hover:text-white transition-colors relative" title="Notifications">
               <Bell className="w-4 h-4" />
-              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500" />
+              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500" />
             </button>
           </div>
         </div>
@@ -137,11 +153,11 @@ export const Launcher: React.FC<LauncherProps> = ({
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <Monitor className={`w-5 h-5 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
-              <div className="flex flex-col">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <Monitor className={`w-5 h-5 flex-shrink-0 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
+              <div className="flex flex-col truncate">
                 <span className="text-xs font-bold text-white">Display</span>
-                <span className="text-[10px] text-gray-400 truncate max-w-[80px]">
+                <span className="text-[10px] text-gray-400 truncate">
                   {selectedSource?.isDisplay ? selectedSource.name : 'Full Screen'}
                 </span>
               </div>
@@ -151,7 +167,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                 e.stopPropagation()
                 onOpenSourcePicker()
               }}
-              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded"
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded flex-shrink-0"
+              title="Select Screen"
             >
               <ChevronDown className="w-4 h-4" />
             </button>
@@ -166,11 +183,11 @@ export const Launcher: React.FC<LauncherProps> = ({
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <WindowIcon className={`w-5 h-5 ${activeCaptureMode === 'window' ? 'text-blue-400' : 'text-gray-400'}`} />
-              <div className="flex flex-col">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <WindowIcon className={`w-5 h-5 flex-shrink-0 ${activeCaptureMode === 'window' ? 'text-blue-400' : 'text-gray-400'}`} />
+              <div className="flex flex-col truncate">
                 <span className="text-xs font-bold text-white">Window</span>
-                <span className="text-[10px] text-gray-400 truncate max-w-[80px]">
+                <span className="text-[10px] text-gray-400 truncate">
                   {selectedSource && !selectedSource.isDisplay ? selectedSource.name : 'App Window'}
                 </span>
               </div>
@@ -180,7 +197,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                 e.stopPropagation()
                 onOpenSourcePicker()
               }}
-              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded"
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded flex-shrink-0"
+              title="Select Window"
             >
               <ChevronDown className="w-4 h-4" />
             </button>
@@ -216,47 +234,111 @@ export const Launcher: React.FC<LauncherProps> = ({
         {/* Audio & Video Source Toggles */}
         <div className="flex flex-col gap-2 pt-1">
           {/* Camera toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-3">
-              <Camera className={`w-4 h-4 ${enableCamera ? 'text-blue-400' : 'text-gray-400'}`} />
-              <span className="text-xs font-semibold text-white">
-                {enableCamera ? 'Webcam Camera' : 'No Camera'}
-              </span>
+          <div className="relative flex flex-col p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex items-center justify-between">
+              <div
+                className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
+                onClick={() => enableCamera && cameras.length > 1 && setShowCamMenu(!showCamMenu)}
+              >
+                <Camera className={`w-4 h-4 flex-shrink-0 ${enableCamera ? 'text-blue-400' : 'text-gray-400'}`} />
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-xs font-semibold text-white truncate">
+                    {enableCamera ? currentCamLabel : 'No Camera'}
+                  </span>
+                  {enableCamera && cameras.length > 1 && (
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setEnableCamera(!enableCamera)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
+                  enableCamera
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                    : 'bg-[#2a2e38] text-gray-400 hover:text-white'
+                }`}
+              >
+                {enableCamera ? 'On' : 'Off'}
+              </button>
             </div>
-            <button
-              onClick={() => setEnableCamera(!enableCamera)}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                enableCamera
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                  : 'bg-[#2a2e38] text-gray-400 hover:text-white'
-              }`}
-            >
-              {enableCamera ? 'On' : 'Off'}
-            </button>
+
+            {/* Camera device dropdown */}
+            {enableCamera && showCamMenu && cameras.length > 0 && (
+              <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-col gap-1">
+                {cameras.map((cam) => (
+                  <button
+                    key={cam.deviceId}
+                    onClick={() => {
+                      setSelectedCameraId(cam.deviceId)
+                      setShowCamMenu(false)
+                    }}
+                    className={`text-left text-xs py-1.5 px-2 rounded-lg truncate transition-colors ${
+                      selectedCameraId === cam.deviceId
+                        ? 'bg-blue-600/30 text-blue-300 font-semibold'
+                        : 'text-gray-300 hover:bg-white/5'
+                    }`}
+                  >
+                    {cam.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Microphone toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-3">
-              {enableMic ? (
-                <Mic className="w-4 h-4 text-blue-400" />
-              ) : (
-                <MicOff className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="text-xs font-semibold text-white">
-                {enableMic ? 'Microphone' : 'No Microphone'}
-              </span>
+          <div className="relative flex flex-col p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex items-center justify-between">
+              <div
+                className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
+                onClick={() => enableMic && mics.length > 1 && setShowMicMenu(!showMicMenu)}
+              >
+                {enableMic ? (
+                  <Mic className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                ) : (
+                  <MicOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                )}
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-xs font-semibold text-white truncate">
+                    {enableMic ? currentMicLabel : 'No Microphone'}
+                  </span>
+                  {enableMic && mics.length > 1 && (
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setEnableMic(!enableMic)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
+                  enableMic
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                    : 'bg-[#2a2e38] text-gray-400 hover:text-white'
+                }`}
+              >
+                {enableMic ? 'On' : 'Off'}
+              </button>
             </div>
-            <button
-              onClick={() => setEnableMic(!enableMic)}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                enableMic
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                  : 'bg-[#2a2e38] text-gray-400 hover:text-white'
-              }`}
-            >
-              {enableMic ? 'On' : 'Off'}
-            </button>
+
+            {/* Mic device dropdown */}
+            {enableMic && showMicMenu && mics.length > 0 && (
+              <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-col gap-1">
+                {mics.map((mic) => (
+                  <button
+                    key={mic.deviceId}
+                    onClick={() => {
+                      setSelectedMicId(mic.deviceId)
+                      setShowMicMenu(false)
+                    }}
+                    className={`text-left text-xs py-1.5 px-2 rounded-lg truncate transition-colors ${
+                      selectedMicId === mic.deviceId
+                        ? 'bg-blue-600/30 text-blue-300 font-semibold'
+                        : 'text-gray-300 hover:bg-white/5'
+                    }`}
+                  >
+                    {mic.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* System Audio toggle */}
