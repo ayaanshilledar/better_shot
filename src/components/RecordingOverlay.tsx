@@ -120,11 +120,11 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
 
   return (
     <div className="drag-region w-full h-full flex items-center justify-center select-none font-sans">
-      <div className="bg-[#101216]/95 backdrop-blur-xl border border-white/10 px-3.5 py-1.5 rounded-xl flex items-center gap-2.5 shadow-2xl text-white">
+      <div className="no-drag bg-[#101216]/95 backdrop-blur-xl border border-white/10 px-3.5 py-1.5 rounded-xl flex items-center gap-2.5 shadow-2xl text-white">
         {/* Stop Recording & Live Timer */}
         <button
           onClick={handleStopRecording}
-          className="no-drag flex items-center gap-1.5 group px-1.5 py-0.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+          className="no-drag flex items-center gap-1.5 group px-1.5 py-0.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
           title="Stop & Save Recording"
         >
           <div className="relative flex items-center justify-center w-4 h-4">
@@ -142,7 +142,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
         <div className="no-drag relative flex flex-col items-center group">
           <button
             onClick={handleToggleMicMute}
-            className="p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="no-drag p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title={isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
           >
             {isMuted ? (
@@ -166,7 +166,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
         {/* Pause / Resume Button */}
         <button
           onClick={handleTogglePause}
-          className="p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+          className="no-drag p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           title={isPaused ? 'Resume Recording' : 'Pause Recording'}
         >
           {isPaused ? (
@@ -179,7 +179,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
         {/* Restart Button */}
         <button
           onClick={handleRestartRecording}
-          className="p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+          className="no-drag p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           title="Restart Recording"
         >
           <RotateCcw className="w-4 h-4" />
@@ -188,7 +188,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
         {/* Trash / Delete Button */}
         <button
           onClick={handleDiscardRecording}
-          className="p-1 rounded-md text-gray-300 hover:text-rose-400 hover:bg-rose-500/20 transition-colors"
+          className="no-drag p-1 rounded-md text-gray-300 hover:text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
           title="Discard Recording"
         >
           <Trash2 className="w-4 h-4" />

@@ -207,6 +207,8 @@ export const App: React.FC = () => {
     }
   }
 
+  const [autoOpenHistory, setAutoOpenHistory] = useState<boolean>(false)
+
   const handleStopRecording = async () => {
     console.log('[BetterShot:App] handleStopRecording triggered...')
     try {
@@ -217,6 +219,7 @@ export const App: React.FC = () => {
         const result = await window.electronAPI.saveRecording(buffer, defaultFileName)
         if (result.success) {
           console.log('[BetterShot:App] Recording saved successfully at:', result.filePath)
+          setAutoOpenHistory(true)
         }
       }
       if (window.electronAPI?.stopRecordingMode) {
@@ -254,13 +257,17 @@ export const App: React.FC = () => {
   return (
     <div className="w-screen h-screen p-2 bg-transparent overflow-hidden relative">
       <Launcher
-        onStartRecording={handleStartRecording}
+        onStartRecording={(mode, sourceId) => {
+          setAutoOpenHistory(false)
+          handleStartRecording(mode, sourceId)
+        }}
         enableMic={enableMic}
         setEnableMic={setEnableMic}
         enableSystemAudio={enableSystemAudio}
         setEnableSystemAudio={setEnableSystemAudio}
         selectedSource={selectedSource}
         onOpenSourcePicker={() => setIsSourcePickerOpen(true)}
+        autoOpenHistory={autoOpenHistory}
       />
 
       {/* Source Picker Modal */}

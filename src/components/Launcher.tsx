@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Monitor,
   Crop,
@@ -28,6 +28,7 @@ interface LauncherProps {
   setEnableSystemAudio: (val: boolean) => void
   selectedSource: DesktopSource | null
   onOpenSourcePicker: () => void
+  autoOpenHistory?: boolean
 }
 
 export const Launcher: React.FC<LauncherProps> = ({
@@ -37,12 +38,20 @@ export const Launcher: React.FC<LauncherProps> = ({
   enableSystemAudio,
   setEnableSystemAudio,
   selectedSource,
-  onOpenSourcePicker
+  onOpenSourcePicker,
+  autoOpenHistory = false
 }) => {
   const [activeCaptureMode, setActiveCaptureMode] = useState<CaptureMode>('display')
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)
   const [recordings, setRecordings] = useState<RecordedFile[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (autoOpenHistory) {
+      console.log('[BetterShot:Launcher] Auto-opening history modal post-recording')
+      handleOpenHistory()
+    }
+  }, [autoOpenHistory])
 
   const handleModeClick = (mode: CaptureMode) => {
     console.log(`[BetterShot:Launcher] Capture mode changed to: ${mode}`)
@@ -99,8 +108,7 @@ export const Launcher: React.FC<LauncherProps> = ({
       {/* Window Drag Header */}
       <div className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90 z-10">
         <div className="drag-region flex-1 flex items-center gap-2">
-          <span className="text-xs font-bold tracking-tight text-white flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+          <span className="text-xs font-semibold tracking-tight text-white">
             {APP_CONFIG.appName}
           </span>
         </div>

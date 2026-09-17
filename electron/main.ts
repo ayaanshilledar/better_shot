@@ -320,7 +320,6 @@ ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: 
 
     await fs.promises.writeFile(filePath, uint8Array)
     console.log(`[BetterShot:Main] Saved recording successfully to: ${filePath}`)
-    shell.showItemInFolder(filePath)
     return { success: true, filePath }
   } catch (error: any) {
     console.error('[BetterShot:Main] Error saving recording:', error)
