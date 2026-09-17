@@ -91,7 +91,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     >
       {/* Outer Studio Background Canvas Frame */}
       <div
-        className={`relative w-full h-full max-w-6xl max-h-[80vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
+        className={`relative w-full h-full max-w-[92vw] max-h-[84vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
           project.background.type === 'none' ? 'border-none' : 'border border-white/10'
         }`}
         style={{
@@ -101,7 +101,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           filter: (project.background.type !== 'none' && project.background.blurAmount > 0)
             ? `blur(${project.background.blurAmount * 0.2}px)`
             : 'none',
-          padding: project.background.type === 'none' ? '0px' : `${project.layout.padding * 1.2}%`,
+          padding: project.background.type === 'none' ? '0px' : `${Math.min(project.layout.padding * 0.5, 24)}px`,
           boxSizing: 'border-box'
         }}
       >
@@ -166,7 +166,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   ref={videoRef}
                   src={mediaUrl}
                   playsInline
-                  className="w-full h-auto object-contain block max-h-[72vh]"
+                  className="w-full h-auto object-contain block max-h-[78vh]"
                   style={{
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden'
@@ -187,82 +187,84 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         </div>
       </div>
 
-      {/* Full-Width Bottom Transport Bar (Matching Reference Design Image 1) */}
-      <div className="w-full h-14 bg-[#0b0c10]/95 border-t border-white/5 px-6 flex items-center justify-between select-none z-20">
-        {/* Far Left: Timecode Readout */}
-        <div className="flex items-center">
-          <span className="font-mono text-xs font-normal text-gray-400 tracking-tight">
-            {formatTime(runtime.currentTime)}/{formatTime(project.media.duration || 4.43)}
-          </span>
-        </div>
+      {/* Balanced Bottom Transport Bar (Matching Reference Design Spacing) */}
+      <div className="w-full h-12 bg-[#0b0c10]/95 border-t border-white/5 flex items-center justify-center select-none z-20">
+        <div className="w-full max-w-4xl px-6 flex items-center justify-between">
+          {/* Far Left: Timecode Readout */}
+          <div className="flex items-center min-w-[110px]">
+            <span className="font-mono text-xs font-normal text-gray-400 tracking-tight">
+              {formatTime(runtime.currentTime)}/{formatTime(project.media.duration || 4.43)}
+            </span>
+          </div>
 
-        {/* Center: Transport Play Controls */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                const t = Math.max(0, videoRef.current.currentTime - 1)
-                videoRef.current.currentTime = t
-                onSeek(t)
-              }
-            }}
-            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Step back 1 sec"
-          >
-            <SkipBack className="w-4 h-4 fill-gray-400 hover:fill-white" />
-          </button>
+          {/* Center: Transport Play Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (videoRef.current) {
+                  const t = Math.max(0, videoRef.current.currentTime - 1)
+                  videoRef.current.currentTime = t
+                  onSeek(t)
+                }
+              }}
+              className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Step back 1 sec"
+            >
+              <SkipBack className="w-4 h-4 fill-gray-400 hover:fill-white" />
+            </button>
 
-          <button
-            onClick={onTogglePlay}
-            className="w-10 h-10 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg cursor-pointer"
-            title={runtime.isPlaying ? 'Pause' : 'Play'}
-          >
-            {runtime.isPlaying ? (
-              <Pause className="w-4 h-4 fill-black text-black" />
-            ) : (
-              <Play className="w-4 h-4 fill-black text-black ml-0.5" />
-            )}
-          </button>
+            <button
+              onClick={onTogglePlay}
+              className="w-8 h-8 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg cursor-pointer"
+              title={runtime.isPlaying ? 'Pause' : 'Play'}
+            >
+              {runtime.isPlaying ? (
+                <Pause className="w-3.5 h-3.5 fill-black text-black" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-black text-black ml-0.5" />
+              )}
+            </button>
 
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                const d = project.media.duration || 5
-                const t = Math.min(d, videoRef.current.currentTime + 1)
-                videoRef.current.currentTime = t
-                onSeek(t)
-              }
-            }}
-            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Step forward 1 sec"
-          >
-            <SkipForward className="w-4 h-4 fill-gray-400 hover:fill-white" />
-          </button>
-        </div>
+            <button
+              onClick={() => {
+                if (videoRef.current) {
+                  const d = project.media.duration || 5
+                  const t = Math.min(d, videoRef.current.currentTime + 1)
+                  videoRef.current.currentTime = t
+                  onSeek(t)
+                }
+              }}
+              className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Step forward 1 sec"
+            >
+              <SkipForward className="w-4 h-4 fill-gray-400 hover:fill-white" />
+            </button>
+          </div>
 
-        {/* Far Right: Scissors & Zoom Controls */}
-        <div className="flex items-center gap-3">
-          <button
-            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Split clip at playhead"
-          >
-            <Scissors className="w-4 h-4" />
-          </button>
+          {/* Far Right: Scissors & Zoom Controls */}
+          <div className="flex items-center gap-2.5">
+            <button
+              className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Split clip at playhead"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+            </button>
 
-          <div className="h-4 w-px bg-white/10 mx-1" />
+            <div className="h-3.5 w-px bg-white/10 mx-0.5" />
 
-          <div className="flex items-center gap-2">
-            <ZoomOut className="w-3.5 h-3.5 text-gray-400" />
-            <input
-              type="range"
-              min="1.0"
-              max="3.0"
-              step="0.1"
-              value={zoomScale}
-              onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
-              className="w-24 accent-blue-500 cursor-pointer h-1 bg-gray-700 rounded-lg"
-            />
-            <ZoomIn className="w-3.5 h-3.5 text-gray-400" />
+            <div className="flex items-center gap-1.5">
+              <ZoomOut className="w-3 h-3 text-gray-400" />
+              <input
+                type="range"
+                min="1.0"
+                max="3.0"
+                step="0.1"
+                value={zoomScale}
+                onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
+                className="w-20 accent-blue-500 cursor-pointer h-1 bg-gray-700 rounded-lg"
+              />
+              <ZoomIn className="w-3 h-3 text-gray-400" />
+            </div>
           </div>
         </div>
       </div>
