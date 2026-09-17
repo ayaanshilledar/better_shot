@@ -4,7 +4,10 @@ import {
   Minus,
   Square,
   X,
-  Home
+  Home,
+  Undo2,
+  Redo2,
+  Maximize2
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState } from '../../types/editor'
 
@@ -28,7 +31,15 @@ interface EditorTopBarProps {
 }
 
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
+  project,
+  runtime,
+  onUpdateTitle,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   onExport,
+  onScaleChange,
   onClose,
   onMinimize
 }) => {
@@ -38,13 +49,15 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     }
   }
 
+  const currentScale = runtime?.previewScale || 'full'
+
   return (
     <header
       onDoubleClick={handleToggleMaximize}
       className="h-12 bg-[#12141a]/95 border-b border-white/10 px-3 flex items-center justify-between select-none z-30 drag-region cursor-default"
     >
-      {/* Left section: Home Navigation */}
-      <div className="flex items-center gap-2 no-drag">
+      {/* Left section: Home Navigation + Title */}
+      <div className="flex items-center gap-3 no-drag">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 px-2.5 py-1 bg-[#1a1d26] hover:bg-[#222735] text-gray-300 hover:text-white text-xs font-medium rounded-lg border border-white/5 transition-all cursor-pointer"
@@ -53,21 +66,72 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
           <Home className="w-3.5 h-3.5 text-blue-400" />
           <span>Home</span>
         </button>
+
+        <div className="h-4 w-px bg-white/10 mx-0.5" />
+
+        {/* Undo / Redo Buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              canUndo
+                ? 'bg-[#1a1d26] hover:bg-[#222735] text-gray-200 border-white/5'
+                : 'bg-transparent text-gray-600 border-transparent cursor-not-allowed opacity-50'
+            }`}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              canRedo
+                ? 'bg-[#1a1d26] hover:bg-[#222735] text-gray-200 border-white/5'
+                : 'bg-transparent text-gray-600 border-transparent cursor-not-allowed opacity-50'
+            }`}
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Project Title Editor */}
+        {project && (
+          <input
+            type="text"
+            value={project.title}
+            onChange={(e) => onUpdateTitle && onUpdateTitle(e.target.value)}
+            className="bg-transparent hover:bg-white/5 focus:bg-[#1a1d26] text-xs font-semibold text-gray-200 focus:text-white px-2 py-1 rounded-md border border-transparent focus:border-white/10 outline-none transition-all max-w-[180px] truncate"
+            title="Rename Project"
+          />
+        )}
       </div>
 
-      {/* Right Section: Export CTA & Window Controls */}
+      {/* Center Section: Preview Scale Selector */}
+      <div className="flex items-center gap-1 bg-[#161922] p-0.5 rounded-lg border border-white/5 no-drag">
+        {(['full', 'half', 'quarter'] as const).map((scale) => {
+          const labels = { full: '100% Full', half: '50% Half', quarter: '25% Quarter' }
+          const isActive = currentScale === scale
+          return (
+            <button
+              key={scale}
+              onClick={() => onScaleChange && onScaleChange(scale)}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {labels[scale]}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Right Section: Export & Window Controls */}
       <div className="flex items-center gap-3 no-drag">
-        {/* Export CTA Button */}
-        <button
-          onClick={onExport}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-500/50 transition-all active:scale-95"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export</span>
-        </button>
-
-        <div className="h-4 w-px bg-white/10" />
-
         {/* Window controls */}
         <div className="flex items-center gap-1">
           <button

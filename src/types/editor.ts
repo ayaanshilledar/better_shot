@@ -42,6 +42,11 @@ export interface LayoutConfig {
   shadow: ShadowType
   aspectRatio: AspectRatioType
   cropRegion?: CropRegionData
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  scale?: number
 }
 
 export interface ExportSettings {
@@ -79,11 +84,12 @@ export interface StudioRuntimeState {
   errorMessage?: string
   currentTime: number
   isPlaying: boolean
-  selectedTab: 'background' | 'layout'
+  selectedTab: 'background' | 'layout' | 'export'
   selectedClipId: string | null
   previewScale: 'full' | 'half' | 'quarter'
   timelineZoom?: number
   hoverState: { element: string | null }
+  isVideoSelected?: boolean
 }
 
 export interface WallpaperPreset {

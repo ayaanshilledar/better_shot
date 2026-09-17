@@ -29,7 +29,10 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       padding: 5, // 5% default padding
       cornerRadius: 12, // 12px rounded corners
       shadow: 'medium',
-      aspectRatio: 'auto'
+      aspectRatio: 'auto',
+      x: 0,
+      y: 0,
+      scale: 1
     },
     timeline: {
       clips: [],

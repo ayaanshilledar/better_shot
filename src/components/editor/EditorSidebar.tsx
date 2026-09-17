@@ -2,7 +2,8 @@ import React from 'react'
 import {
   Image,
   Sliders,
-  Ban
+  Ban,
+  Download
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, ShadowType } from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
@@ -13,6 +14,7 @@ interface EditorSidebarProps {
   onUpdateBackground: (updates: Partial<StudioProject['background']>) => void
   onUpdateLayout: (updates: Partial<StudioProject['layout']>) => void
   onSelectTab: (tab: StudioRuntimeState['selectedTab']) => void
+  onExport?: () => void
 }
 
 export const EditorSidebar: React.FC<EditorSidebarProps> = ({
@@ -20,11 +22,13 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   runtime,
   onUpdateBackground,
   onUpdateLayout,
-  onSelectTab
+  onSelectTab,
+  onExport
 }) => {
   const tabs = [
     { id: 'background', label: 'Background', icon: Image },
-    { id: 'layout', label: 'Layout', icon: Sliders }
+    { id: 'layout', label: 'Layout', icon: Sliders },
+    { id: 'export', label: 'Export', icon: Download }
   ] as const
 
   const shadowOptions: { id: ShadowType; label: string }[] = [
@@ -37,9 +41,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
   return (
     <aside className="w-80 bg-[#12141a] border-l border-white/10 flex flex-col select-none z-20">
-      {/* Top Sidebar Navigation Tabs */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#161922]">
-        <div className="flex items-center gap-1.5">
+      {/* Smooth Segmented Tab Switcher Bar */}
+      <div className="p-3 bg-[#161922]">
+        <div className="grid grid-cols-3 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = runtime.selectedTab === tab.id
@@ -47,14 +51,14 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-md'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{tab.label}</span>
               </button>
             )
           })}
@@ -192,6 +196,11 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Export Section (Blank for now) */}
+        {runtime.selectedTab === 'export' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6" />
         )}
       </div>
     </aside>

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward } from 'lucide-react'
 import { StudioProject, StudioRuntimeState } from '../../types/editor'
 
@@ -10,6 +10,9 @@ interface StudioCanvasProps {
   onTimeUpdate: (time: number) => void
   onSeek: (time: number) => void
   onZoomChange?: (zoomLevel: number) => void
+  onSelectVideo?: () => void
+  onDeselectVideo?: () => void
+  onUpdateLayout?: (updates: Partial<StudioProject['layout']>, skipHistory?: boolean) => void
 }
 
 export const StudioCanvas: React.FC<StudioCanvasProps> = ({
@@ -19,9 +22,26 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   onTogglePlay,
   onTimeUpdate,
   onSeek,
-  onZoomChange
+  onZoomChange,
+  onSelectVideo,
+  onDeselectVideo,
+  onUpdateLayout
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const videoWrapperRef = useRef<HTMLDivElement>(null)
+
+  const isDraggingRef = useRef<boolean>(false)
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    startX: 0,
+    startY: 0
+  })
+  const hasMovedRef = useRef<boolean>(false)
+
+  // Preview Scale multiplier calculation ('full' -> 1.0, 'half' -> 0.5, 'quarter' -> 0.25)
+  const previewScaleMultiplier =
+    runtime.previewScale === 'half' ? 0.5 : runtime.previewScale === 'quarter' ? 0.25 : 1.0
 
   const formatTime = (sec: number) => {
     if (!Number.isFinite(sec) || sec < 0 || isNaN(sec)) {
@@ -96,17 +116,114 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     return project.background.gradient || project.background.color || '#101216'
   }
 
+  // Keep track of layout dimensions when mounted
+  useEffect(() => {
+    if (videoWrapperRef.current && onUpdateLayout) {
+      const rect = videoWrapperRef.current.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        if (!project.layout.width || !project.layout.height) {
+          onUpdateLayout({ width: Math.round(rect.width), height: Math.round(rect.height) }, true)
+        }
+      }
+    }
+  }, [project.layout.width, project.layout.height, project.media.width, project.media.height])
+
+  // Mouse Down Drag Handler on Video Element
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+
+    if (onSelectVideo) onSelectVideo()
+
+    isDraggingRef.current = true
+    hasMovedRef.current = false
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: project.layout.x || 0,
+      startY: project.layout.y || 0
+    }
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return
+
+      const deltaX = moveEvent.clientX - dragStartRef.current.mouseX
+      const deltaY = moveEvent.clientY - dragStartRef.current.mouseY
+
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+        hasMovedRef.current = true
+      }
+
+      // Convert screen-space mouse movement to canvas-space coordinates based on preview scale
+      const canvasDeltaX = deltaX / previewScaleMultiplier
+      const canvasDeltaY = deltaY / previewScaleMultiplier
+
+      const nextX = Math.round(dragStartRef.current.startX + canvasDeltaX)
+      const nextY = Math.round(dragStartRef.current.startY + canvasDeltaY)
+
+      if (onUpdateLayout) {
+        onUpdateLayout({ x: nextX, y: nextY }, true)
+      }
+    }
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+
+        if (hasMovedRef.current && onUpdateLayout && videoWrapperRef.current) {
+          const rect = videoWrapperRef.current.getBoundingClientRect()
+          onUpdateLayout(
+            {
+              x: project.layout.x || 0,
+              y: project.layout.y || 0,
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              scale: project.layout.scale || 1
+            },
+            false
+          )
+        }
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  // Click outside to deselect
+  const handleCanvasClick = () => {
+    if (hasMovedRef.current) {
+      hasMovedRef.current = false
+      return
+    }
+    if (onDeselectVideo) {
+      onDeselectVideo()
+    }
+  }
+
+  const isSelected = Boolean(runtime.isVideoSelected)
+  const posX = project.layout.x || 0
+  const posY = project.layout.y || 0
+  const objectScale = project.layout.scale || 1.0
+
   return (
     <div
       ref={containerRef}
+      onClick={handleCanvasClick}
       className="flex-1 bg-[#090b0e] relative flex flex-col items-center justify-center overflow-hidden p-2 sm:p-3 select-none"
     >
-      {/* Outer Studio Background Canvas Frame */}
+      {/* Outer Studio Background Canvas Frame with Preview Scale transform */}
       <div
-        className={`relative w-full h-full max-w-[96vw] max-h-[88vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 p-3 sm:p-4 ${
+        className={`relative w-full h-full max-w-[96vw] max-h-[88vh] rounded-2xl flex items-center justify-center overflow-hidden transition-transform duration-200 p-3 sm:p-4 ${
           project.background.type === 'none' ? 'border-none' : 'border border-white/10'
         }`}
-        style={{ boxSizing: 'border-box' }}
+        style={{
+          boxSizing: 'border-box',
+          transform: `scale(${previewScaleMultiplier})`,
+          transformOrigin: 'center center'
+        }}
       >
         {/* Dedicated Background Layer (Blur filter applies ONLY to background, never video) */}
         {project.background.type !== 'none' && (
@@ -129,13 +246,17 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         <div
           className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden w-full h-full"
         >
-          {/* Framed HTML5 Video Element (Hardware 60FPS) */}
+          {/* Framed HTML5 Video Element (Hardware 60FPS with selection & free drag transform) */}
           <div
-            className="overflow-hidden transition-all duration-300 relative group flex items-center justify-center"
+            ref={videoWrapperRef}
+            onMouseDown={handleMouseDown}
+            className={`transition-shadow duration-200 relative group flex items-center justify-center cursor-grab active:cursor-grabbing ${
+              isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black/50 shadow-2xl z-20' : ''
+            }`}
             style={{
               borderRadius: `${project.layout.cornerRadius}px`,
-              boxShadow: getShadowStyle(),
-              transform: `scale(${zoomScale}) translateZ(0)`,
+              boxShadow: isSelected ? undefined : getShadowStyle(),
+              transform: `translate(${posX}px, ${posY}px) scale(${objectScale * zoomScale}) translateZ(0)`,
               transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
               aspectRatio: containerAspect,
               width: isPortrait ? 'auto' : '100%',
@@ -144,6 +265,16 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               maxHeight: `${canvasScale * 100}%`
             }}
           >
+            {/* Visual Handles when video is selected */}
+            {isSelected && (
+              <>
+                <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+              </>
+            )}
+
             {mediaUrl ? (
               isCropped ? (
                 <div
@@ -151,7 +282,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   style={{
                     aspectRatio: containerAspect,
                     width: '100%',
-                    height: '100%'
+                    height: '100%',
+                    borderRadius: `${project.layout.cornerRadius}px`
                   }}
                 >
                   <video
@@ -183,6 +315,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   playsInline
                   className="w-full h-full object-cover block"
                   style={{
+                    borderRadius: `${project.layout.cornerRadius}px`,
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden'
                   }}

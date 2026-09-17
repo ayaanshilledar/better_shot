@@ -39,18 +39,22 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     selectedClipId: null,
     previewScale: 'full',
     timelineZoom: 1.0,
-    hoverState: { element: null }
+    hoverState: { element: null },
+    isVideoSelected: false
   })
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
-  // Update project & push to history stack
-  const updateProject = (updater: (prev: StudioProject) => StudioProject) => {
+  // Update project & push to history stack (supports skipHistory for smooth drag rendering)
+  const updateProject = (
+    updater: (prev: StudioProject) => StudioProject,
+    skipHistory = false
+  ) => {
     setProject((prevProject) => {
       const next = updater(prevProject)
       next.updatedAt = Date.now()
 
-      if (!isUndoRedoRef.current) {
+      if (!isUndoRedoRef.current && !skipHistory) {
         setHistory((prevHistory) => {
           const validIndex = Math.max(0, Math.min(historyIndex, prevHistory.length - 1))
           const sliced = prevHistory.slice(0, validIndex + 1)
@@ -249,7 +253,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         onRedo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
-        onExport={handleExport}
+        onExport={() => setRuntime((r) => ({ ...r, selectedTab: 'export' }))}
         onScaleChange={(scale) => setRuntime((r) => ({ ...r, previewScale: scale }))}
         onClose={() => {
           if (onCloseEditor) onCloseEditor()
@@ -274,11 +278,23 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           onTimeUpdate={(t) => setRuntime((r) => ({ ...r, currentTime: t }))}
           onSeek={handleSeek}
           onZoomChange={(zoom) => setRuntime((r) => ({ ...r, timelineZoom: zoom }))}
+          onSelectVideo={() => setRuntime((r) => ({ ...r, isVideoSelected: true }))}
+          onDeselectVideo={() => setRuntime((r) => ({ ...r, isVideoSelected: false }))}
+          onUpdateLayout={(updates, skipHistory) =>
+            updateProject(
+              (p) => ({
+                ...p,
+                layout: { ...p.layout, ...updates }
+              }),
+              skipHistory
+            )
+          }
         />
 
         <EditorSidebar
           project={project}
           runtime={runtime}
+          onExport={handleExport}
           onUpdateBackground={(updates) =>
             updateProject((p) => ({
               ...p,
