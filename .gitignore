@@ -25,6 +25,8 @@ thumb_*.jpg
 # Production build artifacts
 dist/
 **/dist/
+dist-electron/
+**/dist-electron/
 dist-ssr/
 **/dist-ssr/
 
