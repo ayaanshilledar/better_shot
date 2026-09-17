@@ -8,7 +8,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        sans: ['Poppins', 'sans-serif'],
+        mono: ['Poppins', 'sans-serif'],
       },
       colors: {
         brand: {

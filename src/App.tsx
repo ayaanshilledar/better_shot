@@ -132,7 +132,7 @@ export const App: React.FC = () => {
 
   const startAreaRecordingWithRegion = async (cropRegion: CropRegion) => {
     console.log('[BetterShot:App] Starting area recording with region:', cropRegion)
-    let finalSourceId = selectedSource?.id || null
+    let finalSourceId = (selectedSource && selectedSource.isDisplay) ? selectedSource.id : null
     if (!finalSourceId && window.electronAPI?.getDesktopSources) {
       try {
         const sources = await window.electronAPI.getDesktopSources()

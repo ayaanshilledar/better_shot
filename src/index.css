@@ -9,10 +9,14 @@
     --card-border: #282c37;
   }
 
+  * {
+    font-family: 'Poppins', sans-serif !important;
+  }
+
   body {
     background: transparent;
     user-select: none;
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'Poppins', sans-serif !important;
   }
 }
 

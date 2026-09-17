@@ -231,10 +231,25 @@ class ScreenRecorderService {
       const video = document.createElement('video')
       video.autoplay = true
       video.muted = true
+      video.playsInline = true
+      video.style.position = 'fixed'
+      video.style.top = '-9999px'
+      video.style.left = '-9999px'
+      video.style.width = '1px'
+      video.style.height = '1px'
+      video.style.opacity = '0'
+      video.style.pointerEvents = 'none'
+      document.body.appendChild(video)
+
       video.srcObject = new MediaStream([rawVideoTrack])
       this.cropVideoElement = video
 
-      video.onloadedmetadata = async () => {
+      let isResolved = false
+
+      const startCropping = async () => {
+        if (isResolved) return
+        isResolved = true
+
         try {
           await video.play()
         } catch (e) {
@@ -243,32 +258,57 @@ class ScreenRecorderService {
 
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
-        const targetW = Math.max(1, Math.round(crop.width))
-        const targetH = Math.max(1, Math.round(crop.height))
+        const targetW = Math.max(2, Math.round(crop.width))
+        const targetH = Math.max(2, Math.round(crop.height))
         canvas.width = targetW
         canvas.height = targetH
 
-        const scaleX = (video.videoWidth || crop.screenWidth) / crop.screenWidth
-        const scaleY = (video.videoHeight || crop.screenHeight) / crop.screenHeight
+        const videoW = video.videoWidth > 0 ? video.videoWidth : crop.screenWidth
+        const videoH = video.videoHeight > 0 ? video.videoHeight : crop.screenHeight
+
+        const scaleX = videoW / crop.screenWidth
+        const scaleY = videoH / crop.screenHeight
 
         const srcX = Math.round(crop.x * scaleX)
         const srcY = Math.round(crop.y * scaleY)
         const srcW = Math.round(crop.width * scaleX)
         const srcH = Math.round(crop.height * scaleY)
 
-        console.log(`[BetterShot:Recorder] Canvas crop mapping: Video source ${video.videoWidth}x${video.videoHeight} -> Crop src (${srcX}, ${srcY}, ${srcW}, ${srcH}) to canvas (${targetW}x${targetH})`)
+        console.log(`[BetterShot:Recorder] Canvas crop mapping: Screen ${crop.screenWidth}x${crop.screenHeight}, Video ${videoW}x${videoH}, Crop (${srcX}, ${srcY}, ${srcW}, ${srcH}) -> Canvas (${targetW}x${targetH})`)
 
-        const drawFrame = () => {
-          if (ctx && video.readyState >= 2) {
-            ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, targetW, targetH)
+        const renderFrame = () => {
+          if (ctx) {
+            try {
+              ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, targetW, targetH)
+            } catch (err) {
+              console.warn('[BetterShot:Recorder] drawImage error:', err)
+            }
           }
-          this.cropAnimFrameId = requestAnimationFrame(drawFrame)
         }
 
-        drawFrame()
+        // Render initial frame
+        renderFrame()
+
+        // Use setInterval (60fps) so rendering continues reliably even when launcher window is hidden
+        if (this.cropAnimFrameId) {
+          clearInterval(this.cropAnimFrameId as any)
+          cancelAnimationFrame(this.cropAnimFrameId)
+        }
+        this.cropAnimFrameId = window.setInterval(renderFrame, 1000 / 60) as any
 
         const canvasStream = canvas.captureStream(60)
-        resolve(canvasStream.getVideoTracks()[0] || null)
+        const croppedTrack = canvasStream.getVideoTracks()[0] || null
+        resolve(croppedTrack)
+      }
+
+      if (video.readyState >= 1 && video.videoWidth > 0) {
+        startCropping()
+      } else {
+        video.onloadedmetadata = () => startCropping()
+        video.onloadeddata = () => startCropping()
+        setTimeout(() => {
+          startCropping()
+        }, 300)
       }
     })
   }
@@ -406,7 +446,11 @@ class ScreenRecorderService {
     console.log('[BetterShot:Recorder] Cleaning up recording streams and animation loops...')
     if (this.timerInterval) clearInterval(this.timerInterval)
     if (this.animFrameId) cancelAnimationFrame(this.animFrameId)
-    if (this.cropAnimFrameId) cancelAnimationFrame(this.cropAnimFrameId)
+    if (this.cropAnimFrameId) {
+      clearInterval(this.cropAnimFrameId as any)
+      cancelAnimationFrame(this.cropAnimFrameId)
+      this.cropAnimFrameId = null
+    }
     if (this.cropVideoElement) {
       this.cropVideoElement.pause()
       this.cropVideoElement.srcObject = null
