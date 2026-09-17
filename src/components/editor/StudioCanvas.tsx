@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react'
-import { Play, Pause, Scissors, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react'
+import React, { useRef } from 'react'
+import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward } from 'lucide-react'
 import { StudioProject, StudioRuntimeState } from '../../types/editor'
 
 interface StudioCanvasProps {
@@ -91,7 +91,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     >
       {/* Outer Studio Background Canvas Frame */}
       <div
-        className={`relative w-full h-full max-w-5xl max-h-[75vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
+        className={`relative w-full h-full max-w-6xl max-h-[80vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
           project.background.type === 'none' ? 'border-none' : 'border border-white/10'
         }`}
         style={{
@@ -166,7 +166,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   ref={videoRef}
                   src={mediaUrl}
                   playsInline
-                  className="w-full h-auto object-contain block max-h-[60vh]"
+                  className="w-full h-auto object-contain block max-h-[72vh]"
                   style={{
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden'
@@ -187,47 +187,83 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         </div>
       </div>
 
-      {/* Floating Playback & Scissor Controls Bar (Bottom of Stage) */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#12151c]/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 flex items-center gap-4 shadow-2xl z-20">
-        {/* Timecode display */}
-        <span className="font-mono text-xs font-semibold text-gray-300 min-w-[110px]">
-          {formatTime(runtime.currentTime)} / {formatTime(project.media.duration || 4.43)}
-        </span>
+      {/* Full-Width Bottom Transport Bar (Matching Reference Design Image 1) */}
+      <div className="w-full h-14 bg-[#0b0c10]/95 border-t border-white/5 px-6 flex items-center justify-between select-none z-20">
+        {/* Far Left: Timecode Readout */}
+        <div className="flex items-center">
+          <span className="font-mono text-xs font-normal text-gray-400 tracking-tight">
+            {formatTime(runtime.currentTime)}/{formatTime(project.media.duration || 4.43)}
+          </span>
+        </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        {/* Center: Transport Play Controls */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (videoRef.current) {
+                const t = Math.max(0, videoRef.current.currentTime - 1)
+                videoRef.current.currentTime = t
+                onSeek(t)
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title="Step back 1 sec"
+          >
+            <SkipBack className="w-4 h-4 fill-gray-400 hover:fill-white" />
+          </button>
 
-        {/* Play/Pause Button */}
-        <button
-          onClick={onTogglePlay}
-          className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-all shadow-md active:scale-95 cursor-pointer"
-        >
-          {runtime.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
-        </button>
+          <button
+            onClick={onTogglePlay}
+            className="w-10 h-10 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg cursor-pointer"
+            title={runtime.isPlaying ? 'Pause' : 'Play'}
+          >
+            {runtime.isPlaying ? (
+              <Pause className="w-4 h-4 fill-black text-black" />
+            ) : (
+              <Play className="w-4 h-4 fill-black text-black ml-0.5" />
+            )}
+          </button>
 
-        <div className="h-4 w-px bg-white/10" />
+          <button
+            onClick={() => {
+              if (videoRef.current) {
+                const d = project.media.duration || 5
+                const t = Math.min(d, videoRef.current.currentTime + 1)
+                videoRef.current.currentTime = t
+                onSeek(t)
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title="Step forward 1 sec"
+          >
+            <SkipForward className="w-4 h-4 fill-gray-400 hover:fill-white" />
+          </button>
+        </div>
 
-        {/* Scissor / Cut Tool */}
-        <button
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          title="Split clip at playhead"
-        >
-          <Scissors className="w-4 h-4" />
-        </button>
+        {/* Far Right: Scissors & Zoom Controls */}
+        <div className="flex items-center gap-3">
+          <button
+            className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title="Split clip at playhead"
+          >
+            <Scissors className="w-4 h-4" />
+          </button>
 
-        {/* Zoom Level Control */}
-        <div className="flex items-center gap-2 bg-[#1a1d26] px-2.5 py-1 rounded-lg border border-white/5">
-          <ZoomOut className="w-3.5 h-3.5 text-gray-400" />
-          <input
-            type="range"
-            min="1.0"
-            max="3.0"
-            step="0.1"
-            value={zoomScale}
-            onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
-            className="w-20 accent-blue-500 cursor-pointer h-1.5 bg-gray-700 rounded-lg"
-          />
-          <ZoomIn className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-[11px] font-mono font-semibold text-blue-400 min-w-[28px]">{zoomScale.toFixed(1)}x</span>
+          <div className="h-4 w-px bg-white/10 mx-1" />
+
+          <div className="flex items-center gap-2">
+            <ZoomOut className="w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="range"
+              min="1.0"
+              max="3.0"
+              step="0.1"
+              value={zoomScale}
+              onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
+              className="w-24 accent-blue-500 cursor-pointer h-1 bg-gray-700 rounded-lg"
+            />
+            <ZoomIn className="w-3.5 h-3.5 text-gray-400" />
+          </div>
         </div>
       </div>
     </div>
