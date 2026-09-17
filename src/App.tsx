@@ -4,23 +4,12 @@ import { RecordingOverlay } from './components/RecordingOverlay'
 import { SourcePickerModal } from './components/SourcePickerModal'
 import { DesktopSource } from '../electron/preload'
 import { recorderService, CaptureConfig } from './services/recorder'
-import { useMediaDevices } from './hooks/useMediaDevices'
 import { APP_CONFIG } from './config/appConfig'
 
 export const App: React.FC = () => {
   const [route, setRoute] = useState<string>('launcher')
   const [selectedSource, setSelectedSource] = useState<DesktopSource | null>(null)
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState<boolean>(false)
-
-  // Device hooks
-  const {
-    cameras,
-    mics,
-    selectedCameraId,
-    setSelectedCameraId,
-    selectedMicId,
-    setSelectedMicId
-  } = useMediaDevices()
 
   // Source configuration states
   const [enableCamera, setEnableCamera] = useState<boolean>(false)
@@ -51,9 +40,7 @@ export const App: React.FC = () => {
       isDisplay: selectedSource ? selectedSource.isDisplay : true,
       enableCamera: mode === 'camera' || enableCamera,
       enableMic,
-      enableSystemAudio,
-      cameraId: selectedCameraId,
-      micId: selectedMicId
+      enableSystemAudio
     }
 
     try {
@@ -115,12 +102,6 @@ export const App: React.FC = () => {
         setEnableMic={setEnableMic}
         enableSystemAudio={enableSystemAudio}
         setEnableSystemAudio={setEnableSystemAudio}
-        cameras={cameras}
-        mics={mics}
-        selectedCameraId={selectedCameraId}
-        setSelectedCameraId={setSelectedCameraId}
-        selectedMicId={selectedMicId}
-        setSelectedMicId={setSelectedMicId}
       />
 
       <SourcePickerModal
