@@ -38,6 +38,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     selectedTab: 'background',
     selectedClipId: null,
     previewScale: 'full',
+    timelineZoom: 1.0,
     hoverState: { element: null }
   })
 
@@ -108,6 +109,22 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [historyIndex, history, runtime.isPlaying])
+
+  // 60FPS Smooth playback loop for continuous playhead & time animation
+  useEffect(() => {
+    if (!runtime.isPlaying) return
+
+    let animId: number
+    const syncTime = () => {
+      if (videoRef.current && !videoRef.current.paused) {
+        setRuntime((r) => ({ ...r, currentTime: videoRef.current!.currentTime }))
+      }
+      animId = requestAnimationFrame(syncTime)
+    }
+
+    animId = requestAnimationFrame(syncTime)
+    return () => cancelAnimationFrame(animId)
+  }, [runtime.isPlaying])
 
   // Play/Pause Video toggle
   const handleTogglePlay = () => {
@@ -256,6 +273,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           onTogglePlay={handleTogglePlay}
           onTimeUpdate={(t) => setRuntime((r) => ({ ...r, currentTime: t }))}
           onSeek={handleSeek}
+          onZoomChange={(zoom) => setRuntime((r) => ({ ...r, timelineZoom: zoom }))}
         />
 
         <EditorSidebar

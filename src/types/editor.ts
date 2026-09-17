@@ -82,6 +82,7 @@ export interface StudioRuntimeState {
   selectedTab: 'background' | 'layout'
   selectedClipId: string | null
   previewScale: 'full' | 'half' | 'quarter'
+  timelineZoom?: number
   hoverState: { element: string | null }
 }
 

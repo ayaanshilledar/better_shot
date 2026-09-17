@@ -26,7 +26,7 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       blurAmount: 0
     },
     layout: {
-      padding: 10, // 10% padding
+      padding: 5, // 5% default padding
       cornerRadius: 12, // 12px rounded corners
       shadow: 'medium',
       aspectRatio: 'auto'

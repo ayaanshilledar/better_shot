@@ -66,40 +66,48 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
 
 
         <div className="flex-1 flex flex-col overflow-x-auto relative custom-scrollbar bg-[#0b0c10]">
-          {/* Time Scrubber Ruler Bar */}
+          {/* Scalable Inner Track Container */}
           <div
-            ref={rulerRef}
-            onClick={handleRulerClick}
-            className="h-7 bg-[#14161f] border-b border-white/10 relative cursor-pointer flex items-center"
+            className="relative transition-all duration-150 flex flex-col min-w-full min-h-full"
+            style={{ width: `${(runtime.timelineZoom || 1.0) * 100}%` }}
           >
-            {ticks.map((t) => {
-              const pos = (t / duration) * 100
-              return (
-                <div key={t} className="absolute flex flex-col items-center" style={{ left: `${pos}%` }}>
-                  <div className="h-2 w-px bg-gray-500" />
-                  <span className="text-[10px] font-mono text-gray-400 mt-0.5">0:0{t}</span>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Red Playhead Line */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none transition-all duration-75"
-            style={{ left: `calc(7rem + ${playheadPercent}%)` }}
-          >
-            <div className="w-3 h-3 bg-red-500 rounded-full -ml-[5px] -mt-1 shadow-md shadow-red-500/50" />
-          </div>
-
-          {/* Track 1: Video Track Layer */}
-          <div className="h-9 border-b border-white/5 relative flex items-center px-1">
+            {/* Time Scrubber Ruler Bar */}
             <div
-              className="h-7 bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center px-3 gap-2 text-xs font-semibold text-blue-200 shadow-sm"
-              style={{ width: '95%' }}
+              ref={rulerRef}
+              onClick={handleRulerClick}
+              className="h-7 bg-[#14161f] border-b border-white/10 relative cursor-pointer flex items-center select-none"
             >
-              <Film className="w-3.5 h-3.5 text-blue-400" />
-              <span>Clip {Math.round(duration)}s</span>
-              <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300 font-mono">1x</span>
+              {ticks.map((t) => {
+                const pos = (t / duration) * 100
+                return (
+                  <div key={t} className="absolute flex flex-col items-center" style={{ left: `${pos}%` }}>
+                    <div className="h-2 w-px bg-gray-500" />
+                    <span className="text-[10px] font-mono text-gray-400 mt-0.5">0:{t.toString().padStart(2, '0')}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Red Playhead Line */}
+            <div
+              className={`absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none ${
+                runtime.isPlaying ? 'transition-none' : 'transition-all duration-75'
+              }`}
+              style={{ left: `${playheadPercent}%` }}
+            >
+              <div className="w-3 h-3 bg-red-500 rounded-full -ml-[5px] -mt-1 shadow-md shadow-red-500/50" />
+            </div>
+
+            {/* Track 1: Video Track Layer */}
+            <div className="h-9 border-b border-white/5 relative flex items-center px-1">
+              <div
+                className="h-7 bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center px-3 gap-2 text-xs font-semibold text-blue-200 shadow-sm transition-all"
+                style={{ width: '100%' }}
+              >
+                <Film className="w-3.5 h-3.5 text-blue-400" />
+                <span>Clip {Math.round(duration)}s</span>
+                <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300 font-mono">1x</span>
+              </div>
             </div>
           </div>
         </div>
