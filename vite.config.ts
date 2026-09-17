@@ -11,6 +11,9 @@ export default defineConfig({
       {
         // Main-process entry point of the Electron App.
         entry: 'electron/main.ts',
+        onstart(options) {
+          options.startup()
+        },
         vite: {
           build: {
             outDir: 'dist-electron',
