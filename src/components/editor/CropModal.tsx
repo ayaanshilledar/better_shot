@@ -66,6 +66,30 @@ export const CropModal: React.FC<CropModalProps> = ({
     }
   }, [project.layout.cropRegion, isOpen])
 
+  // Arrow keys nudging handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const step = e.shiftKey ? 10 : 1
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setCrop((prev) => ({ ...prev, x: Math.max(0, prev.x - step) }))
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setCrop((prev) => ({ ...prev, x: Math.min(videoW - prev.width, prev.x + step) }))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setCrop((prev) => ({ ...prev, y: Math.max(0, prev.y - step) }))
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setCrop((prev) => ({ ...prev, y: Math.min(videoH - prev.height, prev.y + step) }))
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, videoW, videoH])
+
   if (!isOpen) return null
 
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
@@ -125,6 +149,9 @@ export const CropModal: React.FC<CropModalProps> = ({
     e.stopPropagation()
     setIsDragging(true)
     setDragHandle(handle)
+    if (handle !== 'move') {
+      setSelectedRatio('Free')
+    }
     setDragStart({
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -148,19 +175,39 @@ export const CropModal: React.FC<CropModalProps> = ({
       const newY = Math.max(0, Math.min(videoH - init.height, init.y + dy))
       setCrop((prev) => ({ ...prev, x: newX, y: newY }))
     } else if (dragHandle === 'top') {
-      const newY = Math.max(0, Math.min(init.y + init.height - 100, init.y + dy))
+      const newY = Math.max(0, Math.min(init.y + init.height - 50, init.y + dy))
       const newH = init.height - (newY - init.y)
       setCrop((prev) => ({ ...prev, y: newY, height: newH }))
     } else if (dragHandle === 'bottom') {
-      const newH = Math.max(100, Math.min(videoH - init.y, init.height + dy))
+      const newH = Math.max(50, Math.min(videoH - init.y, init.height + dy))
       setCrop((prev) => ({ ...prev, height: newH }))
     } else if (dragHandle === 'left') {
-      const newX = Math.max(0, Math.min(init.x + init.width - 100, init.x + dx))
+      const newX = Math.max(0, Math.min(init.x + init.width - 50, init.x + dx))
       const newW = init.width - (newX - init.x)
       setCrop((prev) => ({ ...prev, x: newX, width: newW }))
     } else if (dragHandle === 'right') {
-      const newW = Math.max(100, Math.min(videoW - init.x, init.width + dx))
+      const newW = Math.max(50, Math.min(videoW - init.x, init.width + dx))
       setCrop((prev) => ({ ...prev, width: newW }))
+    } else if (dragHandle === 'top-left') {
+      const newX = Math.max(0, Math.min(init.x + init.width - 50, init.x + dx))
+      const newW = init.width - (newX - init.x)
+      const newY = Math.max(0, Math.min(init.y + init.height - 50, init.y + dy))
+      const newH = init.height - (newY - init.y)
+      setCrop((prev) => ({ ...prev, x: newX, y: newY, width: newW, height: newH }))
+    } else if (dragHandle === 'top-right') {
+      const newW = Math.max(50, Math.min(videoW - init.x, init.width + dx))
+      const newY = Math.max(0, Math.min(init.y + init.height - 50, init.y + dy))
+      const newH = init.height - (newY - init.y)
+      setCrop((prev) => ({ ...prev, y: newY, width: newW, height: newH }))
+    } else if (dragHandle === 'bottom-left') {
+      const newX = Math.max(0, Math.min(init.x + init.width - 50, init.x + dx))
+      const newW = init.width - (newX - init.x)
+      const newH = Math.max(50, Math.min(videoH - init.y, init.height + dy))
+      setCrop((prev) => ({ ...prev, x: newX, height: newH, width: newW }))
+    } else if (dragHandle === 'bottom-right') {
+      const newW = Math.max(50, Math.min(videoW - init.x, init.width + dx))
+      const newH = Math.max(50, Math.min(videoH - init.y, init.height + dy))
+      setCrop((prev) => ({ ...prev, width: newW, height: newH }))
     }
   }
 
@@ -210,7 +257,12 @@ export const CropModal: React.FC<CropModalProps> = ({
           <div className="flex-1 flex flex-col items-center justify-center relative">
             <div
               ref={videoStageRef}
-              className="relative w-full h-[450px] bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/10 shadow-inner group"
+              className="relative bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/10 shadow-inner group max-w-full max-h-[450px]"
+              style={{
+                aspectRatio: `${videoW} / ${videoH}`,
+                width: '100%',
+                height: 'auto'
+              }}
             >
               {/* Raw Video Layer */}
               {mediaUrl ? (
@@ -218,14 +270,11 @@ export const CropModal: React.FC<CropModalProps> = ({
                   src={mediaUrl}
                   playsInline
                   muted
-                  className="w-full h-full object-contain pointer-events-none"
+                  className="w-full h-full object-fill pointer-events-none"
                 />
               ) : (
                 <div className="text-gray-500 text-xs">No media loaded</div>
               )}
-
-              {/* Dark dim overlay outside crop area */}
-              <div className="absolute inset-0 bg-black/50 pointer-events-none" />
 
               {/* Draggable Crop Rectangle Frame */}
               <div
@@ -236,49 +285,49 @@ export const CropModal: React.FC<CropModalProps> = ({
                   top: `${topPct}%`,
                   width: `${widthPct}%`,
                   height: `${heightPct}%`,
-                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)'
+                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)'
                 }}
               >
                 {/* Edge Handles */}
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'top')}
-                  className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full cursor-ns-resize shadow-md"
+                  className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full cursor-ns-resize shadow-md hover:scale-110 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'bottom')}
-                  className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full cursor-ns-resize shadow-md"
+                  className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full cursor-ns-resize shadow-md hover:scale-110 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'left')}
-                  className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-full cursor-ew-resize shadow-md"
+                  className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-full cursor-ew-resize shadow-md hover:scale-110 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'right')}
-                  className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-full cursor-ew-resize shadow-md"
+                  className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-full cursor-ew-resize shadow-md hover:scale-110 transition-transform"
                 />
 
                 {/* Corner Handles */}
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'top-left')}
-                  className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize shadow-md"
+                  className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'top-right')}
-                  className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize shadow-md"
+                  className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'bottom-left')}
-                  className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize shadow-md"
+                  className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
                 />
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'bottom-right')}
-                  className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize shadow-md"
+                  className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
                 />
               </div>
             </div>
 
             <p className="text-[11px] text-gray-400 mt-3">
-              Drag to move • Arrow keys nudge • Hold <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-white">⇧</span> to skip snapping
+              Drag corners & edges to crop • Arrow keys nudge • Hold <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-white">⇧</span> to nudge 10px
             </p>
           </div>
 
@@ -292,11 +341,24 @@ export const CropModal: React.FC<CropModalProps> = ({
                   <div
                     className="relative overflow-hidden w-full h-full flex items-center justify-center"
                     style={{
-                      transform: `scale(${100 / (widthPct || 100)})`,
-                      transformOrigin: `${leftPct}% ${topPct}%`
+                      aspectRatio: `${crop.width} / ${crop.height}`
                     }}
                   >
-                    <video src={mediaUrl} playsInline muted className="w-full h-full object-cover" />
+                    <video
+                      src={mediaUrl}
+                      playsInline
+                      muted
+                      style={{
+                        position: 'absolute',
+                        width: `${(videoW / (crop.width || 1)) * 100}%`,
+                        height: `${(videoH / (crop.height || 1)) * 100}%`,
+                        left: `${-(crop.x / (crop.width || 1)) * 100}%`,
+                        top: `${-(crop.y / (crop.height || 1)) * 100}%`,
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                        objectFit: 'fill'
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -313,8 +375,8 @@ export const CropModal: React.FC<CropModalProps> = ({
                       key={preset.id}
                       onClick={() => handleSelectAspect(preset.id, preset.ratio)}
                       className={`py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${isSelected
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-[#181a22] text-gray-400 hover:text-white hover:bg-[#20242e]'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-[#181a22] text-gray-400 hover:text-white hover:bg-[#20242e]'
                         }`}
                     >
                       {preset.label}

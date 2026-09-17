@@ -62,6 +62,26 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   // Streamable local media source URL
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
 
+  const videoW = project.media.width || 1920
+  const videoH = project.media.height || 1080
+  const crop = project.layout.cropRegion
+
+  const isCropped = Boolean(
+    crop &&
+    crop.width > 0 &&
+    crop.height > 0 &&
+    (crop.width !== videoW || crop.height !== videoH || crop.x !== 0 || crop.y !== 0)
+  )
+
+  const cropW = crop?.width || videoW
+  const cropH = crop?.height || videoH
+  const cropX = crop?.x || 0
+  const cropY = crop?.y || 0
+
+  const containerAspect = isCropped
+    ? `${cropW} / ${cropH}`
+    : `${videoW} / ${videoH}`
+
   return (
     <div
       ref={containerRef}
@@ -88,35 +108,77 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
         {/* Media Frame Container (Padding & Shadow Application) */}
         <div
-          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-full"
+          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-[70vh]"
           style={{
             padding: project.background.type === 'none' ? '0%' : `${project.layout.padding}%`,
-            width: project.layout.aspectRatio === '16:9' ? '90%' : project.layout.aspectRatio === '1:1' ? '70%' : '85%',
+            width: isCropped
+              ? 'auto'
+              : project.layout.aspectRatio === '16:9'
+              ? '90%'
+              : project.layout.aspectRatio === '1:1'
+              ? '70%'
+              : '85%',
             height: 'auto'
           }}
         >
           {/* Framed HTML5 Video Element (Hardware 60FPS) */}
           <div
-            className="overflow-hidden transition-all duration-300 relative group"
+            className="overflow-hidden transition-all duration-300 relative group flex items-center justify-center"
             style={{
               borderRadius: `${project.layout.cornerRadius}px`,
               boxShadow: getShadowStyle(),
               transform: `scale(${zoomScale})`,
-              transformOrigin: `${zoomOriginX} ${zoomOriginY}`
+              transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
+              aspectRatio: containerAspect,
+              width: isCropped ? 'auto' : '100%',
+              maxWidth: '100%',
+              maxHeight: '60vh'
             }}
           >
             {mediaUrl ? (
-              <video
-                ref={videoRef}
-                src={mediaUrl}
-                playsInline
-                className="w-full h-auto object-contain block max-h-[60vh]"
-                onTimeUpdate={() => {
-                  if (videoRef.current) {
-                    onTimeUpdate(videoRef.current.currentTime)
-                  }
-                }}
-              />
+              isCropped ? (
+                <div
+                  className="relative overflow-hidden w-full h-full"
+                  style={{
+                    aspectRatio: containerAspect,
+                    width: '100%',
+                    height: '100%'
+                  }}
+                >
+                  <video
+                    ref={videoRef}
+                    src={mediaUrl}
+                    playsInline
+                    style={{
+                      position: 'absolute',
+                      width: `${(videoW / cropW) * 100}%`,
+                      height: `${(videoH / cropH) * 100}%`,
+                      left: `${-(cropX / cropW) * 100}%`,
+                      top: `${-(cropY / cropH) * 100}%`,
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      objectFit: 'fill'
+                    }}
+                    onTimeUpdate={() => {
+                      if (videoRef.current) {
+                        onTimeUpdate(videoRef.current.currentTime)
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={mediaUrl}
+                  playsInline
+                  className="w-full h-auto object-contain block max-h-[60vh]"
+                  onTimeUpdate={() => {
+                    if (videoRef.current) {
+                      onTimeUpdate(videoRef.current.currentTime)
+                    }
+                  }}
+                />
+              )
             ) : (
               <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
                 No Video Stream Loaded
