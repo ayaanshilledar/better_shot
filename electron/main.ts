@@ -80,6 +80,7 @@ function createEditorWindow(filePath?: string) {
   }
 
   if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.maximize()
     editorWindow.show()
     editorWindow.focus()
     if (filePath) {
@@ -127,7 +128,10 @@ function createEditorWindow(filePath?: string) {
 
   editorWindow.once('ready-to-show', () => {
     console.log('[BetterShot:Main] editorWindow ready-to-show event fired')
-    if (!isSmokeTest) editorWindow?.show()
+    if (!isSmokeTest) {
+      editorWindow?.maximize()
+      editorWindow?.show()
+    }
   })
 
   editorWindow.on('closed', () => {
@@ -435,6 +439,22 @@ ipcMain.on('close-editor-window', (event) => {
   if (win && !win.isDestroyed()) {
     win.close()
   }
+})
+
+ipcMain.on('toggle-maximize-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || editorWindow
+  if (win && !win.isDestroyed()) {
+    if (win.isMaximized()) {
+      win.unmaximize()
+    } else {
+      win.maximize()
+    }
+  }
+})
+
+ipcMain.handle('is-window-maximized', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || editorWindow
+  return win && !win.isDestroyed() ? win.isMaximized() : false
 })
 
 ipcMain.on('set-overlay-draggable', (_event, draggable: boolean) => {

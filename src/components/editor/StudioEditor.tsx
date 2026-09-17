@@ -98,6 +98,10 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         handleRedo()
+      } else if (e.key === 'Escape') {
+        if (onCloseEditor) onCloseEditor()
+        else if (window.electronAPI?.closeEditorWindow) window.electronAPI.closeEditorWindow()
+        else window.electronAPI?.closeLauncher()
       }
     }
 

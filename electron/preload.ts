@@ -55,6 +55,14 @@ const electronAPI = {
       console.error('Error closing editor window:', e)
     }
   },
+  toggleMaximizeWindow: () => {
+    try {
+      ipcRenderer.send('toggle-maximize-window')
+    } catch (e) {
+      console.error('Error toggling maximize window:', e)
+    }
+  },
+  isWindowMaximized: (): Promise<boolean> => ipcRenderer.invoke('is-window-maximized'),
   setOverlayDraggable: (draggable: boolean) => ipcRenderer.send('set-overlay-draggable', draggable),
 
   // Overlay Window Bounds Mode

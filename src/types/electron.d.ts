@@ -16,6 +16,8 @@ declare global {
       closeLauncher: () => void
       closeEditorWindow: () => void
       openEditorWindow: (filePath?: string) => Promise<boolean>
+      toggleMaximizeWindow: () => void
+      isWindowMaximized: () => Promise<boolean>
       setOverlayDraggable: (draggable: boolean) => void
       setOverlayMode: (mode: 'countdown' | 'recording') => Promise<boolean>
 
