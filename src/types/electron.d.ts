@@ -14,6 +14,8 @@ declare global {
       saveRecording: (buffer: ArrayBuffer, fileName?: string) => Promise<{ success: boolean; filePath?: string; error?: string }>
       minimizeLauncher: () => void
       closeLauncher: () => void
+      closeEditorWindow: () => void
+      openEditorWindow: (filePath?: string) => Promise<boolean>
       setOverlayDraggable: (draggable: boolean) => void
       setOverlayMode: (mode: 'countdown' | 'recording') => Promise<boolean>
 
@@ -42,6 +44,7 @@ declare global {
       // Event listeners
       onRecordingStateChanged: (callback: (state: string) => void) => () => void
       onAreaSelected: (callback: (cropRegion: CropRegion) => void) => () => void
+      onLoadEditorMedia: (callback: (filePath: string) => void) => () => void
     }
   }
 }

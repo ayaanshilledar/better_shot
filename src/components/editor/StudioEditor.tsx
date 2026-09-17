@@ -173,6 +173,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         await window.electronAPI.deleteRecording(project.media.sourcePath)
       }
       if (onCloseEditor) onCloseEditor()
+      else if (window.electronAPI?.closeEditorWindow) window.electronAPI.closeEditorWindow()
       else window.electronAPI?.closeLauncher()
     }
   }
@@ -231,6 +232,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         onScaleChange={(scale) => setRuntime((r) => ({ ...r, previewScale: scale }))}
         onClose={() => {
           if (onCloseEditor) onCloseEditor()
+          else if (window.electronAPI?.closeEditorWindow) window.electronAPI.closeEditorWindow()
           else window.electronAPI?.closeLauncher()
         }}
         onMinimize={() => window.electronAPI?.minimizeLauncher()}

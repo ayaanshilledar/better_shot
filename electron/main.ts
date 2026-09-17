@@ -75,6 +75,10 @@ let selectionWindow: BrowserWindow | null = null
 let editorWindow: BrowserWindow | null = null
 
 function createEditorWindow(filePath?: string) {
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    launcherWindow.hide()
+  }
+
   if (editorWindow && !editorWindow.isDestroyed()) {
     editorWindow.show()
     editorWindow.focus()
@@ -128,6 +132,10 @@ function createEditorWindow(filePath?: string) {
 
   editorWindow.on('closed', () => {
     editorWindow = null
+    if (launcherWindow && !launcherWindow.isDestroyed()) {
+      launcherWindow.show()
+      launcherWindow.focus()
+    }
   })
 }
 
@@ -360,9 +368,12 @@ ipcMain.handle('stop-recording-mode', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.hide()
   }
+  // Only show launcher if editorWindow is NOT active/open
   if (launcherWindow && !launcherWindow.isDestroyed()) {
-    launcherWindow.show()
-    launcherWindow.focus()
+    if (!editorWindow || editorWindow.isDestroyed() || !editorWindow.isVisible()) {
+      launcherWindow.show()
+      launcherWindow.focus()
+    }
   }
   return true
 })
@@ -410,8 +421,20 @@ ipcMain.on('minimize-launcher', (event) => {
   }
 })
 
-ipcMain.on('close-launcher', () => {
+ipcMain.on('close-launcher', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win && win === editorWindow && !win.isDestroyed()) {
+    win.close()
+    return
+  }
   app.exit(0)
+})
+
+ipcMain.on('close-editor-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || editorWindow
+  if (win && !win.isDestroyed()) {
+    win.close()
+  }
 })
 
 ipcMain.on('set-overlay-draggable', (_event, draggable: boolean) => {

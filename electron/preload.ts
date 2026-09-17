@@ -48,6 +48,13 @@ const electronAPI = {
       console.error('Error closing launcher:', e)
     }
   },
+  closeEditorWindow: () => {
+    try {
+      ipcRenderer.send('close-editor-window')
+    } catch (e) {
+      console.error('Error closing editor window:', e)
+    }
+  },
   setOverlayDraggable: (draggable: boolean) => ipcRenderer.send('set-overlay-draggable', draggable),
 
   // Overlay Window Bounds Mode

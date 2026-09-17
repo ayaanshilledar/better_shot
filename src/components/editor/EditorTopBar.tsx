@@ -13,7 +13,8 @@ import {
   Minus,
   Maximize2,
   X,
-  UserCheck
+  UserCheck,
+  Home
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState } from '../../types/editor'
 
@@ -58,6 +59,14 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     <header className="h-12 bg-[#12141a]/95 border-b border-white/10 px-3 flex items-center justify-between select-none z-30 drag-region">
       {/* Left section: Project Title & Quick Actions */}
       <div className="flex items-center gap-2 no-drag">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-2.5 py-1 bg-[#1a1d26] hover:bg-[#222735] text-gray-300 hover:text-white text-xs font-medium rounded-lg border border-white/5 transition-all cursor-pointer mr-0.5"
+          title="Return to Launcher Home"
+        >
+          <Home className="w-3.5 h-3.5 text-blue-400" />
+          <span>Home</span>
+        </button>
         <div className="flex items-center gap-1.5 bg-[#1a1d26] hover:bg-[#222735] px-2.5 py-1 rounded-lg border border-white/5 transition-all">
           <input
             type="text"
