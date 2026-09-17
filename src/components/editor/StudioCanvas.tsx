@@ -68,15 +68,15 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
   const isCropped = Boolean(
     crop &&
-    crop.width > 0 &&
-    crop.height > 0 &&
+    crop.width > 50 &&
+    crop.height > 50 &&
     (crop.width !== videoW || crop.height !== videoH || crop.x !== 0 || crop.y !== 0)
   )
 
-  const cropW = crop?.width || videoW
-  const cropH = crop?.height || videoH
-  const cropX = crop?.x || 0
-  const cropY = crop?.y || 0
+  const cropW = Math.max(50, crop?.width || videoW)
+  const cropH = Math.max(50, crop?.height || videoH)
+  const cropX = Math.max(0, crop?.x || 0)
+  const cropY = Math.max(0, crop?.y || 0)
 
   const containerAspect = isCropped
     ? `${cropW} / ${cropH}`
@@ -108,31 +108,26 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
         {/* Media Frame Container (Padding & Shadow Application) */}
         <div
-          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-[70vh]"
+          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden"
           style={{
             padding: project.background.type === 'none' ? '0%' : `${project.layout.padding}%`,
-            width: isCropped
-              ? 'auto'
-              : project.layout.aspectRatio === '16:9'
-              ? '90%'
-              : project.layout.aspectRatio === '1:1'
-              ? '70%'
-              : '85%',
-            height: 'auto'
+            width: '100%',
+            height: '100%'
           }}
         >
           {/* Framed HTML5 Video Element (Hardware 60FPS) */}
           <div
-            className="overflow-hidden transition-all duration-300 relative group flex items-center justify-center"
+            className="overflow-hidden transition-all duration-300 relative group flex items-center justify-center max-w-full max-h-full"
             style={{
               borderRadius: `${project.layout.cornerRadius}px`,
               boxShadow: getShadowStyle(),
-              transform: `scale(${zoomScale})`,
+              transform: `scale(${zoomScale}) translateZ(0)`,
               transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
               aspectRatio: containerAspect,
               width: isCropped ? 'auto' : '100%',
-              maxWidth: '100%',
-              maxHeight: '60vh'
+              height: isCropped ? '100%' : 'auto',
+              maxHeight: '60vh',
+              maxWidth: '100%'
             }}
           >
             {mediaUrl ? (
@@ -149,15 +144,16 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                     ref={videoRef}
                     src={mediaUrl}
                     playsInline
+                    className="absolute max-w-none max-h-none"
                     style={{
-                      position: 'absolute',
                       width: `${(videoW / cropW) * 100}%`,
                       height: `${(videoH / cropH) * 100}%`,
                       left: `${-(cropX / cropW) * 100}%`,
                       top: `${-(cropY / cropH) * 100}%`,
-                      maxWidth: 'none',
-                      maxHeight: 'none',
-                      objectFit: 'fill'
+                      objectFit: 'cover',
+                      transform: 'translateZ(0)',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden'
                     }}
                     onTimeUpdate={() => {
                       if (videoRef.current) {
@@ -172,6 +168,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   src={mediaUrl}
                   playsInline
                   className="w-full h-auto object-contain block max-h-[60vh]"
+                  style={{
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden'
+                  }}
                   onTimeUpdate={() => {
                     if (videoRef.current) {
                       onTimeUpdate(videoRef.current.currentTime)
