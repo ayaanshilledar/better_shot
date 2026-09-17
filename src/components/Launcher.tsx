@@ -1,27 +1,19 @@
 import React, { useState } from 'react'
 import {
   Monitor,
-  AppWindow as WindowIcon,
   Crop,
-  Video,
   Mic,
   MicOff,
   Volume2,
   VolumeX,
-  ChevronDown,
   Minus,
   X,
   Play
 } from 'lucide-react'
-import { DesktopSource } from '../../electron/preload'
 import { APP_CONFIG } from '../config/appConfig'
 
 interface LauncherProps {
-  onStartRecording: (mode: 'display' | 'window' | 'area' | 'camera') => void
-  onOpenSourcePicker: () => void
-  selectedSource: DesktopSource | null
-  enableCamera: boolean
-  setEnableCamera: (val: boolean) => void
+  onStartRecording: (mode: 'display' | 'area') => void
   enableMic: boolean
   setEnableMic: (val: boolean) => void
   enableSystemAudio: boolean
@@ -30,16 +22,12 @@ interface LauncherProps {
 
 export const Launcher: React.FC<LauncherProps> = ({
   onStartRecording,
-  onOpenSourcePicker,
-  selectedSource,
-  enableCamera,
-  setEnableCamera,
   enableMic,
   setEnableMic,
   enableSystemAudio,
   setEnableSystemAudio
 }) => {
-  const [activeCaptureMode, setActiveCaptureMode] = useState<'display' | 'window' | 'area' | 'camera'>('display')
+  const [activeCaptureMode, setActiveCaptureMode] = useState<'display' | 'area'>('display')
 
   const handleMinimize = () => {
     window.electronAPI?.minimizeLauncher()
@@ -52,30 +40,38 @@ export const Launcher: React.FC<LauncherProps> = ({
   return (
     <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none">
       {/* Window Drag Header */}
-      <div className="drag-region px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90">
-        {/* Left branding */}
-        <div className="flex items-center gap-2 no-drag">
-          <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center shadow-md">
-            <div className="w-3 h-3 rounded-full border-2 border-black" />
-          </div>
+      <div className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90">
+        {/* Left branding (Draggable title region) */}
+        <div className="drag-region flex-1 flex items-center gap-2">
           <span className="text-sm font-bold tracking-tight text-white">{APP_CONFIG.appName}</span>
-          <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-md border border-white/10">
-            {APP_CONFIG.workspaceLabel}
-          </span>
         </div>
 
-        {/* Right window actions */}
-        <div className="flex items-center gap-1 no-drag">
+        {/* Right window actions (Non-draggable clickable buttons) */}
+        <div className="flex items-center gap-1 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button
-            onClick={handleMinimize}
-            className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (window.electronAPI?.minimizeLauncher) {
+                window.electronAPI.minimizeLauncher()
+              }
+            }}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
             title="Minimize"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={handleClose}
-            className="p-1 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (window.electronAPI?.closeLauncher) {
+                window.electronAPI.closeLauncher()
+              }
+            }}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors cursor-pointer"
             title="Close"
           >
             <X className="w-3.5 h-3.5" />
@@ -85,54 +81,19 @@ export const Launcher: React.FC<LauncherProps> = ({
 
       {/* Main Content Body */}
       <div className="p-3 flex-1 flex flex-col gap-2.5 overflow-hidden">
-        {/* 2x2 Capture Source Grid */}
+        {/* 2-Column Capture Source Grid */}
         <div className="grid grid-cols-2 gap-2">
           {/* Display option */}
           <div
-            onClick={() => {
-              setActiveCaptureMode('display')
-              onOpenSourcePicker()
-            }}
-            className={`group relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+            onClick={() => setActiveCaptureMode('display')}
+            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
               activeCaptureMode === 'display'
                 ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <Monitor className={`w-4 h-4 flex-shrink-0 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
-              <div className="flex flex-col truncate">
-                <span className="text-xs font-bold text-white">Display</span>
-                <span className="text-[9px] text-gray-400 truncate">
-                  {selectedSource?.isDisplay ? selectedSource.name : 'Full Screen'}
-                </span>
-              </div>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-          </div>
-
-          {/* Window option */}
-          <div
-            onClick={() => {
-              setActiveCaptureMode('window')
-              onOpenSourcePicker()
-            }}
-            className={`group relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-              activeCaptureMode === 'window'
-                ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
-                : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
-            }`}
-          >
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <WindowIcon className={`w-4 h-4 flex-shrink-0 ${activeCaptureMode === 'window' ? 'text-blue-400' : 'text-gray-400'}`} />
-              <div className="flex flex-col truncate">
-                <span className="text-xs font-bold text-white">Window</span>
-                <span className="text-[9px] text-gray-400 truncate">
-                  {selectedSource && !selectedSource.isDisplay ? selectedSource.name : 'App Window'}
-                </span>
-              </div>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <Monitor className={`w-4 h-4 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
+            <span className="text-xs font-bold text-white">Display</span>
           </div>
 
           {/* Area option */}
@@ -146,19 +107,6 @@ export const Launcher: React.FC<LauncherProps> = ({
           >
             <Crop className={`w-4 h-4 ${activeCaptureMode === 'area' ? 'text-blue-400' : 'text-gray-400'}`} />
             <span className="text-xs font-bold text-white">Area</span>
-          </div>
-
-          {/* Camera Only option */}
-          <div
-            onClick={() => setActiveCaptureMode('camera')}
-            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-              activeCaptureMode === 'camera'
-                ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
-                : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
-            }`}
-          >
-            <Video className={`w-4 h-4 ${activeCaptureMode === 'camera' ? 'text-blue-400' : 'text-gray-400'}`} />
-            <span className="text-xs font-bold text-white">Camera Only</span>
           </div>
         </div>
 

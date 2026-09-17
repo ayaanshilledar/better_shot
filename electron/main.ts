@@ -14,8 +14,8 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 370,
-    height: 420,
+    width: 350,
+    height: 275,
     resizable: false,
     frame: false,
     transparent: true,
@@ -162,13 +162,24 @@ ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: 
 })
 
 // 5. Window controls
-ipcMain.on('minimize-launcher', () => {
-  launcherWindow?.minimize()
-})
+const handleMinimizeWindow = (event: any) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || launcherWindow
+  if (win && !win.isDestroyed()) {
+    win.minimize()
+  }
+  return true
+}
 
-ipcMain.on('close-launcher', () => {
-  app.quit()
-})
+const handleCloseApp = () => {
+  app.exit(0)
+  return true
+}
+
+ipcMain.on('minimize-launcher', handleMinimizeWindow)
+ipcMain.handle('minimize-launcher', handleMinimizeWindow)
+
+ipcMain.on('close-launcher', handleCloseApp)
+ipcMain.handle('close-launcher', handleCloseApp)
 
 ipcMain.on('set-overlay-draggable', (_event, draggable: boolean) => {
   if (overlayWindow) {

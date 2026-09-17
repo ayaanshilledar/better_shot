@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Launcher } from './components/Launcher'
 import { RecordingOverlay } from './components/RecordingOverlay'
-import { SourcePickerModal } from './components/SourcePickerModal'
-import { DesktopSource } from '../electron/preload'
 import { recorderService, CaptureConfig } from './services/recorder'
 import { APP_CONFIG } from './config/appConfig'
 
 export const App: React.FC = () => {
   const [route, setRoute] = useState<string>('launcher')
-  const [selectedSource, setSelectedSource] = useState<DesktopSource | null>(null)
-  const [isSourcePickerOpen, setIsSourcePickerOpen] = useState<boolean>(false)
 
   // Source configuration states
-  const [enableCamera, setEnableCamera] = useState<boolean>(false)
   const [enableMic, setEnableMic] = useState<boolean>(true)
   const [enableSystemAudio, setEnableSystemAudio] = useState<boolean>(true)
 
@@ -22,23 +17,29 @@ export const App: React.FC = () => {
       setRoute('overlay')
     } else {
       setRoute('launcher')
-      // Auto-load primary screen source
-      if (window.electronAPI?.getDesktopSources) {
-        window.electronAPI.getDesktopSources().then((sources) => {
-          const primaryScreen = sources.find((s) => s.isDisplay) || sources[0]
-          if (primaryScreen) {
-            setSelectedSource(primaryScreen)
-          }
-        })
-      }
     }
   }, [])
 
-  const handleStartRecording = async (mode: 'display' | 'window' | 'area' | 'camera') => {
+  const handleStartRecording = async (_mode: 'display' | 'area') => {
+    let sourceId: string | null = null
+
+    // Get primary display screen directly
+    if (window.electronAPI?.getDesktopSources) {
+      try {
+        const sources = await window.electronAPI.getDesktopSources()
+        const primaryScreen = sources.find((s) => s.isDisplay) || sources[0]
+        if (primaryScreen) {
+          sourceId = primaryScreen.id
+        }
+      } catch (err) {
+        console.warn('Could not auto-fetch display source:', err)
+      }
+    }
+
     const config: CaptureConfig = {
-      sourceId: selectedSource ? selectedSource.id : null,
-      isDisplay: selectedSource ? selectedSource.isDisplay : true,
-      enableCamera: mode === 'camera' || enableCamera,
+      sourceId,
+      isDisplay: true,
+      enableCamera: false,
       enableMic,
       enableSystemAudio
     }
@@ -94,21 +95,10 @@ export const App: React.FC = () => {
     <div className="w-screen h-screen p-2 bg-transparent overflow-hidden">
       <Launcher
         onStartRecording={handleStartRecording}
-        onOpenSourcePicker={() => setIsSourcePickerOpen(true)}
-        selectedSource={selectedSource}
-        enableCamera={enableCamera}
-        setEnableCamera={setEnableCamera}
         enableMic={enableMic}
         setEnableMic={setEnableMic}
         enableSystemAudio={enableSystemAudio}
         setEnableSystemAudio={setEnableSystemAudio}
-      />
-
-      <SourcePickerModal
-        isOpen={isSourcePickerOpen}
-        onClose={() => setIsSourcePickerOpen(false)}
-        onSelectSource={(source) => setSelectedSource(source)}
-        selectedSourceId={selectedSource?.id || null}
       />
     </div>
   )

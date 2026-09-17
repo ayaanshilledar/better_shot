@@ -14,8 +14,22 @@ const electronAPI = {
   stopRecordingMode: (): Promise<boolean> => ipcRenderer.invoke('stop-recording-mode'),
   saveRecording: (buffer: ArrayBuffer, fileName?: string): Promise<{ success: boolean; filePath?: string; error?: string }> =>
     ipcRenderer.invoke('save-recording', buffer, fileName),
-  minimizeLauncher: () => ipcRenderer.send('minimize-launcher'),
-  closeLauncher: () => ipcRenderer.send('close-launcher'),
+  minimizeLauncher: () => {
+    try {
+      ipcRenderer.send('minimize-launcher')
+      ipcRenderer.invoke('minimize-launcher').catch(() => {})
+    } catch (e) {
+      console.error('Error minimizing launcher:', e)
+    }
+  },
+  closeLauncher: () => {
+    try {
+      ipcRenderer.send('close-launcher')
+      ipcRenderer.invoke('close-launcher').catch(() => {})
+    } catch (e) {
+      console.error('Error closing launcher:', e)
+    }
+  },
   setOverlayDraggable: (draggable: boolean) => ipcRenderer.send('set-overlay-draggable', draggable),
 
   // Event listeners
