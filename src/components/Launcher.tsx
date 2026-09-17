@@ -8,16 +8,26 @@ import {
   VolumeX,
   Minus,
   X,
-  Play
+  Play,
+  History,
+  FolderOpen,
+  Film,
+  Clock,
+  RefreshCw
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
+import { DesktopSource, RecordedFile } from '../../electron/preload'
+
+export type CaptureMode = 'display' | 'area'
 
 interface LauncherProps {
-  onStartRecording: (mode: 'display' | 'area') => void
+  onStartRecording: (mode: CaptureMode, sourceId: string | null) => void
   enableMic: boolean
   setEnableMic: (val: boolean) => void
   enableSystemAudio: boolean
   setEnableSystemAudio: (val: boolean) => void
+  selectedSource: DesktopSource | null
+  onOpenSourcePicker: () => void
 }
 
 export const Launcher: React.FC<LauncherProps> = ({
@@ -25,52 +35,110 @@ export const Launcher: React.FC<LauncherProps> = ({
   enableMic,
   setEnableMic,
   enableSystemAudio,
-  setEnableSystemAudio
+  setEnableSystemAudio,
+  selectedSource,
+  onOpenSourcePicker
 }) => {
-  const [activeCaptureMode, setActiveCaptureMode] = useState<'display' | 'area'>('display')
+  const [activeCaptureMode, setActiveCaptureMode] = useState<CaptureMode>('display')
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)
+  const [recordings, setRecordings] = useState<RecordedFile[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
 
-  const handleMinimize = () => {
-    window.electronAPI?.minimizeLauncher()
+  const handleModeClick = (mode: CaptureMode) => {
+    console.log(`[BetterShot:Launcher] Capture mode changed to: ${mode}`)
+    setActiveCaptureMode(mode)
   }
 
-  const handleClose = () => {
-    window.electronAPI?.closeLauncher()
+  const loadRecordings = async () => {
+    setIsLoadingHistory(true)
+    try {
+      if (window.electronAPI?.getRecordings) {
+        const files = await window.electronAPI.getRecordings()
+        setRecordings(files)
+      }
+    } catch (err) {
+      console.error('[BetterShot:Launcher] Error fetching recordings history:', err)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const handleOpenHistory = () => {
+    setIsHistoryOpen(true)
+    loadRecordings()
+  }
+
+  const handlePlayRecording = async (filePath: string) => {
+    console.log('[BetterShot:Launcher] Opening recording file:', filePath)
+    if (window.electronAPI?.openRecordingFile) {
+      await window.electronAPI.openRecordingFile(filePath)
+    }
+  }
+
+  const handleOpenFolder = async () => {
+    console.log('[BetterShot:Launcher] Opening recordings folder')
+    if (window.electronAPI?.openRecordingsFolder) {
+      await window.electronAPI.openRecordingsFolder()
+    }
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${Math.round(bytes / 1024)} KB`
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp)
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
 
   return (
-    <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none">
+    <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none font-sans relative">
       {/* Window Drag Header */}
-      <div className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90">
-        {/* Left branding (Draggable title region) */}
+      <div className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90 z-10">
         <div className="drag-region flex-1 flex items-center gap-2">
-          <span className="text-sm font-bold tracking-tight text-white">{APP_CONFIG.appName}</span>
+          <span className="text-xs font-bold tracking-tight text-white flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+            {APP_CONFIG.appName}
+          </span>
         </div>
 
-        {/* Right window actions (Non-draggable clickable buttons) */}
         <div className="flex items-center gap-1 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          {/* History Icon */}
           <button
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              if (window.electronAPI?.minimizeLauncher) {
-                window.electronAPI.minimizeLauncher()
-              }
+              handleOpenHistory()
             }}
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+            title="Recording History"
+          >
+            <History className="w-3.5 h-3.5" />
+          </button>
+          {/* Minimize Icon */}
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              console.log('[BetterShot:Launcher] Minimize button clicked')
+              window.electronAPI?.minimizeLauncher()
+            }}
             className="no-drag p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
             title="Minimize"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
+          {/* Close Icon */}
           <button
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              if (window.electronAPI?.closeLauncher) {
-                window.electronAPI.closeLauncher()
-              }
+              console.log('[BetterShot:Launcher] Close button clicked')
+              window.electronAPI?.closeLauncher()
             }}
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             className="no-drag p-1 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors cursor-pointer"
             title="Close"
           >
@@ -80,53 +148,55 @@ export const Launcher: React.FC<LauncherProps> = ({
       </div>
 
       {/* Main Content Body */}
-      <div className="p-3 flex-1 flex flex-col gap-2.5 overflow-hidden">
-        {/* 2-Column Capture Source Grid */}
+      <div className="p-3 flex-1 flex flex-col justify-between gap-2 overflow-hidden">
+        {/* 2-Column Capture Mode Grid: Display & Area */}
         <div className="grid grid-cols-2 gap-2">
           {/* Display option */}
-          <div
-            onClick={() => setActiveCaptureMode('display')}
-            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+          <button
+            onClick={() => handleModeClick('display')}
+            className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all ${
               activeCaptureMode === 'display'
-                ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
-                : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
+                ? 'bg-blue-600/20 border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg text-white'
+                : 'bg-[#181b22] border-white/5 text-gray-400 hover:text-white hover:bg-[#20242e]'
             }`}
           >
             <Monitor className={`w-4 h-4 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
-            <span className="text-xs font-bold text-white">Display</span>
-          </div>
+            <span className="text-xs font-bold">Display</span>
+          </button>
 
           {/* Area option */}
-          <div
-            onClick={() => setActiveCaptureMode('area')}
-            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+          <button
+            onClick={() => handleModeClick('area')}
+            className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all ${
               activeCaptureMode === 'area'
-                ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
-                : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
+                ? 'bg-blue-600/20 border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg text-white'
+                : 'bg-[#181b22] border-white/5 text-gray-400 hover:text-white hover:bg-[#20242e]'
             }`}
           >
             <Crop className={`w-4 h-4 ${activeCaptureMode === 'area' ? 'text-blue-400' : 'text-gray-400'}`} />
-            <span className="text-xs font-bold text-white">Area</span>
-          </div>
+            <span className="text-xs font-bold">Area</span>
+          </button>
         </div>
 
         {/* Audio Source Toggles */}
-        <div className="flex flex-col gap-2 pt-0.5">
+        <div className="flex flex-col gap-1.5">
           {/* Microphone toggle */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between p-2 px-3 rounded-xl bg-[#181b22] border border-white/5">
+            <div className="flex items-center gap-2">
               {enableMic ? (
-                <Mic className="w-4 h-4 text-blue-400" />
+                <Mic className="w-3.5 h-3.5 text-blue-400" />
               ) : (
-                <MicOff className="w-4 h-4 text-gray-400" />
+                <MicOff className="w-3.5 h-3.5 text-gray-400" />
               )}
-              <span className="text-xs font-semibold text-white">
-                {enableMic ? 'Microphone' : 'No Microphone'}
-              </span>
+              <span className="text-xs font-semibold text-white">Microphone</span>
             </div>
             <button
-              onClick={() => setEnableMic(!enableMic)}
-              className={`px-3 py-0.5 rounded-full text-xs font-bold transition-all ${
+              onClick={() => {
+                const nextVal = !enableMic
+                console.log(`[BetterShot:Launcher] Microphone toggle changed to: ${nextVal ? 'ON' : 'OFF'}`)
+                setEnableMic(nextVal)
+              }}
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
                 enableMic
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -137,20 +207,22 @@ export const Launcher: React.FC<LauncherProps> = ({
           </div>
 
           {/* System Audio toggle */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between p-2 px-3 rounded-xl bg-[#181b22] border border-white/5">
+            <div className="flex items-center gap-2">
               {enableSystemAudio ? (
-                <Volume2 className="w-4 h-4 text-blue-400" />
+                <Volume2 className="w-3.5 h-3.5 text-blue-400" />
               ) : (
-                <VolumeX className="w-4 h-4 text-gray-400" />
+                <VolumeX className="w-3.5 h-3.5 text-gray-400" />
               )}
-              <span className="text-xs font-semibold text-white">
-                {enableSystemAudio ? 'System Audio' : 'No System Audio'}
-              </span>
+              <span className="text-xs font-semibold text-white">System Audio</span>
             </div>
             <button
-              onClick={() => setEnableSystemAudio(!enableSystemAudio)}
-              className={`px-3 py-0.5 rounded-full text-xs font-bold transition-all ${
+              onClick={() => {
+                const nextVal = !enableSystemAudio
+                console.log(`[BetterShot:Launcher] System Audio toggle changed to: ${nextVal ? 'ON' : 'OFF'}`)
+                setEnableSystemAudio(nextVal)
+              }}
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
                 enableSystemAudio
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -163,13 +235,91 @@ export const Launcher: React.FC<LauncherProps> = ({
 
         {/* Start Recording CTA */}
         <button
-          onClick={() => onStartRecording(activeCaptureMode)}
-          className="mt-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all"
+          onClick={() => {
+            console.log(`[BetterShot:Launcher] Start Recording clicked with mode: ${activeCaptureMode}, sourceId: ${selectedSource?.id}`)
+            onStartRecording(activeCaptureMode, selectedSource?.id || null)
+          }}
+          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all cursor-pointer"
         >
           <Play className="w-3.5 h-3.5 fill-white" />
           Start Recording
         </button>
       </div>
+
+      {/* Recording History Modal Overlay */}
+      {isHistoryOpen && (
+        <div className="absolute inset-0 bg-[#101216]/95 backdrop-blur-md z-30 flex flex-col p-3 overflow-hidden animate-in fade-in duration-150">
+          <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
+            <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+              <Film className="w-3.5 h-3.5 text-blue-400" />
+              Recorded Videos
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={loadRecordings}
+                className="p-1 text-gray-400 hover:text-white rounded transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={handleOpenFolder}
+                className="p-1 text-gray-400 hover:text-white rounded transition-colors"
+                title="Open Folder"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
+              </button>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+            {recordings.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs py-8">
+                <Film className="w-8 h-8 mb-2 opacity-40 text-gray-400" />
+                No recorded videos yet
+              </div>
+            ) : (
+              recordings.map((rec) => (
+                <div
+                  key={rec.filePath}
+                  onClick={() => handlePlayRecording(rec.filePath)}
+                  className="p-2 rounded-xl bg-[#181b22] border border-white/5 hover:border-blue-500/40 hover:bg-[#20242e] transition-all flex items-center justify-between cursor-pointer group"
+                >
+                  <div className="flex flex-col min-w-0 flex-1 pr-2">
+                    <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
+                      {rec.name}
+                    </span>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5 text-gray-500" />
+                        {formatDate(rec.createdAt)}
+                      </span>
+                      <span>•</span>
+                      <span>{formatFileSize(rec.size)}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handlePlayRecording(rec.filePath)
+                    }}
+                    className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                    title="Play Video"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
