@@ -108,6 +108,7 @@ const electronAPI = {
 
   // Recordings Manager
   getRecordings: (): Promise<RecordedFile[]> => ipcRenderer.invoke('get-recordings'),
+  deleteRecording: (filePath: string): Promise<boolean> => ipcRenderer.invoke('delete-recording', filePath),
   openRecordingFile: (filePath: string): Promise<boolean> => ipcRenderer.invoke('open-recording-file', filePath),
   openRecordingsFolder: (): Promise<boolean> => ipcRenderer.invoke('open-recordings-folder'),
 

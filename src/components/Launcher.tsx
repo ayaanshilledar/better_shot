@@ -13,7 +13,8 @@ import {
   FolderOpen,
   Film,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
@@ -81,6 +82,17 @@ export const Launcher: React.FC<LauncherProps> = ({
     console.log('[BetterShot:Launcher] Opening recording file:', filePath)
     if (window.electronAPI?.openRecordingFile) {
       await window.electronAPI.openRecordingFile(filePath)
+    }
+  }
+
+  const handleDeleteRecording = async (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation()
+    console.log('[BetterShot:Launcher] Deleting recording file:', filePath)
+    if (window.electronAPI?.deleteRecording) {
+      const success = await window.electronAPI.deleteRecording(filePath)
+      if (success) {
+        loadRecordings()
+      }
     }
   }
 
@@ -293,37 +305,61 @@ export const Launcher: React.FC<LauncherProps> = ({
                 No recorded videos yet
               </div>
             ) : (
-              recordings.map((rec) => (
-                <div
-                  key={rec.filePath}
-                  onClick={() => handlePlayRecording(rec.filePath)}
-                  className="p-2 rounded-xl bg-[#181b22] border border-white/5 hover:border-blue-500/40 hover:bg-[#20242e] transition-all flex items-center justify-between cursor-pointer group"
-                >
-                  <div className="flex flex-col min-w-0 flex-1 pr-2">
-                    <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
-                      {rec.name}
-                    </span>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5 text-gray-500" />
-                        {formatDate(rec.createdAt)}
+              recordings.map((rec) => {
+                const videoUri = `file:///${rec.filePath.replace(/\\/g, '/')}#t=0.5`
+                return (
+                  <div
+                    key={rec.filePath}
+                    onClick={() => handlePlayRecording(rec.filePath)}
+                    className="p-2 rounded-xl bg-[#181b22] border border-white/5 hover:border-blue-500/40 hover:bg-[#20242e] transition-all flex items-center gap-2.5 cursor-pointer group"
+                  >
+                    {/* Video Thumbnail Preview */}
+                    <div className="relative w-16 h-11 rounded-lg overflow-hidden bg-black/80 border border-white/10 shrink-0 flex items-center justify-center group-hover:border-blue-500/50 transition-colors shadow-inner">
+                      <video
+                        src={videoUri}
+                        className="w-full h-full object-cover pointer-events-none"
+                        preload="metadata"
+                        muted
+                      />
+                    </div>
+
+                    {/* Metadata details */}
+                    <div className="flex flex-col min-w-0 flex-1 pr-1">
+                      <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
+                        {rec.name}
                       </span>
-                      <span>•</span>
-                      <span>{formatFileSize(rec.size)}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-gray-500" />
+                          {formatDate(rec.createdAt)}
+                        </span>
+                        <span>•</span>
+                        <span>{formatFileSize(rec.size)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePlayRecording(rec.filePath)
+                        }}
+                        className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        title="Play Video"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteRecording(e, rec.filePath)}
+                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                        title="Delete Recording"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlePlayRecording(rec.filePath)
-                    }}
-                    className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                    title="Play Video"
-                  >
-                    <Play className="w-3 h-3 fill-current" />
-                  </button>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

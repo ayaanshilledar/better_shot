@@ -439,6 +439,20 @@ ipcMain.handle('get-recordings', async () => {
   }
 })
 
+ipcMain.handle('delete-recording', async (_event, filePath: string) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath)
+      console.log('[BetterShot:Main] Deleted recording file successfully:', filePath)
+      return true
+    }
+    return false
+  } catch (err) {
+    console.error('[BetterShot:Main] Error deleting recording file:', err)
+    return false
+  }
+})
+
 ipcMain.handle('open-recording-file', async (_event, filePath: string) => {
   try {
     if (fs.existsSync(filePath)) {

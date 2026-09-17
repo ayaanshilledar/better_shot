@@ -155,6 +155,7 @@ export const App: React.FC = () => {
     }
 
     try {
+      window.electronAPI?.sendMutedState(!enableMic)
       await runCountdownSequence()
       await recorderService.startRecording(config)
     } catch (err) {
@@ -199,6 +200,7 @@ export const App: React.FC = () => {
     }
 
     try {
+      window.electronAPI?.sendMutedState(!enableMic)
       await runCountdownSequence()
       await recorderService.startRecording(config)
     } catch (err) {

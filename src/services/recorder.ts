@@ -138,21 +138,25 @@ class ScreenRecorderService {
       }
 
       // 3. Microphone Stream
-      if (config.enableMic) {
-        try {
-          console.log('[BetterShot:Recorder] Capturing Microphone Stream...')
-          const micStream = await navigator.mediaDevices.getUserMedia({
-            audio: config.micId ? { deviceId: { exact: config.micId } } : true,
-            video: false
-          })
-          const mTracks = micStream.getAudioTracks()
-          this.micAudioTracks = mTracks
-          rawAudioTracks.push(...mTracks)
-          this.setupAudioMeter(micStream)
-          console.log(`[BetterShot:Recorder] Microphone stream acquired (${mTracks.length} tracks)`)
-        } catch (micErr) {
-          console.warn('[BetterShot:Recorder] Microphone stream error:', micErr)
-        }
+      try {
+        console.log(`[BetterShot:Recorder] Capturing Microphone Stream (enableMic = ${config.enableMic})...`)
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: config.micId ? { deviceId: { exact: config.micId } } : true,
+          video: false
+        })
+        const mTracks = micStream.getAudioTracks()
+        this.micAudioTracks = mTracks
+
+        // Set initial track enabled state to match config.enableMic
+        mTracks.forEach((track) => {
+          track.enabled = config.enableMic
+        })
+
+        rawAudioTracks.push(...mTracks)
+        this.setupAudioMeter(micStream)
+        console.log(`[BetterShot:Recorder] Microphone stream acquired (${mTracks.length} tracks), initial enabled = ${config.enableMic}`)
+      } catch (micErr) {
+        console.warn('[BetterShot:Recorder] Microphone stream error or permission denied:', micErr)
       }
 
       // 4. Combine & Mix Audio Tracks

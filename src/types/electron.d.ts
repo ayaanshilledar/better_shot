@@ -35,6 +35,7 @@ declare global {
 
       // Recordings Manager
       getRecordings: () => Promise<RecordedFile[]>
+      deleteRecording: (filePath: string) => Promise<boolean>
       openRecordingFile: (filePath: string) => Promise<boolean>
       openRecordingsFolder: () => Promise<boolean>
 
