@@ -1,7 +1,11 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, dialog, shell, screen } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 let launcherWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
@@ -61,7 +65,7 @@ function createOverlayWindow() {
   })
 
   // Position at top center of primary display
-  const primaryDisplay = require('electron').screen.getPrimaryDisplay()
+  const primaryDisplay = screen.getPrimaryDisplay()
   const { width } = primaryDisplay.workAreaSize
   overlayWindow.setPosition(Math.round((width - 480) / 2), 40)
 
