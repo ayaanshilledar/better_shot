@@ -82,6 +82,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     ? `${cropW} / ${cropH}`
     : `${videoW} / ${videoH}`
 
+  const isPortrait = cropW < cropH
+
   return (
     <div
       ref={containerRef}
@@ -98,7 +100,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             : (project.background.gradient || project.background.color || '#101216'),
           filter: (project.background.type !== 'none' && project.background.blurAmount > 0)
             ? `blur(${project.background.blurAmount * 0.2}px)`
-            : 'none'
+            : 'none',
+          padding: project.background.type === 'none' ? '0px' : `${project.layout.padding * 1.2}%`,
+          boxSizing: 'border-box'
         }}
       >
         {/* Subtle background overlay grid */}
@@ -106,14 +110,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
         )}
 
-        {/* Media Frame Container (Padding & Shadow Application) */}
+        {/* Media Frame Container */}
         <div
-          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden"
-          style={{
-            padding: project.background.type === 'none' ? '0%' : `${project.layout.padding}%`,
-            width: '100%',
-            height: '100%'
-          }}
+          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden w-full h-full"
         >
           {/* Framed HTML5 Video Element (Hardware 60FPS) */}
           <div
@@ -124,9 +123,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               transform: `scale(${zoomScale}) translateZ(0)`,
               transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
               aspectRatio: containerAspect,
-              width: isCropped ? 'auto' : '100%',
-              height: isCropped ? '100%' : 'auto',
-              maxHeight: '60vh',
+              width: isPortrait ? 'auto' : '100%',
+              height: isPortrait ? '100%' : 'auto',
+              maxHeight: '100%',
               maxWidth: '100%'
             }}
           >
