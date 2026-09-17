@@ -14,8 +14,8 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 400,
-    height: 560,
+    width: 370,
+    height: 420,
     resizable: false,
     frame: false,
     transparent: true,

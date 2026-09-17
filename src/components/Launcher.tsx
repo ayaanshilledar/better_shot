@@ -52,64 +52,63 @@ export const Launcher: React.FC<LauncherProps> = ({
   return (
     <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none">
       {/* Window Drag Header */}
-      <div className="drag-region px-4 py-3 flex items-center justify-between border-b border-white/5 bg-[#14171d]/80">
+      <div className="drag-region px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90">
         {/* Left branding */}
-        <div className="flex items-center gap-2.5 no-drag">
-          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-white/10">
-            <div className="w-4 h-4 rounded-full border-2 border-black" />
+        <div className="flex items-center gap-2 no-drag">
+          <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center shadow-md">
+            <div className="w-3 h-3 rounded-full border-2 border-black" />
           </div>
-          <span className="text-lg font-extrabold tracking-tight text-white">{APP_CONFIG.appName}</span>
-          <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-full border border-white/10">
+          <span className="text-sm font-bold tracking-tight text-white">{APP_CONFIG.appName}</span>
+          <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gray-400 bg-white/5 rounded-md border border-white/10">
             {APP_CONFIG.workspaceLabel}
           </span>
         </div>
 
         {/* Right window actions */}
-        <div className="flex items-center gap-1.5 no-drag">
+        <div className="flex items-center gap-1 no-drag">
           <button
             onClick={handleMinimize}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
             title="Minimize"
           >
-            <Minus className="w-4 h-4" />
+            <Minus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"
+            className="p-1 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"
             title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Main Content Body */}
-      <div className="p-4 flex-1 flex flex-col gap-3.5 overflow-y-auto">
-
+      <div className="p-3 flex-1 flex flex-col gap-2.5 overflow-hidden">
         {/* 2x2 Capture Source Grid */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2">
           {/* Display option */}
           <div
             onClick={() => {
               setActiveCaptureMode('display')
               onOpenSourcePicker()
             }}
-            className={`group relative flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+            className={`group relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
               activeCaptureMode === 'display'
                 ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <div className="flex items-center gap-3 overflow-hidden">
-              <Monitor className={`w-5 h-5 flex-shrink-0 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <Monitor className={`w-4 h-4 flex-shrink-0 ${activeCaptureMode === 'display' ? 'text-blue-400' : 'text-gray-400'}`} />
               <div className="flex flex-col truncate">
                 <span className="text-xs font-bold text-white">Display</span>
-                <span className="text-[10px] text-gray-400 truncate">
+                <span className="text-[9px] text-gray-400 truncate">
                   {selectedSource?.isDisplay ? selectedSource.name : 'Full Screen'}
                 </span>
               </div>
             </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           </div>
 
           {/* Window option */}
@@ -118,57 +117,56 @@ export const Launcher: React.FC<LauncherProps> = ({
               setActiveCaptureMode('window')
               onOpenSourcePicker()
             }}
-            className={`group relative flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+            className={`group relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
               activeCaptureMode === 'window'
                 ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <div className="flex items-center gap-3 overflow-hidden">
-              <WindowIcon className={`w-5 h-5 flex-shrink-0 ${activeCaptureMode === 'window' ? 'text-blue-400' : 'text-gray-400'}`} />
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <WindowIcon className={`w-4 h-4 flex-shrink-0 ${activeCaptureMode === 'window' ? 'text-blue-400' : 'text-gray-400'}`} />
               <div className="flex flex-col truncate">
                 <span className="text-xs font-bold text-white">Window</span>
-                <span className="text-[10px] text-gray-400 truncate">
+                <span className="text-[9px] text-gray-400 truncate">
                   {selectedSource && !selectedSource.isDisplay ? selectedSource.name : 'App Window'}
                 </span>
               </div>
             </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           </div>
 
           {/* Area option */}
           <div
             onClick={() => setActiveCaptureMode('area')}
-            className={`group flex items-center justify-center gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
+            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
               activeCaptureMode === 'area'
                 ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <Crop className={`w-5 h-5 ${activeCaptureMode === 'area' ? 'text-blue-400' : 'text-gray-400'}`} />
+            <Crop className={`w-4 h-4 ${activeCaptureMode === 'area' ? 'text-blue-400' : 'text-gray-400'}`} />
             <span className="text-xs font-bold text-white">Area</span>
           </div>
 
           {/* Camera Only option */}
           <div
             onClick={() => setActiveCaptureMode('camera')}
-            className={`group flex items-center justify-center gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
+            className={`group flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
               activeCaptureMode === 'camera'
                 ? 'bg-[#252934] border-blue-500/60 ring-1 ring-blue-500/40 shadow-lg'
                 : 'bg-[#181b22] border-white/5 hover:bg-[#20242e] hover:border-white/10'
             }`}
           >
-            <Video className={`w-5 h-5 ${activeCaptureMode === 'camera' ? 'text-blue-400' : 'text-gray-400'}`} />
+            <Video className={`w-4 h-4 ${activeCaptureMode === 'camera' ? 'text-blue-400' : 'text-gray-400'}`} />
             <span className="text-xs font-bold text-white">Camera Only</span>
           </div>
         </div>
 
         {/* Audio Source Toggles */}
-        <div className="flex flex-col gap-2 pt-1">
-
+        <div className="flex flex-col gap-2 pt-0.5">
           {/* Microphone toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex items-center gap-2.5">
               {enableMic ? (
                 <Mic className="w-4 h-4 text-blue-400" />
               ) : (
@@ -180,7 +178,7 @@ export const Launcher: React.FC<LauncherProps> = ({
             </div>
             <button
               onClick={() => setEnableMic(!enableMic)}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-0.5 rounded-full text-xs font-bold transition-all ${
                 enableMic
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -191,8 +189,8 @@ export const Launcher: React.FC<LauncherProps> = ({
           </div>
 
           {/* System Audio toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#181b22] border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex items-center gap-2.5">
               {enableSystemAudio ? (
                 <Volume2 className="w-4 h-4 text-blue-400" />
               ) : (
@@ -204,7 +202,7 @@ export const Launcher: React.FC<LauncherProps> = ({
             </div>
             <button
               onClick={() => setEnableSystemAudio(!enableSystemAudio)}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-0.5 rounded-full text-xs font-bold transition-all ${
                 enableSystemAudio
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -218,9 +216,9 @@ export const Launcher: React.FC<LauncherProps> = ({
         {/* Start Recording CTA */}
         <button
           onClick={() => onStartRecording(activeCaptureMode)}
-          className="mt-auto py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all"
+          className="mt-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all"
         >
-          <Play className="w-4 h-4 fill-white" />
+          <Play className="w-3.5 h-3.5 fill-white" />
           Start Recording
         </button>
       </div>
