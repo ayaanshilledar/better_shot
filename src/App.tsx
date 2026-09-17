@@ -3,12 +3,15 @@ import { Launcher, CaptureMode } from './components/Launcher'
 import { RecordingOverlay } from './components/RecordingOverlay'
 import { SourcePickerModal } from './components/SourcePickerModal'
 import { AreaSelectorOverlay } from './components/AreaSelectorOverlay'
+import { StudioEditor } from './components/editor/StudioEditor'
+import { EditorErrorBoundary } from './components/editor/ErrorBoundary'
 import { recorderService, CaptureConfig } from './services/recorder'
 import { APP_CONFIG } from './config/appConfig'
 import { DesktopSource, CropRegion } from '../electron/preload'
 
 export const App: React.FC = () => {
   const [route, setRoute] = useState<string>('launcher')
+  const [editorPath, setEditorPath] = useState<string>('')
 
   // Source configuration states
   const [enableMic, setEnableMic] = useState<boolean>(true)
@@ -21,13 +24,32 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const updateRoute = () => {
-      const hash = window.location.hash.replace('#', '')
-      console.log(`[BetterShot:App] Route hash updated: #${hash || 'launcher'}`)
-      if (hash === 'overlay') {
+      const fullUrl = window.location.href
+      const hashRaw = window.location.hash.replace('#', '')
+      const [hashName, queryStr] = hashRaw.split('?')
+      console.log(`[BetterShot:App] Full window URL: ${fullUrl}`)
+      console.log(`[BetterShot:App] Parsed route hashName: "${hashName}", queryStr: "${queryStr || ''}"`)
+
+      if (hashName === 'editor') {
+        console.log('[BetterShot:App] Setting active route to "editor"')
+        setRoute('editor')
+        if (queryStr) {
+          const params = new URLSearchParams(queryStr)
+          const p = params.get('path')
+          if (p) {
+            const decoded = decodeURIComponent(p)
+            console.log('[BetterShot:App] Extracted editorPath from query params:', decoded)
+            setEditorPath(decoded)
+          }
+        }
+      } else if (hashName === 'overlay') {
+        console.log('[BetterShot:App] Setting active route to "overlay"')
         setRoute('overlay')
-      } else if (hash === 'select-area') {
+      } else if (hashName === 'select-area') {
+        console.log('[BetterShot:App] Setting active route to "select-area"')
         setRoute('select-area')
       } else {
+        console.log('[BetterShot:App] Defaulting active route to "launcher"')
         setRoute('launcher')
       }
     }
@@ -35,6 +57,18 @@ export const App: React.FC = () => {
     updateRoute()
     window.addEventListener('hashchange', updateRoute)
     return () => window.removeEventListener('hashchange', updateRoute)
+  }, [])
+
+  // Listen for direct IPC load-editor-media events
+  useEffect(() => {
+    if (window.electronAPI?.onLoadEditorMedia) {
+      const unsubscribe = window.electronAPI.onLoadEditorMedia((mediaPath: string) => {
+        console.log('[BetterShot:App] IPC onLoadEditorMedia received path:', mediaPath)
+        setEditorPath(mediaPath)
+        setRoute('editor')
+      })
+      return () => unsubscribe()
+    }
   }, [])
 
   // Auto-fetch primary display on startup if no source is selected yet
@@ -242,6 +276,14 @@ export const App: React.FC = () => {
     } catch (err) {
       console.error('[BetterShot:App] Error canceling recording:', err)
     }
+  }
+
+  if (route === 'editor') {
+    return (
+      <EditorErrorBoundary>
+        <StudioEditor recordingFilePath={editorPath} />
+      </EditorErrorBoundary>
+    )
   }
 
   if (route === 'overlay') {

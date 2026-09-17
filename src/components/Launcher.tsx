@@ -12,7 +12,8 @@ import {
   History,
   Film,
   Clock,
-  Trash2
+  Trash2,
+  Wand2
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
@@ -87,9 +88,17 @@ export const Launcher: React.FC<LauncherProps> = ({
   }
 
   const handlePlayRecording = async (filePath: string) => {
-    console.log('[BetterShot:Launcher] Opening recording file:', filePath)
+    console.log('[BetterShot:Launcher] Playing raw recording file:', filePath)
     if (window.electronAPI?.openRecordingFile) {
       await window.electronAPI.openRecordingFile(filePath)
+    }
+  }
+
+  const handleEditRecording = async (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation()
+    console.log('[BetterShot:Launcher] Opening Studio Editor for:', filePath)
+    if (window.electronAPI?.openEditorWindow) {
+      await window.electronAPI.openEditorWindow(filePath)
     }
   }
 
@@ -224,7 +233,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                 console.log(`[BetterShot:Launcher] Microphone toggle changed to: ${nextVal ? 'ON' : 'OFF'}`)
                 setEnableMic(nextVal)
               }}
-              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
                 enableMic
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -250,7 +259,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                 console.log(`[BetterShot:Launcher] System Audio toggle changed to: ${nextVal ? 'ON' : 'OFF'}`)
                 setEnableSystemAudio(nextVal)
               }}
-              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
                 enableSystemAudio
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-[#2a2e38] text-gray-400 hover:text-white'
@@ -333,19 +342,31 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Play Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           handlePlayRecording(rec.filePath)
                         }}
-                        className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm cursor-pointer"
                         title="Play Video"
                       >
                         <Play className="w-3 h-3 fill-current" />
                       </button>
+
+                      {/* Edit Video Button */}
+                      <button
+                        onClick={(e) => handleEditRecording(e, rec.filePath)}
+                        className="p-1.5 rounded-lg bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white transition-all shadow-sm cursor-pointer"
+                        title="Edit Video Studio"
+                      >
+                        <Wand2 className="w-3 h-3" />
+                      </button>
+
+                      {/* Delete Button */}
                       <button
                         onClick={(e) => handleDeleteRecording(e, rec.filePath)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm cursor-pointer"
                         title="Delete Recording"
                       >
                         <Trash2 className="w-3 h-3" />

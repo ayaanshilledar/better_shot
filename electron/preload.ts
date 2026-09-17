@@ -106,11 +106,12 @@ const electronAPI = {
     }
   },
 
-  // Recordings Manager
+  // Recordings Manager & Studio Editor
   getRecordings: (): Promise<RecordedFile[]> => ipcRenderer.invoke('get-recordings'),
   deleteRecording: (filePath: string): Promise<boolean> => ipcRenderer.invoke('delete-recording', filePath),
   openRecordingFile: (filePath: string): Promise<boolean> => ipcRenderer.invoke('open-recording-file', filePath),
   openRecordingsFolder: (): Promise<boolean> => ipcRenderer.invoke('open-recordings-folder'),
+  openEditorWindow: (filePath?: string): Promise<boolean> => ipcRenderer.invoke('open-editor-window', filePath),
 
   // Event listeners
   onRecordingStateChanged: (callback: (state: string) => void): (() => void) => {
@@ -125,6 +126,13 @@ const electronAPI = {
     ipcRenderer.on('area-selected', subscription)
     return () => {
       ipcRenderer.removeListener('area-selected', subscription)
+    }
+  },
+  onLoadEditorMedia: (callback: (filePath: string) => void): (() => void) => {
+    const subscription = (_event: any, value: string) => callback(value)
+    ipcRenderer.on('load-editor-media', subscription)
+    return () => {
+      ipcRenderer.removeListener('load-editor-media', subscription)
     }
   }
 }

@@ -72,6 +72,64 @@ try {
 let launcherWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let selectionWindow: BrowserWindow | null = null
+let editorWindow: BrowserWindow | null = null
+
+function createEditorWindow(filePath?: string) {
+  if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.show()
+    editorWindow.focus()
+    if (filePath) {
+      editorWindow.webContents.send('load-editor-media', filePath)
+    }
+    return
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenW, height: screenH } = primaryDisplay.workArea
+
+  editorWindow = new BrowserWindow({
+    width: Math.min(1240, screenW - 40),
+    height: Math.min(820, screenH - 40),
+    minWidth: 900,
+    minHeight: 600,
+    resizable: true,
+    frame: false,
+    transparent: false,
+    show: false,
+    backgroundColor: '#0d0d11',
+    webPreferences: {
+      preload: preloadPath,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+      backgroundThrottling: false
+    }
+  })
+
+  observeSmokeWindow('editor', editorWindow)
+
+  const encodedPath = filePath ? encodeURIComponent(filePath) : ''
+  const hash = encodedPath ? `editor?path=${encodedPath}` : 'editor'
+
+  if (devServerUrl) {
+    const baseUrl = devServerUrl.endsWith('/') ? devServerUrl : `${devServerUrl}/`
+    const targetUrl = `${baseUrl}#${hash}`
+    console.log(`[BetterShot:Main] Loading dev URL for editorWindow: ${targetUrl}`)
+    editorWindow.loadURL(targetUrl)
+  } else {
+    console.log(`[BetterShot:Main] Loading production index file for editorWindow with hash: ${hash}`)
+    editorWindow.loadFile(rendererIndexPath, { hash })
+  }
+
+  editorWindow.once('ready-to-show', () => {
+    console.log('[BetterShot:Main] editorWindow ready-to-show event fired')
+    if (!isSmokeTest) editorWindow?.show()
+  })
+
+  editorWindow.on('closed', () => {
+    editorWindow = null
+  })
+}
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
@@ -323,11 +381,25 @@ ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: 
 
     await fs.promises.writeFile(filePath, uint8Array)
     console.log(`[BetterShot:Main] Saved recording successfully to: ${filePath}`)
+
+    // Automatically trigger editor window creation upon saving recording
+    try {
+      createEditorWindow(filePath)
+    } catch (e) {
+      console.warn('[BetterShot:Main] Could not auto-open editor window:', e)
+    }
+
     return { success: true, filePath }
   } catch (error: any) {
     console.error('[BetterShot:Main] Error saving recording:', error)
     return { success: false, error: error.message }
   }
+})
+
+ipcMain.handle('open-editor-window', (_event, filePath?: string) => {
+  console.log('[BetterShot:Main] IPC handle: open-editor-window requested for:', filePath)
+  createEditorWindow(filePath)
+  return true
 })
 
 // Window controls
