@@ -89,6 +89,13 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     ? 1.0
     : Math.max(0.5, 1 - (project.layout.padding / 40) * 0.35)
 
+  // Compute background style string for the background layer
+  const getBgStyle = () => {
+    if (project.background.type === 'none') return 'transparent'
+    if (project.background.customImageUrl) return `url(${project.background.customImageUrl}) center/cover no-repeat`
+    return project.background.gradient || project.background.color || '#101216'
+  }
+
   return (
     <div
       ref={containerRef}
@@ -99,24 +106,28 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         className={`relative w-full h-full max-w-[96vw] max-h-[88vh] rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-300 p-3 sm:p-4 ${
           project.background.type === 'none' ? 'border-none' : 'border border-white/10'
         }`}
-        style={{
-          background: project.background.type === 'none'
-            ? 'transparent'
-            : (project.background.gradient || project.background.color || '#101216'),
-          filter: (project.background.type !== 'none' && project.background.blurAmount > 0)
-            ? `blur(${project.background.blurAmount * 0.2}px)`
-            : 'none',
-          boxSizing: 'border-box'
-        }}
+        style={{ boxSizing: 'border-box' }}
       >
-        {/* Subtle background overlay grid */}
+        {/* Dedicated Background Layer (Blur filter applies ONLY to background, never video) */}
         {project.background.type !== 'none' && (
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+          <div
+            className="absolute inset-0 transition-all duration-300 pointer-events-none"
+            style={{
+              background: getBgStyle(),
+              filter: project.background.blurAmount > 0
+                ? `blur(${project.background.blurAmount * 0.25}px)`
+                : 'none',
+              transform: project.background.blurAmount > 0 ? 'scale(1.08)' : 'none'
+            }}
+          >
+            {/* Subtle background overlay grid */}
+            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
+          </div>
         )}
 
-        {/* Media Frame Container */}
+        {/* Media Frame Container (Stays crisp & unblurred above background layer) */}
         <div
-          className="relative transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden w-full h-full"
+          className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden w-full h-full"
         >
           {/* Framed HTML5 Video Element (Hardware 60FPS) */}
           <div
