@@ -31,6 +31,8 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       cornerRadius: 12, // 12px rounded corners
       shadow: 'medium',
       aspectRatio: 'auto',
+      borderWidth: 1, // 1px clean subtle border
+      borderOpacity: 25, // 25% glassy opacity
       x: 0,
       y: 0,
       scale: 1,

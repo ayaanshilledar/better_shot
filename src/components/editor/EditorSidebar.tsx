@@ -222,6 +222,40 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               />
             </div>
 
+            {/* Border Width Slider */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-300">Border Width</span>
+                <span className="font-mono text-blue-400 font-semibold">{project.layout.borderWidth ?? 1}px</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="8"
+                step="1"
+                value={project.layout.borderWidth ?? 1}
+                onChange={(e) => onUpdateLayout({ borderWidth: parseInt(e.target.value, 10) })}
+                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+              />
+            </div>
+
+            {/* Border Opacity Slider */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-300">Border Opacity</span>
+                <span className="font-mono text-blue-400 font-semibold">{project.layout.borderOpacity ?? 25}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={project.layout.borderOpacity ?? 25}
+                onChange={(e) => onUpdateLayout({ borderOpacity: parseInt(e.target.value, 10) })}
+                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+              />
+            </div>
+
             {/* Drop Shadow Preset Buttons */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-gray-300">Drop Shadow</span>

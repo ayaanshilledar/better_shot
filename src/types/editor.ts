@@ -48,6 +48,8 @@ export interface LayoutConfig {
   cornerRadius: number // 0px to 48px
   shadow: ShadowType
   aspectRatio: AspectRatioType
+  borderWidth?: number // 0px to 10px
+  borderOpacity?: number // 0% to 100%
   cropRegion?: CropRegionData
   x?: number
   y?: number

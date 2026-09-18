@@ -232,6 +232,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     frameW = Math.round(availableVideoH * videoRatio)
   }
 
+  const borderWidth = project.layout.borderWidth ?? 1
+  const borderOpacity = project.layout.borderOpacity ?? 25
+
   // Compute background style string for the background layer
   const getBgStyle = () => {
     if (project.background.type === 'none') return 'transparent'
@@ -599,6 +602,22 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                   <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
                 </div>
               </div>
+            )}
+
+            {/* Outer Border Stroke Layer (Expands strictly OUTSIDE the video frame) */}
+            {borderWidth > 0 && borderOpacity > 0 && (
+              <div
+                className="absolute pointer-events-none z-30 transition-all duration-150"
+                style={{
+                  top: `-${borderWidth}px`,
+                  left: `-${borderWidth}px`,
+                  right: `-${borderWidth}px`,
+                  bottom: `-${borderWidth}px`,
+                  borderRadius: `${project.layout.cornerRadius + borderWidth}px`,
+                  border: `${borderWidth}px solid rgba(255, 255, 255, ${borderOpacity / 100})`,
+                  boxSizing: 'border-box'
+                }}
+              />
             )}
 
             {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
