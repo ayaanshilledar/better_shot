@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Plus, Video, ZoomIn, Film, Sparkles, Target, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, ZoomEvent } from '../../types/editor'
 
 interface EditorTimelineProps {
@@ -157,10 +157,10 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onAddZoomEvent && onAddZoomEvent()}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold text-xs rounded-lg border border-purple-500/30 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-semibold text-xs rounded-lg border border-blue-500/30 transition-all cursor-pointer"
             title="Add Zoom Keyframe at current playhead position"
           >
-            <Plus className="w-3.5 h-3.5 text-purple-400" />
+            <Plus className="w-3.5 h-3.5 text-blue-400" />
             <span>Add Zoom</span>
           </button>
         </div>
@@ -178,19 +178,15 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Track Labels Column */}
         <div className="w-28 bg-[#12141a] border-r border-white/10 flex flex-col pt-7 z-10">
-          <div className="h-9 px-3 flex items-center gap-2 text-xs font-semibold text-gray-300 border-b border-white/5">
-            <Video className="w-3.5 h-3.5 text-blue-400" />
+          <div className="h-9 px-3 flex items-center text-xs font-semibold text-gray-300 border-b border-white/5">
             <span>Video</span>
           </div>
 
           <div className="h-10 px-3 flex items-center justify-between text-xs font-semibold text-gray-300 border-b border-white/5 group">
-            <div className="flex items-center gap-2">
-              <ZoomIn className="w-3.5 h-3.5 text-purple-400" />
-              <span>Zoom</span>
-            </div>
+            <span>Zoom</span>
             <button
               onClick={() => onAddZoomEvent && onAddZoomEvent()}
-              className="p-1 hover:bg-purple-500/20 text-purple-400 rounded transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 text-blue-400 rounded transition-colors cursor-pointer"
               title="Add Zoom Keyframe"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -238,7 +234,6 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                 className="h-7 bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center px-3 gap-2 text-xs font-semibold text-blue-200 shadow-sm transition-all"
                 style={{ width: '100%' }}
               >
-                <Film className="w-3.5 h-3.5 text-blue-400" />
                 <span>Clip {Math.round(duration)}s</span>
                 <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300 font-mono">1x</span>
               </div>
@@ -254,7 +249,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
               {/* Interactive Ghost "+ Add Zoom" Preview Button on Hover (Only over empty track space) */}
               {trackHoverX !== null && trackHoverTime !== null && !activeDragId && !isHoveringExistingBlock && (
                 <div
-                  className="absolute z-20 pointer-events-none -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-purple-600/90 text-white border border-purple-400 text-[10px] font-bold rounded-lg shadow-xl shadow-purple-600/50 backdrop-blur-sm animate-pulse"
+                  className="absolute z-20 pointer-events-none -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-blue-600/90 text-white border border-blue-400 text-[10px] font-semibold rounded-lg shadow-lg backdrop-blur-sm animate-pulse"
                   style={{ left: `${trackHoverX}px` }}
                 >
                   <Plus className="w-3 h-3" />
@@ -263,7 +258,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
               )}
 
               {project.timeline.zoomEvents.length === 0 ? (
-                <span className="text-[10px] text-gray-500 pl-3 italic group-hover:text-purple-300 transition-colors">
+                <span className="text-[10px] text-gray-500 pl-3 italic group-hover:text-blue-300 transition-colors">
                   Click anywhere on this track to add a zoom keyframe
                 </span>
               ) : (
@@ -279,9 +274,9 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                       onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'move')}
                       className={`absolute h-8 rounded-lg border flex items-center justify-between px-2 cursor-grab active:cursor-grabbing transition-shadow group/block ${
                         isSelected
-                          ? 'bg-purple-600/70 border-purple-400 text-white shadow-lg shadow-purple-500/40 ring-2 ring-purple-400 z-10'
-                          : 'bg-purple-900/50 border-purple-500/50 hover:bg-purple-800/60 text-purple-200'
-                      } ${isDraggingThis ? 'scale-[1.02] shadow-2xl z-30' : ''}`}
+                          ? 'bg-blue-600/70 border-blue-400 text-white shadow-md ring-2 ring-blue-400/80 z-10'
+                          : 'bg-blue-950/60 border-blue-500/40 hover:bg-blue-900/60 text-blue-200'
+                      } ${isDraggingThis ? 'scale-[1.02] shadow-xl z-30' : ''}`}
                       style={{
                         left: `${leftPercent}%`,
                         width: `${Math.max(4, widthPercent)}%`
@@ -291,7 +286,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                       {/* Left Resize Handle */}
                       <div
                         onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'resize-left')}
-                        className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-purple-400/50 rounded-l-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
+                        className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-400/50 rounded-l-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
                         title="Drag edge to change zoom start time"
                       >
                         <div className="w-0.5 h-3 bg-white/70 rounded-full" />
@@ -299,16 +294,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
 
                       {/* Main Zoom Info Tag */}
                       <div className="flex items-center gap-1.5 overflow-hidden select-none pointer-events-none px-1">
-                        {z.type === 'auto' ? (
-                          <Sparkles className="w-3 h-3 text-yellow-300 shrink-0" />
-                        ) : (
-                          <Target className="w-3 h-3 text-purple-300 shrink-0" />
-                        )}
-                        <span className="text-[11px] font-bold font-mono truncate">
-                          {z.scale.toFixed(1)}x
-                        </span>
-                        <span className="text-[9px] opacity-80 font-mono truncate hidden sm:inline">
-                          ({z.easing})
+                        <span className="text-[11px] font-semibold font-mono truncate">
+                          {z.scale.toFixed(1)}x Zoom
                         </span>
                       </div>
 
@@ -318,8 +305,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                           e.stopPropagation()
                           if (onDeleteZoomEvent) onDeleteZoomEvent(z.id)
                         }}
-                        className="p-1 text-purple-300 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors cursor-pointer pointer-events-auto shrink-0 z-20"
-                        title="Delete this zoom keyframe"
+                        className="p-1 text-gray-300 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors cursor-pointer pointer-events-auto shrink-0 z-20"
+                        title="Delete keyframe"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -327,7 +314,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                       {/* Right Resize Handle */}
                       <div
                         onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'resize-right')}
-                        className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-purple-400/50 rounded-r-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
+                        className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-400/50 rounded-r-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
                         title="Drag edge to change zoom duration"
                       >
                         <div className="w-0.5 h-3 bg-white/70 rounded-full" />
@@ -335,7 +322,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
 
                       {/* Live Dragging Tooltip */}
                       {isDraggingThis && (
-                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-purple-950 text-white border border-purple-400 text-[10px] font-mono px-2 py-0.5 rounded shadow-xl whitespace-nowrap z-40 pointer-events-none">
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#12141a] text-white border border-blue-500/50 text-[10px] font-mono px-2 py-0.5 rounded shadow-xl whitespace-nowrap z-40 pointer-events-none">
                           {dragMode === 'move' && `Start: ${z.startTime.toFixed(2)}s`}
                           {dragMode === 'resize-left' && `Start: ${z.startTime.toFixed(2)}s | Dur: ${z.duration.toFixed(2)}s`}
                           {dragMode === 'resize-right' && `Duration: ${z.duration.toFixed(2)}s`}

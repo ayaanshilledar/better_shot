@@ -7,13 +7,7 @@ import {
   Volume2,
   VolumeX,
   ZoomIn,
-  Plus,
-  Trash2,
-  Sparkles,
-  Target,
-  Move,
-  Activity,
-  Layers
+  Trash2
 } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, ShadowType, ZoomEvent, ZoomEasingType } from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
@@ -253,64 +247,52 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         {/* Zoom Controls Tab Content */}
         {runtime.selectedTab === 'zoom' && (
           <div className="flex flex-col gap-4">
-            {/* Mode Switcher: Manual Zoom vs Auto Zoom */}
+            {/* Mode Switcher: Manual vs Auto Zoom */}
             <div className="grid grid-cols-2 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
               <button
                 onClick={() => setZoomMode('manual')}
-                className={`py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   zoomMode === 'manual'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    ? 'bg-blue-600 text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <ZoomIn className="w-3.5 h-3.5" />
-                <span>Manual Zoom</span>
+                Manual
               </button>
 
               <button
                 onClick={() => setZoomMode('auto')}
-                className={`py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   zoomMode === 'auto'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    ? 'bg-blue-600 text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Auto Zoom</span>
+                Auto Zoom
               </button>
             </div>
 
             {/* MANUAL ZOOM MODE */}
             {zoomMode === 'manual' && (
               <div className="flex flex-col gap-4">
-                {/* Primary Action Button: Add Zoom at Playhead */}
-                <button
-                  onClick={() => onAddZoomEvent && onAddZoomEvent()}
-                  className="w-full py-2.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Zoom Keyframe at {runtime.currentTime.toFixed(2)}s</span>
-                </button>
-
                 {/* Zoom Keyframe Events List */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs text-gray-400 font-semibold px-1">
                     <span>Timeline Zoom Events</span>
-                    <span className="font-mono text-[11px] text-purple-400">
+                    <span className="font-mono text-[11px] text-blue-400 font-semibold">
                       {project.timeline.zoomEvents.length} active
                     </span>
                   </div>
 
                   {project.timeline.zoomEvents.length === 0 ? (
-                    <div className="p-4 bg-[#161922] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-center gap-2">
-                      <Target className="w-6 h-6 text-gray-500" />
+                    <div className="p-4 bg-[#161922] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-center gap-1.5">
                       <p className="text-xs text-gray-400">
-                        No zoom events added yet. Move playhead and click above to add a zoom keyframe.
+                        No zoom keyframes yet. Click on the timeline track below to add a zoom.
                       </p>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar">
-                      {project.timeline.zoomEvents.map((z, idx) => {
+                    <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto custom-scrollbar">
+                      {project.timeline.zoomEvents.map((z) => {
                         const isSelected = z.id === runtime.selectedZoomId
                         return (
                           <div
@@ -318,25 +300,20 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                             onClick={() => onSelectZoomEvent && onSelectZoomEvent(z.id)}
                             className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                               isSelected
-                                ? 'bg-purple-900/40 border-purple-500 text-white ring-1 ring-purple-500/50'
+                                ? 'bg-[#1a1d28] border-blue-500/60 text-white shadow-sm'
                                 : 'bg-[#161922] border-white/5 hover:border-white/20 text-gray-300'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 font-mono text-[10px] font-bold shrink-0">
-                                #{idx + 1}
-                              </div>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-semibold">{z.scale.toFixed(1)}x Zoom</span>
-                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono">
-                                    {z.type || 'manual'}
-                                  </span>
-                                </div>
-                                <span className="text-[10px] font-mono text-gray-400">
-                                  {z.startTime.toFixed(2)}s - {(z.startTime + z.duration).toFixed(2)}s ({z.duration.toFixed(1)}s)
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-200">{z.scale.toFixed(1)}x Zoom</span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-mono capitalize">
+                                  {z.type || 'manual'}
                                 </span>
                               </div>
+                              <span className="text-[10px] font-mono text-gray-400">
+                                {z.startTime.toFixed(2)}s - {(z.startTime + z.duration).toFixed(2)}s ({z.duration.toFixed(1)}s)
+                              </span>
                             </div>
 
                             <button
@@ -345,7 +322,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                 if (onDeleteZoomEvent) onDeleteZoomEvent(z.id)
                               }}
                               className="p-1 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-white/5 cursor-pointer"
-                              title="Delete Zoom Event"
+                              title="Delete Keyframe"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -358,11 +335,10 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
                 {/* SELECTED ZOOM EVENT PROPERTY EDITOR */}
                 {selectedZoomEvent && (
-                  <div className="p-3 bg-[#161922] border border-purple-500/30 rounded-xl flex flex-col gap-3">
+                  <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                      <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                        <Target className="w-3.5 h-3.5 text-purple-400" />
-                        Edit Selected Zoom Keyframe
+                      <span className="text-xs font-bold text-gray-200">
+                        Selected Keyframe
                       </span>
                       <span className="text-[10px] font-mono text-gray-400">
                         @{selectedZoomEvent.startTime.toFixed(2)}s
@@ -373,7 +349,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-gray-300">Zoom Scale</span>
-                        <span className="font-mono text-purple-400 font-bold">
+                        <span className="font-mono text-blue-400 font-bold">
                           {selectedZoomEvent.scale.toFixed(2)}x
                         </span>
                       </div>
@@ -387,7 +363,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           onUpdateZoomEvent &&
                           onUpdateZoomEvent(selectedZoomEvent.id, { scale: parseFloat(e.target.value) })
                         }
-                        className="accent-purple-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+                        className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
                       />
                       {/* Scale Presets */}
                       <div className="grid grid-cols-4 gap-1">
@@ -398,9 +374,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                               onUpdateZoomEvent &&
                               onUpdateZoomEvent(selectedZoomEvent.id, { scale: presetScale })
                             }
-                            className={`py-0.5 rounded text-[10px] font-mono font-semibold transition-colors ${
+                            className={`py-1 rounded text-[10px] font-mono font-semibold transition-colors ${
                               Math.abs(selectedZoomEvent.scale - presetScale) < 0.05
-                                ? 'bg-purple-600 text-white'
+                                ? 'bg-blue-600 text-white shadow-sm'
                                 : 'bg-[#12141a] text-gray-400 hover:text-white'
                             }`}
                           >
@@ -410,97 +386,11 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       </div>
                     </div>
 
-                    {/* Easing Function Curve Dropdown */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-gray-300">Easing Curve</span>
-                      <select
-                        value={selectedZoomEvent.easing}
-                        onChange={(e) =>
-                          onUpdateZoomEvent &&
-                          onUpdateZoomEvent(selectedZoomEvent.id, { easing: e.target.value as ZoomEasingType })
-                        }
-                        className="w-full bg-[#12141a] border border-white/10 rounded-lg py-1.5 px-2.5 text-xs text-purple-200 focus:outline-none focus:border-purple-500 cursor-pointer font-sans"
-                      >
-                        {easingOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Ease-In & Ease-Out Duration Sliders */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-gray-400">Ease In</span>
-                          <span className="font-mono text-purple-400">
-                            {(selectedZoomEvent.easeInDuration ?? 0.4).toFixed(2)}s
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1.0"
-                          step="0.05"
-                          value={selectedZoomEvent.easeInDuration ?? 0.4}
-                          onChange={(e) =>
-                            onUpdateZoomEvent &&
-                            onUpdateZoomEvent(selectedZoomEvent.id, { easeInDuration: parseFloat(e.target.value) })
-                          }
-                          className="accent-purple-500 cursor-pointer h-1 bg-[#1e222e] rounded-lg"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-gray-400">Ease Out</span>
-                          <span className="font-mono text-purple-400">
-                            {(selectedZoomEvent.easeOutDuration ?? 0.4).toFixed(2)}s
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1.0"
-                          step="0.05"
-                          value={selectedZoomEvent.easeOutDuration ?? 0.4}
-                          onChange={(e) =>
-                            onUpdateZoomEvent &&
-                            onUpdateZoomEvent(selectedZoomEvent.id, { easeOutDuration: parseFloat(e.target.value) })
-                          }
-                          className="accent-purple-500 cursor-pointer h-1 bg-[#1e222e] rounded-lg"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Duration Slider */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-gray-300">Total Zoom Duration</span>
-                        <span className="font-mono text-purple-400 font-semibold">
-                          {selectedZoomEvent.duration.toFixed(1)}s
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="10.0"
-                        step="0.1"
-                        value={selectedZoomEvent.duration}
-                        onChange={(e) =>
-                          onUpdateZoomEvent &&
-                          onUpdateZoomEvent(selectedZoomEvent.id, { duration: parseFloat(e.target.value) })
-                        }
-                        className="accent-purple-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-                      />
-                    </div>
-
                     {/* Focal Position X & Y + 2D Interactive Target Picker */}
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-gray-300">Focal Origin Target</span>
-                        <span className="font-mono text-purple-400 text-[11px] font-bold">
+                        <span className="font-mono text-blue-400 text-[11px] font-bold">
                           X: {Math.round(selectedZoomEvent.x)}%, Y: {Math.round(selectedZoomEvent.y)}%
                         </span>
                       </div>
@@ -517,7 +407,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                             onUpdateZoomEvent(selectedZoomEvent.id, { x, y })
                           }
                         }}
-                        className="w-full h-24 bg-[#0b0c10] border border-purple-500/40 rounded-xl relative overflow-hidden cursor-crosshair group flex items-center justify-center shadow-inner"
+                        className="w-full h-24 bg-[#101216] border border-white/10 rounded-xl relative overflow-hidden cursor-crosshair group flex items-center justify-center shadow-inner"
                         title="Click anywhere to set focus point"
                       >
                         {/* Rule of Thirds Grid Lines */}
@@ -528,18 +418,14 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
                         {/* Active Target Dot Pin */}
                         <div
-                          className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-purple-300 bg-purple-600/60 shadow-lg shadow-purple-500/80 flex items-center justify-center transition-all pointer-events-none group-hover:scale-110"
+                          className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-sm flex items-center justify-center pointer-events-none"
                           style={{
                             left: `${selectedZoomEvent.x}%`,
                             top: `${selectedZoomEvent.y}%`
                           }}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full bg-white shadow" />
+                          <div className="w-1 h-1 rounded-full bg-white" />
                         </div>
-
-                        <span className="absolute bottom-1 right-1.5 text-[9px] font-mono text-purple-300 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-500/30 backdrop-blur-sm">
-                          Click to position ({Math.round(selectedZoomEvent.x)}%, {Math.round(selectedZoomEvent.y)}%)
-                        </span>
                       </div>
 
                       {/* Position Presets */}
@@ -557,8 +443,8 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                               }
                               className={`py-1 px-2 text-[10px] rounded border transition-all cursor-pointer ${
                                 isActive
-                                  ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-sm'
-                                  : 'bg-[#12141a] hover:bg-purple-600/30 text-gray-300 border-white/5'
+                                  ? 'bg-blue-600 text-white border-blue-500 font-semibold shadow-sm'
+                                  : 'bg-[#12141a] hover:bg-white/5 text-gray-300 border-white/5'
                               }`}
                             >
                               {preset.label}
@@ -575,19 +461,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             {/* AUTO ZOOM MODE */}
             {zoomMode === 'auto' && (
               <div className="flex flex-col gap-4">
-                <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-xl flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-purple-300">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    <span>Smart Auto-Zoom Engine</span>
-                  </div>
+                <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-gray-200">Auto-Zoom Engine</span>
                   <p className="text-[11px] text-gray-400 leading-relaxed">
-                    Auto-Zoom scans your video timeline and places smooth focal zoom keyframes across active areas with ease-in transitions.
+                    Auto-Zoom scans your video timeline and places smooth focal zoom keyframes across active regions.
                   </p>
                 </div>
 
                 {/* Density Selector */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-gray-300">Zoom Frequency & Density</span>
+                  <span className="text-xs font-semibold text-gray-300">Density</span>
                   <div className="grid grid-cols-3 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
                     {(['subtle', 'balanced', 'dynamic'] as const).map((d) => (
                       <button
@@ -595,7 +478,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                         onClick={() => setAutoDensity(d)}
                         className={`py-1.5 text-[11px] font-semibold rounded-lg capitalize transition-all cursor-pointer ${
                           autoDensity === d
-                            ? 'bg-purple-600 text-white shadow-md'
+                            ? 'bg-blue-600 text-white shadow-md'
                             : 'text-gray-400 hover:text-white'
                         }`}
                       >
@@ -608,8 +491,8 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 {/* Max Auto Scale Limit */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-gray-300">Max Auto Scale Limit</span>
-                    <span className="font-mono text-purple-400 font-semibold">{autoMaxScale.toFixed(2)}x</span>
+                    <span className="font-semibold text-gray-300">Max Auto Scale</span>
+                    <span className="font-mono text-blue-400 font-semibold">{autoMaxScale.toFixed(2)}x</span>
                   </div>
                   <input
                     type="range"
@@ -618,35 +501,8 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     step="0.05"
                     value={autoMaxScale}
                     onChange={(e) => setAutoMaxScale(parseFloat(e.target.value))}
-                    className="accent-purple-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+                    className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
                   />
-                </div>
-
-                {/* Easing Speed */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-gray-300">Transition Ease Speed</span>
-                  <div className="grid grid-cols-2 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
-                    <button
-                      onClick={() => setAutoEaseSpeed(0.3)}
-                      className={`py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer ${
-                        autoEaseSpeed === 0.3
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      0.3s Snappy
-                    </button>
-                    <button
-                      onClick={() => setAutoEaseSpeed(0.5)}
-                      className={`py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer ${
-                        autoEaseSpeed === 0.5
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      0.5s Smooth
-                    </button>
-                  </div>
                 </div>
 
                 {/* Generate Auto Zooms Button */}
@@ -659,10 +515,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       easeSpeed: autoEaseSpeed
                     })
                   }
-                  className="w-full py-2.5 px-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
+                  className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-yellow-300 animate-spin" />
-                  <span>Generate Auto Zooms</span>
+                  Generate Auto Zooms
                 </button>
 
                 {/* Clear Auto Zooms Button */}

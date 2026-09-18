@@ -349,29 +349,18 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             {(runtime.selectedTab === 'zoom' || selectedZoomEvent || activeZoomState.activeEventId) && (
               <div
                 onMouseDown={handleReticleMouseDown}
-                className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group ${
-                  selectedZoomEvent ? 'pointer-events-auto' : 'pointer-events-none'
+                className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group transition-transform ${
+                  selectedZoomEvent ? 'pointer-events-auto hover:scale-110' : 'pointer-events-none'
                 }`}
                 style={{
                   left: `${reticleX}%`,
                   top: `${reticleY}%`
                 }}
-                title={`Zoom Focal Target (X: ${Math.round(reticleX)}%, Y: ${Math.round(reticleY)}%) - Drag to move target`}
+                title="Drag to position zoom focus target"
               >
-                {/* Target Pin Center Dot & Ring */}
-                <div className="w-9 h-9 rounded-full border-2 border-purple-400 bg-purple-600/30 shadow-lg shadow-purple-500/50 flex items-center justify-center transition-transform group-hover:scale-110">
-                  <div className="w-2.5 h-2.5 rounded-full bg-white shadow-md" />
-                </div>
-                {/* Crosshair guide lines */}
-                <div className="absolute w-12 h-0.5 bg-purple-400/70 pointer-events-none" />
-                <div className="absolute h-12 w-0.5 bg-purple-400/70 pointer-events-none" />
-
-                {/* Target Coordinate Badge */}
-                <div className="absolute top-6 left-6 bg-purple-950/90 text-purple-200 border border-purple-500/50 text-[10px] font-mono px-2 py-0.5 rounded-md shadow-2xl whitespace-nowrap backdrop-blur-md pointer-events-none flex items-center gap-1.5">
-                  <Target className="w-3 h-3 text-purple-400" />
-                  <span>
-                    {selectedZoomEvent ? 'Target' : 'Active Zoom'}: ({Math.round(reticleX)}%, {Math.round(reticleY)}%)
-                  </span>
+                {/* Minimal Target Circle Pin */}
+                <div className="w-5 h-5 rounded-full border-2 border-white bg-blue-600/80 shadow-md flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
                 </div>
               </div>
             )}
