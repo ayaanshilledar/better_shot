@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { StudioProject, StudioRuntimeState, CropRegionData } from '../../types/editor'
+import { StudioProject, StudioRuntimeState, CropRegionData, ZoomEvent } from '../../types/editor'
 import { createDefaultProject } from '../../services/projectService'
+import { generateAutoZooms, AutoZoomOptions } from '../../utils/zoomUtils'
 import { EditorTopBar } from './EditorTopBar'
 import { StudioCanvas } from './StudioCanvas'
 import { EditorSidebar } from './EditorSidebar'
@@ -37,6 +38,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     isPlaying: false,
     selectedTab: 'background',
     selectedClipId: null,
+    selectedZoomId: null,
     previewScale: 'full',
     timelineZoom: 1.0,
     hoverState: { element: null },
@@ -87,7 +89,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     }
   }
 
-  // Keybindings for Space (Play/Pause), Undo, Redo
+  // Keybindings for Space (Play/Pause), Undo, Redo, Delete Zoom
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -103,6 +105,8 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         handleRedo()
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && runtime.selectedZoomId) {
+        handleDeleteZoomEvent(runtime.selectedZoomId)
       } else if (e.key === 'Escape') {
         if (onCloseEditor) onCloseEditor()
         else if (window.electronAPI?.closeEditorWindow) window.electronAPI.closeEditorWindow()
@@ -112,7 +116,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [historyIndex, history, runtime.isPlaying])
+  }, [historyIndex, history, runtime.isPlaying, runtime.selectedZoomId])
 
   // 60FPS Smooth playback loop for continuous playhead & time animation
   useEffect(() => {
@@ -238,6 +242,119 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     }))
   }
 
+  // ZOOM EVENT MANAGEMENT HANDLERS
+  const handleAddZoomEvent = (zoomData?: Partial<ZoomEvent>) => {
+    const newId = `zoom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    const newZoom: ZoomEvent = {
+      id: newId,
+      startTime: parseFloat(runtime.currentTime.toFixed(2)),
+      duration: 2.0,
+      easeInDuration: 0.4,
+      easeOutDuration: 0.4,
+      x: 50,
+      y: 50,
+      scale: 1.8,
+      easing: 'ease-in-out',
+      type: 'manual',
+      label: 'Manual Zoom',
+      ...zoomData
+    }
+
+    updateProject((p) => ({
+      ...p,
+      timeline: {
+        ...p.timeline,
+        zoomEvents: [...p.timeline.zoomEvents, newZoom]
+      }
+    }))
+
+    setRuntime((r) => ({
+      ...r,
+      selectedTab: 'zoom',
+      selectedZoomId: newId
+    }))
+  }
+
+  const handleUpdateZoomEvent = (zoomId: string, updates: Partial<ZoomEvent>, skipHistory = false) => {
+    updateProject(
+      (p) => ({
+        ...p,
+        timeline: {
+          ...p.timeline,
+          zoomEvents: p.timeline.zoomEvents.map((z) =>
+            z.id === zoomId ? { ...z, ...updates } : z
+          )
+        }
+      }),
+      skipHistory
+    )
+  }
+
+  const handleDeleteZoomEvent = (zoomId: string) => {
+    updateProject((p) => ({
+      ...p,
+      timeline: {
+        ...p.timeline,
+        zoomEvents: p.timeline.zoomEvents.filter((z) => z.id !== zoomId)
+      }
+    }))
+
+    if (runtime.selectedZoomId === zoomId) {
+      setRuntime((r) => ({ ...r, selectedZoomId: null }))
+    }
+  }
+
+  const handleGenerateAutoZooms = (options?: AutoZoomOptions) => {
+    const totalDuration = project.media.duration || 10
+    const autoZooms = generateAutoZooms(totalDuration, options)
+
+    updateProject((p) => {
+      const manualZooms = p.timeline.zoomEvents.filter((z) => z.type !== 'auto')
+      return {
+        ...p,
+        timeline: {
+          ...p.timeline,
+          zoomEvents: [...manualZooms, ...autoZooms]
+        }
+      }
+    })
+
+    if (autoZooms.length > 0) {
+      setRuntime((r) => ({
+        ...r,
+        selectedTab: 'zoom',
+        selectedZoomId: autoZooms[0].id
+      }))
+    }
+  }
+
+  const handleClearAutoZooms = () => {
+    updateProject((p) => ({
+      ...p,
+      timeline: {
+        ...p.timeline,
+        zoomEvents: p.timeline.zoomEvents.filter((z) => z.type !== 'auto')
+      }
+    }))
+
+    setRuntime((r) => ({ ...r, selectedZoomId: null }))
+  }
+
+  const handleUpdateZoomFocalPoint = (zoomId: string, x: number, y: number) => {
+    updateProject(
+      (p) => ({
+        ...p,
+        timeline: {
+          ...p.timeline,
+          zoomEvents: p.timeline.zoomEvents.map((z) =>
+            z.id === zoomId ? { ...z, x, y } : z
+          )
+        }
+      }),
+      true
+    )
+  }
+
   const handleExport = async () => {
     alert(`Exporting project "${project.title}" to MP4 with ${project.background.presetId} background frame...`)
   }
@@ -289,6 +406,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
               skipHistory
             )
           }
+          onUpdateZoomFocalPoint={handleUpdateZoomFocalPoint}
         />
 
         <EditorSidebar
@@ -308,11 +426,25 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
             }))
           }
           onSelectTab={(tab) => setRuntime((r) => ({ ...r, selectedTab: tab }))}
+          onAddZoomEvent={handleAddZoomEvent}
+          onUpdateZoomEvent={handleUpdateZoomEvent}
+          onDeleteZoomEvent={handleDeleteZoomEvent}
+          onSelectZoomEvent={(zoomId) => setRuntime((r) => ({ ...r, selectedZoomId: zoomId }))}
+          onGenerateAutoZooms={handleGenerateAutoZooms}
+          onClearAutoZooms={handleClearAutoZooms}
         />
       </div>
 
       {/* Bottom Timeline Section */}
-      <EditorTimeline project={project} runtime={runtime} onSeek={handleSeek} />
+      <EditorTimeline
+        project={project}
+        runtime={runtime}
+        onSeek={handleSeek}
+        onSelectZoomEvent={(zoomId) => setRuntime((r) => ({ ...r, selectedTab: 'zoom', selectedZoomId: zoomId }))}
+        onAddZoomEvent={handleAddZoomEvent}
+        onUpdateZoomEvent={handleUpdateZoomEvent}
+        onDeleteZoomEvent={handleDeleteZoomEvent}
+      />
 
       {/* Crop Modal Dialog */}
       <CropModal

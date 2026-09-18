@@ -1,6 +1,7 @@
-import React, { useRef, useEffect } from 'react'
-import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward } from 'lucide-react'
+import React, { useRef, useEffect, useState } from 'react'
+import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward, Crosshair, Target } from 'lucide-react'
 import { StudioProject, StudioRuntimeState } from '../../types/editor'
+import { calculateActiveZoom } from '../../utils/zoomUtils'
 
 interface StudioCanvasProps {
   project: StudioProject
@@ -13,6 +14,7 @@ interface StudioCanvasProps {
   onSelectVideo?: () => void
   onDeselectVideo?: () => void
   onUpdateLayout?: (updates: Partial<StudioProject['layout']>, skipHistory?: boolean) => void
+  onUpdateZoomFocalPoint?: (zoomId: string, x: number, y: number) => void
 }
 
 export const StudioCanvas: React.FC<StudioCanvasProps> = ({
@@ -25,12 +27,14 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   onZoomChange,
   onSelectVideo,
   onDeselectVideo,
-  onUpdateLayout
+  onUpdateLayout,
+  onUpdateZoomFocalPoint
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoWrapperRef = useRef<HTMLDivElement>(null)
 
   const isDraggingRef = useRef<boolean>(false)
+  const isDraggingReticleRef = useRef<boolean>(false)
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -70,14 +74,23 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     }
   }
 
-  // Active zoom scale calculation for real-time preview
-  const currentZoomEvent = project.timeline.zoomEvents.find(
-    (z) => runtime.currentTime >= z.startTime && runtime.currentTime <= z.startTime + z.duration
+  // Calculate smooth sub-frame active zoom state (scale & origin X/Y)
+  const activeZoomState = calculateActiveZoom(
+    project.timeline.zoomEvents,
+    runtime.currentTime
   )
 
-  const zoomScale = currentZoomEvent ? currentZoomEvent.scale : 1.0
-  const zoomOriginX = currentZoomEvent ? `${currentZoomEvent.x}%` : '50%'
-  const zoomOriginY = currentZoomEvent ? `${currentZoomEvent.y}%` : '50%'
+  const selectedZoomEvent = project.timeline.zoomEvents.find(
+    (z) => z.id === runtime.selectedZoomId
+  )
+
+  // Use selected event's target focal point if in Zoom tab & event selected, else use real-time animated state
+  const reticleX = selectedZoomEvent ? selectedZoomEvent.x : activeZoomState.x
+  const reticleY = selectedZoomEvent ? selectedZoomEvent.y : activeZoomState.y
+
+  const zoomScale = activeZoomState.scale
+  const zoomOriginX = `${activeZoomState.x}%`
+  const zoomOriginY = `${activeZoomState.y}%`
 
   // Streamable local media source URL
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
@@ -145,6 +158,18 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
     if (onSelectVideo) onSelectVideo()
 
+    if (runtime.selectedTab === 'zoom' && selectedZoomEvent && onUpdateZoomFocalPoint) {
+      const videoWrapperEl = videoWrapperRef.current
+      if (videoWrapperEl) {
+        const rect = videoWrapperEl.getBoundingClientRect()
+        const rawX = ((e.clientX - rect.left) / rect.width) * 100
+        const rawY = ((e.clientY - rect.top) / rect.height) * 100
+        const clampedX = Math.round(Math.max(0, Math.min(100, rawX)))
+        const clampedY = Math.round(Math.max(0, Math.min(100, rawY)))
+        onUpdateZoomFocalPoint(selectedZoomEvent.id, clampedX, clampedY)
+      }
+    }
+
     isDraggingRef.current = true
     hasMovedRef.current = false
     dragStartRef.current = {
@@ -196,6 +221,41 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           )
         }
       }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  // Mouse Down Drag Handler for Zoom Reticle Target Point
+  const handleReticleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    if (!selectedZoomEvent || !onUpdateZoomFocalPoint) return
+
+    isDraggingReticleRef.current = true
+
+    const videoWrapperEl = videoWrapperRef.current
+    if (!videoWrapperEl) return
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingReticleRef.current) return
+
+      const rect = videoWrapperEl.getBoundingClientRect()
+      const rawX = ((moveEvent.clientX - rect.left) / rect.width) * 100
+      const rawY = ((moveEvent.clientY - rect.top) / rect.height) * 100
+
+      const clampedX = Math.round(Math.max(0, Math.min(100, rawX)))
+      const clampedY = Math.round(Math.max(0, Math.min(100, rawY)))
+
+      onUpdateZoomFocalPoint(selectedZoomEvent.id, clampedX, clampedY)
+    }
+
+    const handleMouseUp = () => {
+      isDraggingReticleRef.current = false
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -283,6 +343,37 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
                 <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
               </>
+            )}
+
+            {/* Visual Target Reticle Overlay for Zoom Focal Point */}
+            {(runtime.selectedTab === 'zoom' || selectedZoomEvent || activeZoomState.activeEventId) && (
+              <div
+                onMouseDown={handleReticleMouseDown}
+                className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group ${
+                  selectedZoomEvent ? 'pointer-events-auto' : 'pointer-events-none'
+                }`}
+                style={{
+                  left: `${reticleX}%`,
+                  top: `${reticleY}%`
+                }}
+                title={`Zoom Focal Target (X: ${Math.round(reticleX)}%, Y: ${Math.round(reticleY)}%) - Drag to move target`}
+              >
+                {/* Target Pin Center Dot & Ring */}
+                <div className="w-9 h-9 rounded-full border-2 border-purple-400 bg-purple-600/30 shadow-lg shadow-purple-500/50 flex items-center justify-center transition-transform group-hover:scale-110">
+                  <div className="w-2.5 h-2.5 rounded-full bg-white shadow-md" />
+                </div>
+                {/* Crosshair guide lines */}
+                <div className="absolute w-12 h-0.5 bg-purple-400/70 pointer-events-none" />
+                <div className="absolute h-12 w-0.5 bg-purple-400/70 pointer-events-none" />
+
+                {/* Target Coordinate Badge */}
+                <div className="absolute top-6 left-6 bg-purple-950/90 text-purple-200 border border-purple-500/50 text-[10px] font-mono px-2 py-0.5 rounded-md shadow-2xl whitespace-nowrap backdrop-blur-md pointer-events-none flex items-center gap-1.5">
+                  <Target className="w-3 h-3 text-purple-400" />
+                  <span>
+                    {selectedZoomEvent ? 'Target' : 'Active Zoom'}: ({Math.round(reticleX)}%, {Math.round(reticleY)}%)
+                  </span>
+                </div>
+              </div>
             )}
 
             {mediaUrl ? (
