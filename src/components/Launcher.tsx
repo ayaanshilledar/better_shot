@@ -13,7 +13,7 @@ import {
   Film,
   Clock,
   Trash2,
-  Wand2
+  Pencil
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
@@ -360,7 +360,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                         className="p-1.5 rounded-lg bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white transition-all shadow-sm cursor-pointer"
                         title="Edit Video Studio"
                       >
-                        <Wand2 className="w-3 h-3" />
+                        <Pencil className="w-3 h-3" />
                       </button>
 
                       {/* Delete Button */}

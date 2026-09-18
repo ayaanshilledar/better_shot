@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward, Crosshair, Target } from 'lucide-react'
-import { StudioProject, StudioRuntimeState } from '../../types/editor'
+import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward, Crosshair, Target, Crop, Frame, ChevronDown, Check } from 'lucide-react'
+import { StudioProject, StudioRuntimeState, AspectRatioType } from '../../types/editor'
 import { calculateActiveZoom } from '../../utils/zoomUtils'
 
 interface StudioCanvasProps {
@@ -15,7 +15,18 @@ interface StudioCanvasProps {
   onDeselectVideo?: () => void
   onUpdateLayout?: (updates: Partial<StudioProject['layout']>, skipHistory?: boolean) => void
   onUpdateZoomFocalPoint?: (zoomId: string, x: number, y: number) => void
+  onToggleCrop?: () => void
+  onScaleChange?: (scale: 'full' | 'half' | 'quarter') => void
 }
+
+const FRAME_PRESETS: { id: AspectRatioType; label: string; ratioText: string; subLabel: string }[] = [
+  { id: 'auto', label: 'Auto', ratioText: 'Fit Video', subLabel: 'Natural / Crop Ratio' },
+  { id: '16:9', label: '16:9', ratioText: 'Landscape', subLabel: 'YouTube / Desktop' },
+  { id: '9:16', label: '9:16', ratioText: 'Portrait', subLabel: 'TikTok / Reels / Shorts' },
+  { id: '1:1', label: '1:1', ratioText: 'Square', subLabel: 'Instagram / Feed' },
+  { id: '4:3', label: '4:3', ratioText: 'Classic', subLabel: 'Presentation / Tablet' },
+  { id: '21:9', label: '21:9', ratioText: 'Ultrawide', subLabel: 'Cinematic Monitor' }
+]
 
 export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   project,
@@ -28,7 +39,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   onSelectVideo,
   onDeselectVideo,
   onUpdateLayout,
-  onUpdateZoomFocalPoint
+  onUpdateZoomFocalPoint,
+  onToggleCrop,
+  onScaleChange
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoWrapperRef = useRef<HTMLDivElement>(null)
@@ -42,6 +55,21 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     startY: 0
   })
   const hasMovedRef = useRef<boolean>(false)
+
+  // Floating Frame Aspect Ratio menu state
+  const [isFrameMenuOpen, setIsFrameMenuOpen] = useState<boolean>(false)
+  const frameMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isFrameMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (frameMenuRef.current && !frameMenuRef.current.contains(e.target as Node)) {
+        setIsFrameMenuOpen(false)
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    return () => window.removeEventListener('mousedown', handleClickOutside)
+  }, [isFrameMenuOpen])
 
   // Preview Scale multiplier calculation ('full' -> 1.0, 'half' -> 0.5, 'quarter' -> 0.25)
   const previewScaleMultiplier =
@@ -92,35 +120,117 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   const zoomOriginX = `${activeZoomState.x}%`
   const zoomOriginY = `${activeZoomState.y}%`
 
+  const stageRef = useRef<HTMLDivElement>(null)
+
+  // Real video dimensions tracking from loaded video stream
+  const [actualVideoDims, setActualVideoDims] = useState<{ width: number; height: number }>({
+    width: project.media.width || 1920,
+    height: project.media.height || 1080
+  })
+
+  // Stage dimensions tracking to reliably fit any aspect ratio (1:1, 4:3, 9:16, 16:9, 21:9)
+  const [stageDimensions, setStageDimensions] = useState<{ width: number; height: number }>({ width: 1920, height: 1080 })
+
+  useEffect(() => {
+    const el = stageRef.current || containerRef.current
+    if (!el) return
+
+    const updateFromRect = (width: number, height: number) => {
+      if (width > 0 && height > 0) {
+        setStageDimensions({ width: Math.round(width), height: Math.round(height) })
+      }
+    }
+
+    const rect = el.getBoundingClientRect()
+    updateFromRect(rect.width, rect.height)
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect
+          updateFromRect(width, height)
+        }
+      })
+      observer.observe(el)
+      return () => observer.disconnect()
+    } else {
+      const onResize = () => {
+        const r = el.getBoundingClientRect()
+        updateFromRect(r.width, r.height)
+      }
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
   // Streamable local media source URL
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
 
-  const videoW = project.media.width || 1920
-  const videoH = project.media.height || 1080
+  const videoW = actualVideoDims.width || project.media.width || 1920
+  const videoH = actualVideoDims.height || project.media.height || 1080
   const crop = project.layout.cropRegion
 
   const isCropped = Boolean(
     crop &&
-    crop.width > 50 &&
-    crop.height > 50 &&
-    (crop.width !== videoW || crop.height !== videoH || crop.x !== 0 || crop.y !== 0)
+    crop.width > 20 &&
+    crop.height > 20 &&
+    (Math.abs(crop.width - videoW) > 2 || Math.abs(crop.height - videoH) > 2 || crop.x > 2 || crop.y > 2)
   )
 
-  const cropW = Math.max(50, crop?.width || videoW)
-  const cropH = Math.max(50, crop?.height || videoH)
-  const cropX = Math.max(0, crop?.x || 0)
-  const cropY = Math.max(0, crop?.y || 0)
+  const cropW = Math.max(20, isCropped ? crop!.width : videoW)
+  const cropH = Math.max(20, isCropped ? crop!.height : videoH)
+  const cropX = Math.max(0, isCropped ? crop!.x : 0)
+  const cropY = Math.max(0, isCropped ? crop!.y : 0)
 
-  const containerAspect = isCropped
-    ? `${cropW} / ${cropH}`
-    : `${videoW} / ${videoH}`
+  const containerAspect = `${cropW} / ${cropH}`
+  const videoRatio = cropW / cropH
 
-  const isPortrait = cropW < cropH
+  // Canvas aspect ratio resolution
+  const activeAspectRatio: AspectRatioType = project.layout.aspectRatio || 'auto'
+  const canvasAspectDecimal = (() => {
+    switch (activeAspectRatio) {
+      case '16:9':
+        return 16 / 9
+      case '9:16':
+        return 9 / 16
+      case '1:1':
+        return 1 / 1
+      case '4:3':
+        return 4 / 3
+      case '21:9':
+        return 21 / 9
+      case 'auto':
+      default:
+        return cropW / cropH
+    }
+  })()
+
+  // Compute pixel-exact outer canvas frame dimensions fitting stage
+  const maxCanvasW = Math.max(100, stageDimensions.width - 24)
+  const maxCanvasH = Math.max(100, stageDimensions.height - 24)
+
+  let canvasW = maxCanvasW
+  let canvasH = Math.round(maxCanvasW / canvasAspectDecimal)
+  if (canvasH > maxCanvasH) {
+    canvasH = maxCanvasH
+    canvasW = Math.round(maxCanvasH * canvasAspectDecimal)
+  }
 
   // Compute dynamic scale factor based on padding slider (0 to 40 mapped to 1.0 down to 0.65)
   const canvasScale = project.background.type === 'none'
     ? 1.0
     : Math.max(0.5, 1 - (project.layout.padding / 40) * 0.35)
+
+  // Compute pixel-exact video frame width and height inside the canvas frame
+  const availableVideoW = Math.max(80, (canvasW - 32) * canvasScale)
+  const availableVideoH = Math.max(80, (canvasH - 32) * canvasScale)
+
+  let frameW = availableVideoW
+  let frameH = Math.round(availableVideoW / videoRatio)
+  if (frameH > availableVideoH) {
+    frameH = availableVideoH
+    frameW = Math.round(availableVideoH * videoRatio)
+  }
 
   // Compute background style string for the background layer
   const getBgStyle = () => {
@@ -283,19 +393,144 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     <div
       ref={containerRef}
       onClick={handleCanvasClick}
-      className="flex-1 bg-[#090b0e] relative flex flex-col items-center justify-center overflow-hidden p-2 sm:p-3 select-none"
+      className="flex-1 bg-[#090b0e] relative flex flex-col items-center justify-between overflow-hidden select-none"
     >
-      {/* Outer Studio Background Canvas Frame with Preview Scale transform */}
+      {/* Top Canvas Header (Clean & Borderless, Left: Crop Video | Right: Preview Scale Pill) */}
+      <div className="w-full h-12 px-6 flex items-center justify-between select-none z-20 border-b-0 bg-transparent shrink-0">
+        {/* Left End: Crop Video & Frame Aspect Ratio Controls */}
+        <div className="flex items-center gap-2">
+          {/* Crop Video Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (onToggleCrop) onToggleCrop()
+            }}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+              isCropped
+                ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30 shadow-blue-500/10'
+                : 'bg-[#14161f] hover:bg-[#1a1d28] text-gray-300 hover:text-white border-white/10 hover:border-white/20'
+            }`}
+            title={isCropped ? `Cropped (${cropW}x${cropH}) - Click to adjust crop` : 'Crop Video'}
+          >
+            <Crop className="w-3.5 h-3.5 text-blue-400" />
+            <span>Crop Video</span>
+            {isCropped && (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            )}
+          </button>
+
+          {/* Frame Aspect Ratio Dropdown Button */}
+          <div className="relative" ref={frameMenuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsFrameMenuOpen((prev) => !prev)
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                isFrameMenuOpen || activeAspectRatio !== 'auto'
+                  ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30 shadow-blue-500/10'
+                  : 'bg-[#14161f] hover:bg-[#1a1d28] text-gray-300 hover:text-white border-white/10 hover:border-white/20'
+              }`}
+              title="Change canvas aspect ratio frame"
+            >
+              <Frame className="w-3.5 h-3.5 text-blue-400" />
+              <span>Frame: <span className="font-mono text-white">{activeAspectRatio.toUpperCase()}</span></span>
+              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isFrameMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Floating Dropdown Menu */}
+            {isFrameMenuOpen && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute left-0 top-full mt-1.5 w-52 bg-[#12141a] border border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150"
+              >
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-white/5 mb-0.5">
+                  Canvas Aspect Ratio
+                </div>
+                {FRAME_PRESETS.map((preset) => {
+                  const isActive = activeAspectRatio === preset.id
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => {
+                        if (onUpdateLayout) {
+                          onUpdateLayout({ aspectRatio: preset.id })
+                        }
+                        setIsFrameMenuOpen(false)
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${
+                        isActive
+                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-xs">{preset.label}</span>
+                          <span className={`text-[11px] ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>• {preset.ratioText}</span>
+                        </div>
+                        <span className={`text-[10px] ${isActive ? 'text-blue-200' : 'text-gray-500'}`}>{preset.subLabel}</span>
+                      </div>
+                      {isActive && (
+                        <Check className="w-3.5 h-3.5 text-white shrink-0 ml-2" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right End: Preview Scale Segmented Pill Switcher (Matching Provided Screenshot) */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center bg-[#14161f] p-1 rounded-xl border border-white/5 shadow-inner gap-0.5"
+        >
+          {(['full', 'half', 'quarter'] as const).map((scale) => {
+            const labels = {
+              full: '100% Full',
+              half: '50% Half',
+              quarter: '25% Quarter'
+            }
+            const isActive = runtime.previewScale === scale
+            return (
+              <button
+                key={scale}
+                onClick={() => onScaleChange && onScaleChange(scale)}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                }`}
+              >
+                {labels[scale]}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Main Studio Middle Canvas Area */}
       <div
-        className={`relative w-full h-full max-w-[96vw] max-h-[88vh] rounded-2xl flex items-center justify-center overflow-hidden transition-transform duration-200 p-3 sm:p-4 ${
-          project.background.type === 'none' ? 'border-none' : 'border border-white/10'
-        }`}
-        style={{
-          boxSizing: 'border-box',
-          transform: `scale(${previewScaleMultiplier})`,
-          transformOrigin: 'center center'
-        }}
+        ref={stageRef}
+        className="flex-1 w-full relative flex items-center justify-center overflow-hidden p-2 sm:p-3 min-h-0"
       >
+        {/* Outer Studio Background Canvas Frame with Preview Scale transform */}
+        <div
+          className={`relative rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-200 p-3 sm:p-4 ${
+            project.background.type === 'none' ? 'border-none' : 'border border-white/10'
+          }`}
+          style={{
+            boxSizing: 'border-box',
+            width: `${canvasW}px`,
+            height: `${canvasH}px`,
+            maxWidth: '100%',
+            maxHeight: '100%',
+            transform: `scale(${previewScaleMultiplier})`,
+            transformOrigin: 'center center'
+          }}
+        >
         {/* Dedicated Background Layer (Blur filter applies ONLY to background, never video) */}
         {project.background.type !== 'none' && (
           <div
@@ -330,10 +565,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               transform: `translate(${posX}px, ${posY}px) scale(${objectScale}) translateZ(0)`,
               transformOrigin: 'center center',
               aspectRatio: containerAspect,
-              width: isPortrait ? 'auto' : '100%',
-              height: isPortrait ? '100%' : 'auto',
-              maxWidth: `${canvasScale * 100}%`,
-              maxHeight: `${canvasScale * 100}%`
+              width: `${frameW}px`,
+              height: `${frameH}px`,
+              maxWidth: '100%',
+              maxHeight: '100%'
             }}
           >
             {/* Visual Handles when video is selected */}
@@ -368,15 +603,14 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
             {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
             <div
-              className="w-full h-full relative overflow-hidden flex items-center justify-center"
+              className="w-full h-full relative overflow-hidden"
               style={{
-                borderRadius: `${project.layout.cornerRadius}px`,
-                aspectRatio: containerAspect
+                borderRadius: `${project.layout.cornerRadius}px`
               }}
             >
               {/* Inner Zoom Layer (Scales video content smoothly without overflowing outer frame or affecting padding) */}
               <div
-                className="w-full h-full relative flex items-center justify-center"
+                className="w-full h-full relative overflow-hidden"
                 style={{
                   transform: `scale(${zoomScale}) translateZ(0)`,
                   transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
@@ -384,54 +618,34 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 }}
               >
                 {mediaUrl ? (
-                  isCropped ? (
-                    <div
-                      className="relative overflow-hidden w-full h-full"
-                      style={{
-                        aspectRatio: containerAspect,
-                        width: '100%',
-                        height: '100%'
-                      }}
-                    >
-                      <video
-                        ref={videoRef}
-                        src={mediaUrl}
-                        playsInline
-                        className="absolute max-w-none max-h-none"
-                        style={{
-                          width: `${(videoW / cropW) * 100}%`,
-                          height: `${(videoH / cropH) * 100}%`,
-                          left: `${-(cropX / cropW) * 100}%`,
-                          top: `${-(cropY / cropH) * 100}%`,
-                          objectFit: 'cover',
-                          transform: 'translateZ(0)',
-                          willChange: 'transform',
-                          backfaceVisibility: 'hidden'
-                        }}
-                        onTimeUpdate={() => {
-                          if (videoRef.current) {
-                            onTimeUpdate(videoRef.current.currentTime)
-                          }
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <video
-                      ref={videoRef}
-                      src={mediaUrl}
-                      playsInline
-                      className="w-full h-full object-cover block"
-                      style={{
-                        transform: 'translateZ(0)',
-                        backfaceVisibility: 'hidden'
-                      }}
-                      onTimeUpdate={() => {
-                        if (videoRef.current) {
-                          onTimeUpdate(videoRef.current.currentTime)
-                        }
-                      }}
-                    />
-                  )
+                  <video
+                    ref={videoRef}
+                    src={mediaUrl}
+                    playsInline
+                    className={isCropped ? "absolute max-w-none max-h-none block" : "w-full h-full object-cover block"}
+                    style={{
+                      width: isCropped ? `${(videoW / cropW) * 100}%` : '100%',
+                      height: isCropped ? `${(videoH / cropH) * 100}%` : '100%',
+                      left: isCropped ? `${-(cropX / cropW) * 100}%` : '0%',
+                      top: isCropped ? `${-(cropY / cropH) * 100}%` : '0%',
+                      objectFit: isCropped ? 'fill' : 'cover',
+                      borderRadius: `${project.layout.cornerRadius}px`,
+                      transform: 'translateZ(0)',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden'
+                    }}
+                    onLoadedMetadata={(e) => {
+                      const el = e.currentTarget
+                      if (el.videoWidth && el.videoHeight) {
+                        setActualVideoDims({ width: el.videoWidth, height: el.videoHeight })
+                      }
+                    }}
+                    onTimeUpdate={() => {
+                      if (videoRef.current) {
+                        onTimeUpdate(videoRef.current.currentTime)
+                      }
+                    }}
+                  />
                 ) : (
                   <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
                     No Video Stream Loaded
@@ -442,9 +656,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
           </div>
         </div>
       </div>
+    </div>
 
       {/* Bottom Transport Bar (Clean Aligned Placement) */}
-      <div className="w-full h-12 bg-[#0b0c10]/95 border-t border-white/5 px-6 flex items-center justify-between relative select-none z-20">
+      <div className="w-full h-12 bg-[#0b0c10]/95 border-t-0 px-6 flex items-center justify-between relative select-none z-20">
         {/* Far Left: Timecode Readout */}
         <div className="flex items-center min-w-[110px]">
           <span className="font-mono text-xs font-normal text-gray-400 tracking-tight">

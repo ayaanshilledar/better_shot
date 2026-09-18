@@ -160,17 +160,18 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         }
       }
 
-      if (Number.isFinite(dur) && dur > 0) {
-        updateProject((p) => ({
-          ...p,
-          media: {
-            ...p.media,
-            duration: dur,
-            width: video.videoWidth || 1920,
-            height: video.videoHeight || 1080
-          }
-        }))
-      }
+      const w = video.videoWidth || 1920
+      const h = video.videoHeight || 1080
+
+      updateProject((p) => ({
+        ...p,
+        media: {
+          ...p.media,
+          duration: Number.isFinite(dur) && dur > 0 ? dur : p.media.duration,
+          width: w,
+          height: h
+        }
+      }))
     }
 
     const handleEnded = () => {
@@ -242,29 +243,67 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     }))
   }
 
-  // ZOOM EVENT MANAGEMENT HANDLERS
+  // ZOOM EVENT MANAGEMENT HANDLERS (Non-overlapping timeframe guarantee)
   const handleAddZoomEvent = (zoomData?: Partial<ZoomEvent>) => {
+    const rawDuration = project.media.duration
+    const totalDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 10.0
+    const targetStart = parseFloat((zoomData?.startTime ?? runtime.currentTime).toFixed(2))
+
+    // Check if targetStart falls inside any existing zoom event
+    const existingZooms = [...project.timeline.zoomEvents].sort((a, b) => a.startTime - b.startTime)
+    const activeAtStart = existingZooms.find(
+      (z) => targetStart >= z.startTime && targetStart < z.startTime + z.duration
+    )
+
+    if (activeAtStart) {
+      // Already inside a zoom event at this timeframe! Select the existing one instead of creating a conflicting duplicate
+      setRuntime((r) => ({
+        ...r,
+        selectedTab: 'zoom',
+        selectedZoomId: activeAtStart.id
+      }))
+      return
+    }
+
+    // Check if there is enough room before totalDuration ends
+    if (targetStart >= totalDuration - 0.2) {
+      return
+    }
+
+    // Find the next upcoming zoom event after targetStart
+    const nextZoom = existingZooms.find((z) => z.startTime > targetStart)
+    const availableGap = nextZoom ? nextZoom.startTime - targetStart : totalDuration - targetStart
+
+    // Minimum usable duration for a zoom event is 0.3s
+    if (availableGap < 0.3) {
+      return
+    }
+
+    // Desired duration (default 2.0s or custom from zoomData, clamped to available gap)
+    const desiredDuration = zoomData?.duration ?? 2.0
+    const finalDuration = parseFloat(Math.max(0.3, Math.min(desiredDuration, availableGap)).toFixed(2))
+
     const newId = `zoom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
     const newZoom: ZoomEvent = {
       id: newId,
-      startTime: parseFloat(runtime.currentTime.toFixed(2)),
-      duration: 2.0,
-      easeInDuration: 0.4,
-      easeOutDuration: 0.4,
+      easeInDuration: Math.min(0.4, parseFloat((finalDuration / 2).toFixed(2))),
+      easeOutDuration: Math.min(0.4, parseFloat((finalDuration / 2).toFixed(2))),
       x: 50,
       y: 50,
       scale: 1.8,
       easing: 'ease-in-out',
       type: 'manual',
       label: 'Manual Zoom',
-      ...zoomData
+      ...zoomData,
+      startTime: targetStart,
+      duration: finalDuration
     }
 
     updateProject((p) => ({
       ...p,
       timeline: {
         ...p.timeline,
-        zoomEvents: [...p.timeline.zoomEvents, newZoom]
+        zoomEvents: [...p.timeline.zoomEvents, newZoom].sort((a, b) => a.startTime - b.startTime)
       }
     }))
 
@@ -281,9 +320,9 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         ...p,
         timeline: {
           ...p.timeline,
-          zoomEvents: p.timeline.zoomEvents.map((z) =>
-            z.id === zoomId ? { ...z, ...updates } : z
-          )
+          zoomEvents: p.timeline.zoomEvents
+            .map((z) => (z.id === zoomId ? { ...z, ...updates } : z))
+            .sort((a, b) => a.startTime - b.startTime)
         }
       }),
       skipHistory
@@ -306,26 +345,32 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
 
   const handleGenerateAutoZooms = (options?: AutoZoomOptions) => {
     const totalDuration = project.media.duration || 10
-    const autoZooms = generateAutoZooms(totalDuration, options)
+    const rawAutoZooms = generateAutoZooms(totalDuration, options)
 
     updateProject((p) => {
       const manualZooms = p.timeline.zoomEvents.filter((z) => z.type !== 'auto')
+      // Only keep auto zooms that do not collide with any manual zoom
+      const nonCollidingAutoZooms = rawAutoZooms.filter((autoZ) => {
+        const autoEnd = autoZ.startTime + autoZ.duration
+        return !manualZooms.some((manZ) => {
+          const manEnd = manZ.startTime + manZ.duration
+          return autoZ.startTime < manEnd && autoEnd > manZ.startTime
+        })
+      })
+
       return {
         ...p,
         timeline: {
           ...p.timeline,
-          zoomEvents: [...manualZooms, ...autoZooms]
+          zoomEvents: [...manualZooms, ...nonCollidingAutoZooms].sort((a, b) => a.startTime - b.startTime)
         }
       }
     })
 
-    if (autoZooms.length > 0) {
-      setRuntime((r) => ({
-        ...r,
-        selectedTab: 'zoom',
-        selectedZoomId: autoZooms[0].id
-      }))
-    }
+    setRuntime((r) => ({
+      ...r,
+      selectedTab: 'zoom'
+    }))
   }
 
   const handleClearAutoZooms = () => {
@@ -407,6 +452,8 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
             )
           }
           onUpdateZoomFocalPoint={handleUpdateZoomFocalPoint}
+          onToggleCrop={handleToggleCrop}
+          onScaleChange={(scale) => setRuntime((r) => ({ ...r, previewScale: scale }))}
         />
 
         <EditorSidebar

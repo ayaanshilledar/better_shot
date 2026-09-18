@@ -154,7 +154,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
 
   return (
     <div className="drag-region w-full h-full flex items-center justify-center select-none font-sans">
-      <div className="drag-region bg-[#101216]/95 backdrop-blur-xl border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-2xl text-white hover:border-white/20 transition-colors">
+      <div className="drag-region bg-[#12141a] border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-2xl text-white hover:border-white/20 transition-colors">
         {/* Draggable Grip Handle */}
         <div
           className="drag-region flex items-center justify-center text-gray-400 hover:text-white cursor-grab active:cursor-grabbing px-0.5"

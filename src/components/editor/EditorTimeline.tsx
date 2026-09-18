@@ -51,13 +51,40 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
     ticks.push(i)
   }
 
-  // Check if track hover time falls inside an existing zoom block
-  const isHoveringExistingBlock = Boolean(
+  // Check if current playhead is inside any zoom event or too close to next block
+  const isCurrentTimeInsideZoom = project.timeline.zoomEvents.some(
+    (z) => runtime.currentTime >= z.startTime && runtime.currentTime < z.startTime + z.duration
+  )
+
+  const nextZoomAfterCurrent = project.timeline.zoomEvents
+    .filter((z) => z.startTime > runtime.currentTime)
+    .sort((a, b) => a.startTime - b.startTime)[0]
+
+  const gapAfterCurrent = nextZoomAfterCurrent
+    ? nextZoomAfterCurrent.startTime - runtime.currentTime
+    : duration - runtime.currentTime
+
+  const canAddZoomAtCurrentTime = !isCurrentTimeInsideZoom && gapAfterCurrent >= 0.3 && duration - runtime.currentTime >= 0.3
+
+  // Check if track hover time falls inside an existing zoom block or has insufficient gap (<0.3s)
+  const isHoverInsideExisting = Boolean(
     trackHoverTime !== null &&
     project.timeline.zoomEvents.some(
-      (z) => trackHoverTime >= z.startTime && trackHoverTime <= z.startTime + z.duration
+      (z) => trackHoverTime >= z.startTime && trackHoverTime < z.startTime + z.duration
     )
   )
+
+  const nextZoomAfterHover = trackHoverTime !== null
+    ? project.timeline.zoomEvents
+        .filter((z) => z.startTime > trackHoverTime)
+        .sort((a, b) => a.startTime - b.startTime)[0]
+    : null
+
+  const gapAfterHover = trackHoverTime !== null
+    ? (nextZoomAfterHover ? nextZoomAfterHover.startTime - trackHoverTime : duration - trackHoverTime)
+    : 0
+
+  const isHoverValid = trackHoverTime !== null && !isHoverInsideExisting && gapAfterHover >= 0.3 && (duration - trackHoverTime >= 0.3)
 
   // Track Mouse Movement over Zoom Track Row for Ghost Add Preview
   const handleTrackMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -76,13 +103,13 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
 
   // Click on empty Zoom Track row area to add Zoom keyframe at mouse location
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (trackHoverTime !== null && onAddZoomEvent && !isHoveringExistingBlock && !activeDragId) {
+    if (trackHoverTime !== null && onAddZoomEvent && isHoverValid && !activeDragId) {
       onSeek(trackHoverTime)
       onAddZoomEvent({ startTime: trackHoverTime })
     }
   }
 
-  // Handle Dragging Zoom Event Block (Move or Resize)
+  // Handle Dragging Zoom Event Block (Move or Resize with strict collision boundaries)
   const handleZoomBlockMouseDown = (
     e: React.MouseEvent,
     z: ZoomEvent,
@@ -105,12 +132,24 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
 
     const trackWidth = trackEl.getBoundingClientRect().width || 1
 
+    // Determine neighbor boundary blocks to prevent collision / overlap
+    const otherBlocks = project.timeline.zoomEvents
+      .filter((other) => other.id !== z.id)
+      .sort((a, b) => a.startTime - b.startTime)
+
+    const prevBlock = [...otherBlocks].reverse().find((other) => other.startTime + other.duration <= startStartTime + 0.001)
+    const nextBlock = otherBlocks.find((other) => other.startTime >= startStartTime + startDuration - 0.001)
+
+    const minAllowedStart = prevBlock ? prevBlock.startTime + prevBlock.duration : 0
+    const maxAllowedEnd = nextBlock ? nextBlock.startTime : duration
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX
       const deltaTime = (deltaX / trackWidth) * duration
 
       if (mode === 'move') {
-        const nextStartTime = Math.max(0, Math.min(duration - startDuration, startStartTime + deltaTime))
+        const maxAllowedStart = Math.max(minAllowedStart, maxAllowedEnd - startDuration)
+        const nextStartTime = Math.max(minAllowedStart, Math.min(maxAllowedStart, startStartTime + deltaTime))
         const roundedStart = parseFloat(nextStartTime.toFixed(2))
 
         if (onUpdateZoomEvent) {
@@ -118,8 +157,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
         }
         onSeek(roundedStart)
       } else if (mode === 'resize-left') {
-        const maxStart = startStartTime + startDuration - 0.2
-        const nextStartTime = Math.max(0, Math.min(maxStart, startStartTime + deltaTime))
+        const maxStart = startStartTime + startDuration - 0.3
+        const nextStartTime = Math.max(minAllowedStart, Math.min(maxStart, startStartTime + deltaTime))
         const nextDuration = startStartTime + startDuration - nextStartTime
 
         const roundedStart = parseFloat(nextStartTime.toFixed(2))
@@ -130,7 +169,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
         }
         onSeek(roundedStart)
       } else if (mode === 'resize-right') {
-        const nextDuration = Math.max(0.2, Math.min(duration - startStartTime, startDuration + deltaTime))
+        const maxAllowedDur = Math.max(0.3, maxAllowedEnd - startStartTime)
+        const nextDuration = Math.max(0.3, Math.min(maxAllowedDur, startDuration + deltaTime))
         const roundedDur = parseFloat(nextDuration.toFixed(2))
 
         if (onUpdateZoomEvent) {
@@ -156,11 +196,22 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
       <div className="h-9 px-3 border-b border-white/5 bg-[#14161f] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onAddZoomEvent && onAddZoomEvent()}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-semibold text-xs rounded-lg border border-blue-500/30 transition-all cursor-pointer"
-            title="Add Zoom Keyframe at current playhead position"
+            onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
+            disabled={!canAddZoomAtCurrentTime}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border transition-all ${
+              canAddZoomAtCurrentTime
+                ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-semibold border-blue-500/30 cursor-pointer'
+                : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed opacity-50'
+            }`}
+            title={
+              canAddZoomAtCurrentTime
+                ? 'Add Zoom Keyframe at current playhead position'
+                : isCurrentTimeInsideZoom
+                ? 'Cannot add zoom: playhead is already inside a zoom event'
+                : 'Cannot add zoom: not enough room before next zoom or end of clip'
+            }
           >
-            <Plus className="w-3.5 h-3.5 text-blue-400" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Add Zoom</span>
           </button>
         </div>
@@ -185,9 +236,20 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
           <div className="h-10 px-3 flex items-center justify-between text-xs font-semibold text-gray-300 border-b border-white/5 group">
             <span>Zoom</span>
             <button
-              onClick={() => onAddZoomEvent && onAddZoomEvent()}
-              className="p-1 hover:bg-white/10 text-blue-400 rounded transition-colors cursor-pointer"
-              title="Add Zoom Keyframe"
+              onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
+              disabled={!canAddZoomAtCurrentTime}
+              className={`p-1 rounded transition-colors ${
+                canAddZoomAtCurrentTime
+                  ? 'hover:bg-white/10 text-blue-400 cursor-pointer'
+                  : 'text-gray-600 cursor-not-allowed opacity-40'
+              }`}
+              title={
+                canAddZoomAtCurrentTime
+                  ? 'Add Zoom Keyframe'
+                  : isCurrentTimeInsideZoom
+                  ? 'Cannot add zoom: playhead is already inside a zoom event'
+                  : 'Cannot add zoom: not enough room before next zoom'
+              }
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -246,8 +308,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
               onClick={handleTrackClick}
               className="h-10 border-b border-white/5 relative flex items-center px-1 bg-[#10121a]/60 hover:bg-[#151726]/80 cursor-pointer transition-colors group"
             >
-              {/* Interactive Ghost "+ Add Zoom" Preview Button on Hover (Only over empty track space) */}
-              {trackHoverX !== null && trackHoverTime !== null && !activeDragId && !isHoveringExistingBlock && (
+              {/* Interactive Ghost "+ Add Zoom" Preview Button on Hover (Only over valid empty track space) */}
+              {trackHoverX !== null && trackHoverTime !== null && !activeDragId && isHoverValid && (
                 <div
                   className="absolute z-20 pointer-events-none -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-blue-600/90 text-white border border-blue-400 text-[10px] font-semibold rounded-lg shadow-lg backdrop-blur-sm animate-pulse"
                   style={{ left: `${trackHoverX}px` }}

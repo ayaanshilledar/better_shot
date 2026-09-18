@@ -27,18 +27,21 @@ export const CropModal: React.FC<CropModalProps> = ({
   project,
   onApplyCrop
 }) => {
-  const [selectedRatio, setSelectedRatio] = useState<string>('4:3')
+  // Video stream dimensions
+  const initialVideoW = project.media.width || 1920
+  const initialVideoH = project.media.height || 1080
+
+  const [videoW, setVideoW] = useState<number>(initialVideoW)
+  const [videoH, setVideoH] = useState<number>(initialVideoH)
+
+  const [selectedRatio, setSelectedRatio] = useState<string>('Free')
   const [snapToRatios, setSnapToRatios] = useState<boolean>(true)
 
-  // Crop Region State (relative to video dimensions, e.g. 1920x1080)
-  const videoW = project.media.width || 1920
-  const videoH = project.media.height || 1080
-
   const [crop, setCrop] = useState<{ x: number; y: number; width: number; height: number }>({
-    x: 241,
+    x: 0,
     y: 0,
-    width: 1441,
-    height: 1080
+    width: initialVideoW,
+    height: initialVideoH
   })
 
   // Dragging state
@@ -53,18 +56,33 @@ export const CropModal: React.FC<CropModalProps> = ({
   const videoStageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (project.layout.cropRegion) {
-      setCrop({
-        x: project.layout.cropRegion.x,
-        y: project.layout.cropRegion.y,
-        width: project.layout.cropRegion.width,
-        height: project.layout.cropRegion.height
-      })
-      if (project.layout.cropRegion.aspectRatio) {
-        setSelectedRatio(project.layout.cropRegion.aspectRatio)
+    if (isOpen) {
+      const curW = project.media.width || initialVideoW
+      const curH = project.media.height || initialVideoH
+      setVideoW(curW)
+      setVideoH(curH)
+
+      if (project.layout.cropRegion) {
+        setCrop({
+          x: project.layout.cropRegion.x,
+          y: project.layout.cropRegion.y,
+          width: project.layout.cropRegion.width,
+          height: project.layout.cropRegion.height
+        })
+        if (project.layout.cropRegion.aspectRatio) {
+          setSelectedRatio(project.layout.cropRegion.aspectRatio)
+        }
+      } else {
+        setCrop({
+          x: 0,
+          y: 0,
+          width: curW,
+          height: curH
+        })
+        setSelectedRatio('Free')
       }
     }
-  }, [project.layout.cropRegion, isOpen])
+  }, [project.layout.cropRegion, isOpen, project.media.width, project.media.height])
 
   // Arrow keys nudging handler
   useEffect(() => {
@@ -134,12 +152,12 @@ export const CropModal: React.FC<CropModalProps> = ({
   }
 
   const handleReset = () => {
-    setSelectedRatio('4:3')
+    setSelectedRatio('Free')
     setCrop({
-      x: 241,
+      x: 0,
       y: 0,
-      width: 1441,
-      height: 1080
+      width: videoW,
+      height: videoH
     })
   }
 
@@ -271,6 +289,23 @@ export const CropModal: React.FC<CropModalProps> = ({
                   playsInline
                   muted
                   className="w-full h-full object-fill pointer-events-none"
+                  onLoadedMetadata={(e) => {
+                    const el = e.currentTarget
+                    if (el.videoWidth && el.videoHeight) {
+                      const realW = el.videoWidth
+                      const realH = el.videoHeight
+                      setVideoW(realW)
+                      setVideoH(realH)
+                      if (!project.layout.cropRegion) {
+                        setCrop({
+                          x: 0,
+                          y: 0,
+                          width: realW,
+                          height: realH
+                        })
+                      }
+                    }
+                  }}
                 />
               ) : (
                 <div className="text-gray-500 text-xs">No media loaded</div>
