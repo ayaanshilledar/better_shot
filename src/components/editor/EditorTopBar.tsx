@@ -54,7 +54,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   return (
     <header
       onDoubleClick={handleToggleMaximize}
-      className="h-12 bg-[#12141a]/95 border-b border-white/10 px-3 flex items-center justify-between select-none z-30 drag-region cursor-default"
+      className="h-12 bg-[#12141a]/95 px-3 flex items-center justify-between select-none z-30 drag-region cursor-default"
     >
       {/* Left section: Home Navigation + Title */}
       <div className="flex items-center gap-3 no-drag">

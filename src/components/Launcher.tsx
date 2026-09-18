@@ -135,14 +135,17 @@ export const Launcher: React.FC<LauncherProps> = ({
   return (
     <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none font-sans relative">
       {/* Window Drag Header */}
-      <div className="px-3.5 pt-3 pb-1 flex items-center justify-between z-10">
-        <div className="drag-region flex-1 flex items-center gap-2">
-          <span className="text-xs font-semibold tracking-tight text-white">
-            {APP_CONFIG.appName}
-          </span>
+      <header className="h-10 bg-[#12141a]/95 px-3 flex items-center justify-between select-none z-10 drag-region cursor-default shrink-0">
+        <div className="flex items-center gap-2 no-drag">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#1a1d26] rounded-lg border border-white/5 shadow-sm">
+            <Film className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-xs font-semibold tracking-tight text-white">
+              {APP_CONFIG.appName}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div className="flex items-center gap-2 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           {/* History Icon */}
           <button
             onClick={(e) => {
@@ -150,42 +153,46 @@ export const Launcher: React.FC<LauncherProps> = ({
               e.stopPropagation()
               handleOpenHistory()
             }}
-            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+            className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
             title="Recording History"
           >
             <History className="w-3.5 h-3.5" />
           </button>
-          {/* Minimize Icon */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              console.log('[BetterShot:Launcher] Minimize button clicked')
-              window.electronAPI?.minimizeLauncher()
-            }}
-            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
-            title="Minimize"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          {/* Close Icon */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              console.log('[BetterShot:Launcher] Close button clicked')
-              window.electronAPI?.closeLauncher()
-            }}
-            className="no-drag p-1 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors cursor-pointer"
-            title="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+
+          <div className="h-4 w-px bg-white/10" />
+
+          {/* Window controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('[BetterShot:Launcher] Minimize button clicked')
+                window.electronAPI?.minimizeLauncher()
+              }}
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+              title="Minimize"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('[BetterShot:Launcher] Close button clicked')
+                window.electronAPI?.closeLauncher()
+              }}
+              className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded-md transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content Body */}
-      <div className="px-3.5 pb-3.5 pt-1.5 flex-1 flex flex-col justify-between gap-2 overflow-hidden">
+      <div className="px-3.5 pb-3.5 pt-2 flex-1 flex flex-col justify-between gap-2 overflow-hidden">
         {/* 2-Column Capture Mode Grid: Display & Area */}
         <div className="grid grid-cols-2 gap-2">
           {/* Display option */}
