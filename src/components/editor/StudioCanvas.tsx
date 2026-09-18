@@ -168,6 +168,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         const clampedY = Math.round(Math.max(0, Math.min(100, rawY)))
         onUpdateZoomFocalPoint(selectedZoomEvent.id, clampedX, clampedY)
       }
+      return
     }
 
     isDraggingRef.current = true
@@ -326,8 +327,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             style={{
               borderRadius: `${project.layout.cornerRadius}px`,
               boxShadow: isSelected ? undefined : getShadowStyle(),
-              transform: `translate(${posX}px, ${posY}px) scale(${objectScale * zoomScale}) translateZ(0)`,
-              transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
+              transform: `translate(${posX}px, ${posY}px) scale(${objectScale}) translateZ(0)`,
+              transformOrigin: 'center center',
               aspectRatio: containerAspect,
               width: isPortrait ? 'auto' : '100%',
               height: isPortrait ? '100%' : 'auto',
@@ -365,62 +366,79 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               </div>
             )}
 
-            {mediaUrl ? (
-              isCropped ? (
-                <div
-                  className="relative overflow-hidden w-full h-full"
-                  style={{
-                    aspectRatio: containerAspect,
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: `${project.layout.cornerRadius}px`
-                  }}
-                >
-                  <video
-                    ref={videoRef}
-                    src={mediaUrl}
-                    playsInline
-                    className="absolute max-w-none max-h-none"
-                    style={{
-                      width: `${(videoW / cropW) * 100}%`,
-                      height: `${(videoH / cropH) * 100}%`,
-                      left: `${-(cropX / cropW) * 100}%`,
-                      top: `${-(cropY / cropH) * 100}%`,
-                      objectFit: 'cover',
-                      transform: 'translateZ(0)',
-                      willChange: 'transform',
-                      backfaceVisibility: 'hidden'
-                    }}
-                    onTimeUpdate={() => {
-                      if (videoRef.current) {
-                        onTimeUpdate(videoRef.current.currentTime)
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <video
-                  ref={videoRef}
-                  src={mediaUrl}
-                  playsInline
-                  className="w-full h-full object-cover block"
-                  style={{
-                    borderRadius: `${project.layout.cornerRadius}px`,
-                    transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden'
-                  }}
-                  onTimeUpdate={() => {
-                    if (videoRef.current) {
-                      onTimeUpdate(videoRef.current.currentTime)
-                    }
-                  }}
-                />
-              )
-            ) : (
-              <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
-                No Video Stream Loaded
+            {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
+            <div
+              className="w-full h-full relative overflow-hidden flex items-center justify-center"
+              style={{
+                borderRadius: `${project.layout.cornerRadius}px`,
+                aspectRatio: containerAspect
+              }}
+            >
+              {/* Inner Zoom Layer (Scales video content smoothly without overflowing outer frame or affecting padding) */}
+              <div
+                className="w-full h-full relative flex items-center justify-center"
+                style={{
+                  transform: `scale(${zoomScale}) translateZ(0)`,
+                  transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
+                  willChange: 'transform'
+                }}
+              >
+                {mediaUrl ? (
+                  isCropped ? (
+                    <div
+                      className="relative overflow-hidden w-full h-full"
+                      style={{
+                        aspectRatio: containerAspect,
+                        width: '100%',
+                        height: '100%'
+                      }}
+                    >
+                      <video
+                        ref={videoRef}
+                        src={mediaUrl}
+                        playsInline
+                        className="absolute max-w-none max-h-none"
+                        style={{
+                          width: `${(videoW / cropW) * 100}%`,
+                          height: `${(videoH / cropH) * 100}%`,
+                          left: `${-(cropX / cropW) * 100}%`,
+                          top: `${-(cropY / cropH) * 100}%`,
+                          objectFit: 'cover',
+                          transform: 'translateZ(0)',
+                          willChange: 'transform',
+                          backfaceVisibility: 'hidden'
+                        }}
+                        onTimeUpdate={() => {
+                          if (videoRef.current) {
+                            onTimeUpdate(videoRef.current.currentTime)
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      src={mediaUrl}
+                      playsInline
+                      className="w-full h-full object-cover block"
+                      style={{
+                        transform: 'translateZ(0)',
+                        backfaceVisibility: 'hidden'
+                      }}
+                      onTimeUpdate={() => {
+                        if (videoRef.current) {
+                          onTimeUpdate(videoRef.current.currentTime)
+                        }
+                      }}
+                    />
+                  )
+                ) : (
+                  <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
+                    No Video Stream Loaded
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
