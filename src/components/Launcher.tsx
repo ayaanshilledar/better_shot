@@ -10,10 +10,7 @@ import {
   X,
   Play,
   History,
-  Film,
-  Clock,
-  Trash2,
-  Pencil
+  Film
 } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
@@ -94,8 +91,8 @@ export const Launcher: React.FC<LauncherProps> = ({
     }
   }
 
-  const handleEditRecording = async (e: React.MouseEvent, filePath: string) => {
-    e.stopPropagation()
+  const handleEditRecording = async (filePath: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
     console.log('[BetterShot:Launcher] Opening Studio Editor for:', filePath)
     if (window.electronAPI?.openEditorWindow) {
       await window.electronAPI.openEditorWindow(filePath)
@@ -129,7 +126,8 @@ export const Launcher: React.FC<LauncherProps> = ({
 
   const formatDate = (timestamp: number) => {
     const d = new Date(timestamp)
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    return `${d.getMonth() + 1}/${d.getDate()}, ${timeStr}`
   }
 
   return (
@@ -292,7 +290,7 @@ export const Launcher: React.FC<LauncherProps> = ({
       {/* Recording History Modal Overlay */}
       {isHistoryOpen && (
         <div className="absolute inset-0 bg-[#101216]/95 backdrop-blur-md z-30 flex flex-col p-3 overflow-hidden animate-in fade-in duration-150">
-          <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
+          <div className="flex items-center justify-between pb-2 mb-2">
             <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
               <Film className="w-3.5 h-3.5 text-blue-400" />
               Recorded Videos
@@ -300,7 +298,7 @@ export const Launcher: React.FC<LauncherProps> = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setIsHistoryOpen(false)}
-                className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-3.5 h-3.5" />
@@ -320,11 +318,12 @@ export const Launcher: React.FC<LauncherProps> = ({
                 return (
                   <div
                     key={rec.filePath}
-                    onClick={() => handlePlayRecording(rec.filePath)}
-                    className="p-2 rounded-xl bg-[#181b22] border border-white/5 hover:border-blue-500/40 hover:bg-[#20242e] transition-all flex items-center gap-2.5 cursor-pointer group"
+                    onClick={() => handleEditRecording(rec.filePath)}
+                    className="p-2 rounded-xl bg-[#181b22] border border-white/5 hover:border-blue-500/30 hover:bg-[#1f242e] transition-all flex items-center gap-2.5 cursor-pointer group"
+                    title="Open in Studio Editor"
                   >
                     {/* Video Thumbnail Preview */}
-                    <div className="relative w-16 h-11 rounded-lg overflow-hidden bg-black/80 border border-white/10 shrink-0 flex items-center justify-center group-hover:border-blue-500/50 transition-colors shadow-inner">
+                    <div className="relative w-12 h-9 rounded-lg overflow-hidden bg-black/80 border border-white/10 shrink-0 flex items-center justify-center group-hover:border-blue-500/40 transition-colors shadow-inner">
                       <video
                         src={videoUri}
                         className="w-full h-full object-cover pointer-events-none"
@@ -334,51 +333,28 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </div>
 
                     {/* Metadata details */}
-                    <div className="flex flex-col min-w-0 flex-1 pr-1">
-                      <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-xs font-medium text-white truncate group-hover:text-blue-400 transition-colors">
                         {rec.name}
                       </span>
-                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5 text-gray-500" />
-                          {formatDate(rec.createdAt)}
-                        </span>
-                        <span>•</span>
-                        <span>{formatFileSize(rec.size)}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-0.5 truncate">
+                        <span className="truncate">{formatDate(rec.createdAt)}</span>
+                        <span className="text-gray-600 shrink-0">•</span>
+                        <span className="shrink-0">{formatFileSize(rec.size)}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* Play Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePlayRecording(rec.filePath)
-                        }}
-                        className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm cursor-pointer"
-                        title="Play Video"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                      </button>
-
-                      {/* Edit Video Button */}
-                      <button
-                        onClick={(e) => handleEditRecording(e, rec.filePath)}
-                        className="p-1.5 rounded-lg bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white transition-all shadow-sm cursor-pointer"
-                        title="Edit Video Studio"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => handleDeleteRecording(e, rec.filePath)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm cursor-pointer"
-                        title="Delete Recording"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
+                    {/* Single Action Button (Play) */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handlePlayRecording(rec.filePath)
+                      }}
+                      className="w-6 h-6 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-all shadow-sm cursor-pointer shrink-0"
+                      title="Play Video"
+                    >
+                      <Play className="w-3 h-3 fill-current ml-0.5" />
+                    </button>
                   </div>
                 )
               })
