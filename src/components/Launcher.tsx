@@ -135,7 +135,7 @@ export const Launcher: React.FC<LauncherProps> = ({
   return (
     <div className="w-full h-full bg-[#101216] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl select-none font-sans relative">
       {/* Window Drag Header */}
-      <div className="px-3 py-2 flex items-center justify-between border-b border-white/5 bg-[#14171d]/90 z-10">
+      <div className="px-3.5 pt-3 pb-1 flex items-center justify-between z-10">
         <div className="drag-region flex-1 flex items-center gap-2">
           <span className="text-xs font-semibold tracking-tight text-white">
             {APP_CONFIG.appName}
@@ -185,7 +185,7 @@ export const Launcher: React.FC<LauncherProps> = ({
       </div>
 
       {/* Main Content Body */}
-      <div className="p-3 flex-1 flex flex-col justify-between gap-2 overflow-hidden">
+      <div className="px-3.5 pb-3.5 pt-1.5 flex-1 flex flex-col justify-between gap-2 overflow-hidden">
         {/* 2-Column Capture Mode Grid: Display & Area */}
         <div className="grid grid-cols-2 gap-2">
           {/* Display option */}

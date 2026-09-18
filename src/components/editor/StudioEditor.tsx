@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { StudioProject, StudioRuntimeState, CropRegionData, ZoomEvent } from '../../types/editor'
+import { StudioProject, StudioRuntimeState, CropRegionData, ZoomEvent, ExportProgress } from '../../types/editor'
 import { createDefaultProject } from '../../services/projectService'
 import { generateAutoZooms, AutoZoomOptions } from '../../utils/zoomUtils'
+import { createExportProcess } from '../../services/exportService'
 import { EditorTopBar } from './EditorTopBar'
 import { StudioCanvas } from './StudioCanvas'
 import { EditorSidebar } from './EditorSidebar'
 import { EditorTimeline } from './EditorTimeline'
 import { CropModal } from './CropModal'
+import { ExportModal } from './ExportModal'
 
 interface StudioEditorProps {
   recordingFilePath?: string
@@ -400,8 +402,57 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     )
   }
 
-  const handleExport = async () => {
-    alert(`Exporting project "${project.title}" to MP4 with ${project.background.presetId} background frame...`)
+  // Export State and Handlers
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false)
+  const [exportProgress, setExportProgress] = useState<ExportProgress>({
+    progress: 0,
+    currentTime: 0,
+    totalDuration: 1,
+    fps: 60,
+    etaSeconds: 0,
+    phase: 'preparing'
+  })
+  const exportCancelRef = useRef<(() => void) | null>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  const handleStartExport = () => {
+    setIsExportModalOpen(true)
+    const currentSettings = {
+      format: project.exportSettings?.format || 'mp4',
+      resolution: project.exportSettings?.resolution || '1080p',
+      fps: project.exportSettings?.fps || 60,
+      bitratePreset: project.exportSettings?.bitratePreset || 'high',
+      customBitrateMbps: project.exportSettings?.customBitrateMbps || 12,
+      includeAudio: project.exportSettings?.includeAudio ?? true,
+      audioBitrateKbps: project.exportSettings?.audioBitrateKbps || 192,
+      saveLocation: project.exportSettings?.saveLocation
+    }
+
+    const { promise, cancel } = createExportProcess(
+      project,
+      currentSettings,
+      (prog) => setExportProgress(prog),
+      (canvas) => {
+        previewCanvasRef.current = canvas
+      }
+    )
+
+    exportCancelRef.current = cancel
+    promise.catch((err) => {
+      console.error('Export error:', err)
+    })
+  }
+
+  const handleCancelExport = () => {
+    if (exportCancelRef.current) {
+      exportCancelRef.current()
+      exportCancelRef.current = null
+    }
+  }
+
+  const handleCloseExportModal = () => {
+    handleCancelExport()
+    setIsExportModalOpen(false)
   }
 
   return (
@@ -459,7 +510,13 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         <EditorSidebar
           project={project}
           runtime={runtime}
-          onExport={handleExport}
+          onExport={handleStartExport}
+          onUpdateExportSettings={(updates) =>
+            updateProject((p) => ({
+              ...p,
+              exportSettings: { ...p.exportSettings, ...updates }
+            }))
+          }
           onUpdateBackground={(updates) =>
             updateProject((p) => ({
               ...p,
@@ -499,6 +556,17 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         onClose={() => setIsCropModalOpen(false)}
         project={project}
         onApplyCrop={handleApplyCrop}
+      />
+
+      {/* Export Progress Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={handleCloseExportModal}
+        onCancel={handleCancelExport}
+        progress={exportProgress}
+        project={project}
+        settings={project.exportSettings}
+        previewCanvasRef={previewCanvasRef}
       />
     </div>
   )

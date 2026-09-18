@@ -60,10 +60,32 @@ export interface LayoutConfig {
   isMuted?: boolean
 }
 
+export type ExportResolution = 'original' | '4k' | '2k' | '1080p' | '720p'
+export type ExportFps = 60 | 30 | 24
+export type ExportBitratePreset = 'ultra' | 'high' | 'standard' | 'economy' | 'custom'
+export type ExportFormat = 'mp4' | 'webm'
+
 export interface ExportSettings {
-  format: 'mp4' | 'webm'
-  resolution: 'original' | '1080p' | '4k'
+  format: ExportFormat
+  resolution: ExportResolution
+  fps: ExportFps
+  bitratePreset: ExportBitratePreset
+  customBitrateMbps?: number
+  includeAudio: boolean
+  audioBitrateKbps: 128 | 192 | 256 | 320
+  saveLocation?: string
+}
+
+export interface ExportProgress {
+  progress: number // 0 to 100
+  currentTime: number
+  totalDuration: number
   fps: number
+  etaSeconds: number
+  phase: 'preparing' | 'rendering' | 'encoding' | 'saving' | 'completed' | 'error' | 'cancelled'
+  error?: string
+  filePath?: string
+  fileSize?: number
 }
 
 export interface StudioProject {

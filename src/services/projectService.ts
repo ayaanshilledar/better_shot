@@ -45,8 +45,12 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
     },
     exportSettings: {
       format: 'mp4',
-      resolution: 'original',
-      fps: 60
+      resolution: '1080p',
+      fps: 60,
+      bitratePreset: 'high',
+      customBitrateMbps: 12,
+      includeAudio: true,
+      audioBitrateKbps: 192
     }
   }
 }

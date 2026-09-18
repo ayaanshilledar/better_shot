@@ -127,6 +127,19 @@ const electronAPI = {
   openRecordingFile: (filePath: string): Promise<boolean> => ipcRenderer.invoke('open-recording-file', filePath),
   openRecordingsFolder: (): Promise<boolean> => ipcRenderer.invoke('open-recordings-folder'),
   openEditorWindow: (filePath?: string): Promise<boolean> => ipcRenderer.invoke('open-editor-window', filePath),
+  saveExportedVideo: (
+    buffer: ArrayBuffer,
+    fileName?: string,
+    targetPath?: string
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+    ipcRenderer.invoke('save-exported-video', buffer, fileName, targetPath),
+  showSaveDialog: (
+    defaultName: string,
+    format: string
+  ): Promise<{ canceled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('show-save-dialog', defaultName, format),
+  showItemInFolder: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('show-item-in-folder', filePath),
 
   // Event listeners
   onRecordingStateChanged: (callback: (state: string) => void): (() => void) => {

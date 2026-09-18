@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
@@ -145,8 +145,8 @@ function createEditorWindow(filePath?: string) {
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 350,
-    height: 265,
+    width: 300,
+    height: 255,
     resizable: false,
     frame: false,
     transparent: true,
@@ -415,6 +415,67 @@ ipcMain.handle('open-editor-window', (_event, filePath?: string) => {
   console.log('[BetterShot:Main] IPC handle: open-editor-window requested for:', filePath)
   createEditorWindow(filePath)
   return true
+})
+
+ipcMain.handle('save-exported-video', async (_event, buffer: ArrayBuffer, fileName?: string, targetPath?: string) => {
+  console.log(`[BetterShot:Main] IPC handle: save-exported-video requested (${buffer.byteLength} bytes)`)
+  try {
+    let filePath = targetPath
+    if (!filePath) {
+      const exportsDir = path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
+      if (!fs.existsSync(exportsDir)) {
+        fs.mkdirSync(exportsDir, { recursive: true })
+      }
+      const defaultName = fileName || `BetterShot_Export_${Date.now()}.mp4`
+      filePath = path.join(exportsDir, defaultName)
+    } else {
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    }
+
+    const uint8Array = new Uint8Array(buffer)
+    await fs.promises.writeFile(filePath, uint8Array)
+    console.log(`[BetterShot:Main] Saved exported video successfully to: ${filePath}`)
+    return { success: true, filePath }
+  } catch (error: any) {
+    console.error('[BetterShot:Main] Error saving exported video:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('show-save-dialog', async (event, defaultName: string, format: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || editorWindow || launcherWindow
+  const exportsDir = path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
+  if (!fs.existsSync(exportsDir)) {
+    fs.mkdirSync(exportsDir, { recursive: true })
+  }
+  const ext = (format || 'mp4').toLowerCase() === 'webm' ? 'webm' : 'mp4'
+  const filters = ext === 'webm'
+    ? [{ name: 'WebM Video (*.webm)', extensions: ['webm'] }]
+    : [{ name: 'MP4 Video (*.mp4)', extensions: ['mp4'] }]
+
+  const result = await dialog.showSaveDialog(win!, {
+    title: 'Export Video As',
+    defaultPath: path.join(exportsDir, defaultName),
+    filters,
+    properties: ['showOverwriteConfirmation', 'createDirectory']
+  })
+  return { canceled: result.canceled, filePath: result.filePath }
+})
+
+ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      shell.showItemInFolder(filePath)
+      return true
+    }
+    return false
+  } catch (err) {
+    console.error('[BetterShot:Main] Error showing item in folder:', err)
+    return false
+  }
 })
 
 // Window controls

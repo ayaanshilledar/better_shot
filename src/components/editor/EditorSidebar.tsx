@@ -9,9 +9,25 @@ import {
   ZoomIn,
   Trash2
 } from 'lucide-react'
-import { StudioProject, StudioRuntimeState, ShadowType, ZoomEvent, ZoomEasingType } from '../../types/editor'
+import {
+  StudioProject,
+  StudioRuntimeState,
+  ShadowType,
+  ZoomEvent,
+  ZoomEasingType,
+  ExportResolution,
+  ExportFps,
+  ExportBitratePreset,
+  ExportFormat
+} from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
 import { AutoZoomOptions } from '../../utils/zoomUtils'
+import {
+  calculateExportDimensions,
+  calculateTargetBitrate,
+  estimateFileSize,
+  formatBitrate
+} from '../../services/exportService'
 
 interface EditorSidebarProps {
   project: StudioProject
@@ -25,6 +41,7 @@ interface EditorSidebarProps {
   onSelectZoomEvent?: (zoomId: string | null) => void
   onGenerateAutoZooms?: (options?: AutoZoomOptions) => void
   onClearAutoZooms?: () => void
+  onUpdateExportSettings?: (updates: Partial<StudioProject['exportSettings']>) => void
   onExport?: () => void
 }
 
@@ -40,6 +57,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   onSelectZoomEvent,
   onGenerateAutoZooms,
   onClearAutoZooms,
+  onUpdateExportSettings,
   onExport
 }) => {
   const [zoomMode, setZoomMode] = useState<'manual' | 'auto'>('manual')
@@ -48,6 +66,50 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const [autoDensity, setAutoDensity] = useState<'subtle' | 'balanced' | 'dynamic'>('balanced')
   const [autoMaxScale, setAutoMaxScale] = useState<number>(1.6)
   const [autoEaseSpeed, setAutoEaseSpeed] = useState<number>(0.4)
+
+  // Export Settings normalization and dynamic calculations
+  const exportSettings = {
+    format: project.exportSettings?.format || 'mp4',
+    resolution: project.exportSettings?.resolution || '1080p',
+    fps: project.exportSettings?.fps || 60,
+    bitratePreset: project.exportSettings?.bitratePreset || 'high',
+    customBitrateMbps: project.exportSettings?.customBitrateMbps || 12,
+    includeAudio: project.exportSettings?.includeAudio ?? true,
+    audioBitrateKbps: project.exportSettings?.audioBitrateKbps || 192,
+    saveLocation: project.exportSettings?.saveLocation
+  }
+
+  const currentDimensions = calculateExportDimensions(
+    project.layout.aspectRatio,
+    exportSettings.resolution,
+    project.media.width,
+    project.media.height
+  )
+
+  const currentBitrate = calculateTargetBitrate(
+    exportSettings.resolution,
+    exportSettings.bitratePreset,
+    exportSettings.customBitrateMbps
+  )
+
+  const estimatedSize = estimateFileSize(
+    project.media.duration || 10,
+    currentBitrate,
+    exportSettings.audioBitrateKbps,
+    exportSettings.includeAudio
+  )
+
+  const handleSelectSaveLocation = async () => {
+    if (window.electronAPI?.showSaveDialog) {
+      const cleanTitle = (project.title || 'BetterShot').replace(/[<>:"/\\|?*]+/g, '_')
+      const ext = exportSettings.format || 'mp4'
+      const defaultName = `${cleanTitle}_${exportSettings.resolution}.${ext}`
+      const res = await window.electronAPI.showSaveDialog(defaultName, ext)
+      if (!res.canceled && res.filePath && onUpdateExportSettings) {
+        onUpdateExportSettings({ saveLocation: res.filePath })
+      }
+    }
+  }
 
   const tabs = [
     { id: 'background', label: 'Bg', icon: Image },
@@ -617,9 +679,166 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
           </div>
         )}
 
-        {/* Export Section (Blank for now) */}
+        {/* Simplified, Clean Export Section */}
         {runtime.selectedTab === 'export' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6" />
+          <div className="flex flex-col gap-4">
+            {/* Format Segmented Row */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                Format
+              </span>
+              <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                {(['mp4', 'webm'] as const).map((fmt) => {
+                  const isActive = exportSettings.format === fmt
+                  return (
+                    <button
+                      key={fmt}
+                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ format: fmt })}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center uppercase ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {fmt}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Resolution Selector (Equal 4 Columns, Clean Fit) */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Resolution
+                </span>
+                <span className="text-[10px] font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                  {currentDimensions.width} × {currentDimensions.height}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                {(['4k', '1080p', '720p', 'original'] as const).map((res) => {
+                  const isActive = exportSettings.resolution === res
+                  const label = res === 'original' ? 'Native' : res.toUpperCase()
+                  return (
+                    <button
+                      key={res}
+                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res })}
+                      className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        isActive
+                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Frame Rate (Smooth 60 vs Standard 30) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                Frame Rate
+              </span>
+              <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                {([60, 30] as const).map((f) => {
+                  const isActive = exportSettings.fps === f
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ fps: f })}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        isActive
+                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {f} FPS {f === 60 ? '(Smooth)' : '(Standard)'}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Quality Preset (Clean 3 Levels) */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Quality
+                </span>
+                <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                  {formatBitrate(currentBitrate)}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                {(['ultra', 'high', 'standard'] as const).map((preset) => {
+                  const isActive = exportSettings.bitratePreset === preset
+                  const labels = { ultra: 'Ultra', high: 'High', standard: 'Standard' }
+                  return (
+                    <button
+                      key={preset}
+                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ bitratePreset: preset })}
+                      className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        isActive
+                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {labels[preset]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Audio Toggle (Simple Single Row) */}
+            <div className="flex items-center justify-between p-3 bg-[#161924] rounded-xl border border-white/5">
+              <span className="text-xs font-medium text-gray-200">Audio Track</span>
+              <button
+                onClick={() =>
+                  onUpdateExportSettings &&
+                  onUpdateExportSettings({ includeAudio: !exportSettings.includeAudio })
+                }
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                  exportSettings.includeAudio ? 'bg-blue-600' : 'bg-gray-700'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    exportSettings.includeAudio ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Quick Summary Strip & Save As */}
+            <div className="flex items-center justify-between px-3 py-2 bg-[#141720] rounded-xl border border-white/5 text-[11px]">
+              <div className="flex items-center gap-1.5 text-gray-400">
+                <span>Est. Size:</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  {estimatedSize}
+                </span>
+              </div>
+              <button
+                onClick={handleSelectSaveLocation}
+                className="text-[10px] font-semibold text-gray-400 hover:text-white transition-colors cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md"
+                title="Choose custom export folder"
+              >
+                {exportSettings.saveLocation ? 'Custom Path' : 'Save As...'}
+              </button>
+            </div>
+
+            {/* Primary Action Export Button */}
+            <button
+              onClick={() => onExport && onExport()}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer text-center mt-1"
+            >
+              Export Video
+            </button>
+          </div>
         )}
       </div>
     </aside>

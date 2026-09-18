@@ -89,13 +89,13 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   const getShadowStyle = () => {
     switch (project.layout.shadow) {
       case 'soft':
-        return '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)'
+        return '0 8px 20px -4px rgba(0, 0, 0, 0.35), 0 4px 8px -2px rgba(0, 0, 0, 0.2)'
       case 'medium':
-        return '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0,0,0,0.4)'
+        return '0 14px 30px -8px rgba(0, 0, 0, 0.55), 0 6px 12px -3px rgba(0, 0, 0, 0.3)'
       case 'hard':
-        return '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 0, 0, 0.8)'
+        return '0 18px 36px -8px rgba(0, 0, 0, 0.75), 0 8px 16px -4px rgba(0, 0, 0, 0.4)'
       case 'glow':
-        return '0 0 35px rgba(59, 130, 246, 0.4), 0 20px 40px -10px rgba(0, 0, 0, 0.8)'
+        return '0 0 25px rgba(59, 130, 246, 0.4), 0 12px 28px -6px rgba(0, 0, 0, 0.6)'
       case 'none':
       default:
         return 'none'
@@ -222,8 +222,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     : Math.max(0.5, 1 - (project.layout.padding / 40) * 0.35)
 
   // Compute pixel-exact video frame width and height inside the canvas frame
-  const availableVideoW = Math.max(80, (canvasW - 32) * canvasScale)
-  const availableVideoH = Math.max(80, (canvasH - 32) * canvasScale)
+  const availableVideoW = Math.max(80, (canvasW - 48) * canvasScale)
+  const availableVideoH = Math.max(80, (canvasH - 48) * canvasScale)
 
   let frameW = availableVideoW
   let frameH = Math.round(availableVideoW / videoRatio)
@@ -553,7 +553,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
         {/* Media Frame Container (Stays crisp & unblurred above background layer) */}
         <div
-          className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full overflow-hidden w-full h-full"
+          className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full w-full h-full"
         >
           {/* Framed HTML5 Video Element (Hardware 60FPS with selection & free drag transform) */}
           <div

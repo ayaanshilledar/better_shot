@@ -42,6 +42,16 @@ declare global {
       deleteRecording: (filePath: string) => Promise<boolean>
       openRecordingFile: (filePath: string) => Promise<boolean>
       openRecordingsFolder: () => Promise<boolean>
+      saveExportedVideo: (
+        buffer: ArrayBuffer,
+        fileName?: string,
+        targetPath?: string
+      ) => Promise<{ success: boolean; filePath?: string; error?: string }>
+      showSaveDialog: (
+        defaultName: string,
+        format: string
+      ) => Promise<{ canceled: boolean; filePath?: string }>
+      showItemInFolder: (filePath: string) => Promise<boolean>
 
       // Event listeners
       onRecordingStateChanged: (callback: (state: string) => void) => () => void
