@@ -8,6 +8,9 @@ import {
 } from '../types/editor'
 import { calculateActiveZoom } from '../utils/zoomUtils'
 import { WALLPAPER_PRESETS } from '../config/presets'
+import { getInterpolatedCursorPosition, renderCursorOnCanvas } from '../utils/cursorRenderUtils'
+import { DEFAULT_CURSOR_CONFIG } from '../types/cursor'
+import { clickSoundService } from './clickSoundService'
 
 // Preload image cache to avoid repeated image fetching during rendering
 const imageCache = new Map<string, HTMLImageElement>()
@@ -397,7 +400,29 @@ export function renderFrameToCanvas(
   } else {
     ctx.drawImage(video, 0, 0, nativeW, nativeH, frameX, frameY, frameW, frameH)
   }
+
+  // 6b. Draw Cursor & Click Ripples (Single-Cursor Replacement)
+  const cursorConfig = project.cursorConfig || DEFAULT_CURSOR_CONFIG
+  if (cursorConfig.enabled) {
+    const cursor = getInterpolatedCursorPosition(project.cursorData, currentTime)
+    if (cursor) {
+      renderCursorOnCanvas(
+        ctx,
+        cursor,
+        project.cursorData,
+        cursorConfig,
+        frameX,
+        frameY,
+        frameW,
+        frameH,
+        currentTime,
+        scaleRef
+      )
+    }
+  }
+
   ctx.restore()
+
 
   // 7. Draw Outer Border Stroke
   const borderWidth = project.layout.borderWidth ?? 1
@@ -657,6 +682,21 @@ export function createExportProcess(
           sourceNode.connect(gainNode)
           gainNode.connect(destination)
 
+          // Setup Click Audio FX mixing into export stream
+          let clickGainNode: GainNode | null = null
+          let clickSoundBuffer: AudioBuffer | null = null
+          const cursorConfig = project.cursorConfig || DEFAULT_CURSOR_CONFIG
+          if (cursorConfig.sound?.enabled && project.cursorData?.clicks?.length) {
+            try {
+              clickGainNode = audioCtx.createGain()
+              clickGainNode.gain.value = (cursorConfig.sound.volume / 100) * 0.5
+              clickGainNode.connect(destination)
+              clickSoundBuffer = clickSoundService.renderToBuffer(audioCtx, cursorConfig.sound.soundType)
+            } catch (err) {
+              console.warn('Could not initialize click sound buffer for export:', err)
+            }
+          }
+
           const tracks = destination.stream.getAudioTracks()
           if (tracks.length > 0) {
             audioStreamTrack = tracks[0]
@@ -705,6 +745,8 @@ export function createExportProcess(
       hiddenVideo.currentTime = 0
       await hiddenVideo.play()
 
+      let lastExportClickMs = -1
+
       await new Promise<void>((resolve, reject) => {
         let animFrameId: number
 
@@ -717,6 +759,21 @@ export function createExportProcess(
 
           const currTime = hiddenVideo!.currentTime
           renderFrameToCanvas(ctx, hiddenVideo!, project, currTime, exportW, exportH, bgImage)
+
+          // Mix click sound into audio stream when click timestamp is crossed
+          if (audioCtx && project.cursorData?.clicks && project.cursorConfig?.sound?.enabled) {
+            const currMs = currTime * 1000
+            const recentClicks = project.cursorData.clicks.filter(
+              c => c.t <= currMs && c.t > lastExportClickMs
+            )
+            if (recentClicks.length > 0) {
+              lastExportClickMs = currMs
+              try {
+                clickSoundService.play(project.cursorConfig.sound.soundType, project.cursorConfig.sound.volume)
+              } catch (_) {}
+            }
+          }
+
 
           if (onPreviewFrame) {
             onPreviewFrame(canvas)

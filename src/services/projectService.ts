@@ -1,5 +1,6 @@
 import { StudioProject } from '../types/editor'
 import { WALLPAPER_PRESETS } from '../config/presets'
+import { DEFAULT_CURSOR_CONFIG, CursorTelemetryData } from '../types/cursor'
 
 export const createDefaultProject = (sourcePath: string, fileName: string): StudioProject => {
   const defaultPreset = WALLPAPER_PRESETS[0]
@@ -43,6 +44,7 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       clips: [],
       zoomEvents: []
     },
+    cursorConfig: { ...DEFAULT_CURSOR_CONFIG },
     exportSettings: {
       format: 'mp4',
       resolution: '1080p',
@@ -54,3 +56,23 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
     }
   }
 }
+
+/**
+ * Attempts to load cursor telemetry data from the sidecar .cursor.json file via Electron IPC.
+ */
+export const loadCursorTelemetryForVideo = async (videoPath: string): Promise<CursorTelemetryData | null> => {
+  if (typeof window === 'undefined' || !(window as any).electronAPI?.loadCursorTelemetry) {
+    return null
+  }
+  try {
+    const data = await (window as any).electronAPI.loadCursorTelemetry(videoPath)
+    if (data && Array.isArray(data.samples)) {
+      console.log(`[BetterShot:ProjectService] Loaded cursor telemetry for ${videoPath} (${data.samples.length} samples, ${data.clicks?.length || 0} clicks)`)
+      return data
+    }
+  } catch (err) {
+    console.warn('[BetterShot:ProjectService] Could not load cursor telemetry:', err)
+  }
+  return null
+}
+

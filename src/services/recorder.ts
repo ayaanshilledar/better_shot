@@ -216,6 +216,15 @@ class ScreenRecorderService {
 
       this.mediaRecorder.start(1000) // 1 second slice chunks
       this.startTimer()
+
+      // Start synchronized cursor and click telemetry tracking
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.startCursorTracking) {
+        (window as any).electronAPI.startCursorTracking({
+          sourceId: config.sourceId,
+          cropRegion: config.cropRegion
+        }).catch((err: any) => console.warn('[BetterShot:Recorder] Error starting cursor tracking:', err))
+      }
+
       console.log('[BetterShot:Recorder] MediaRecorder started successfully!')
 
       return true
@@ -364,6 +373,12 @@ class ScreenRecorderService {
 
   public async stopRecording(): Promise<ArrayBuffer | null> {
     console.log('[BetterShot:Recorder] Stopping recording requested...')
+
+    // Signal cursor tracker to stop and finalize telemetry
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.stopCursorTracking) {
+      (window as any).electronAPI.stopCursorTracking().catch((err: any) => console.warn('[BetterShot:Recorder] Error stopping cursor tracking:', err))
+    }
+
     return new Promise((resolve) => {
       if (!this.mediaRecorder) {
         console.log('[BetterShot:Recorder] No active mediaRecorder found to stop.')

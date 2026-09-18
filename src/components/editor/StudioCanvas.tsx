@@ -2,6 +2,9 @@ import React, { useRef, useEffect, useState } from 'react'
 import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward, Crosshair, Target, Crop, Frame, ChevronDown, Check } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, AspectRatioType } from '../../types/editor'
 import { calculateActiveZoom } from '../../utils/zoomUtils'
+import { getInterpolatedCursorPosition, renderCursorOnCanvas } from '../../utils/cursorRenderUtils'
+import { clickSoundService } from '../../services/clickSoundService'
+import { DEFAULT_CURSOR_CONFIG } from '../../types/cursor'
 
 interface StudioCanvasProps {
   project: StudioProject
@@ -45,6 +48,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoWrapperRef = useRef<HTMLDivElement>(null)
+  const cursorCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const prevTimeRef = useRef<number>(0)
 
   const isDraggingRef = useRef<boolean>(false)
   const isDraggingReticleRef = useRef<boolean>(false)
@@ -263,6 +268,48 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
       videoRef.current.volume = isMuted ? 0 : Math.max(0, Math.min(1, vol))
     }
   }, [project.layout.volume, project.layout.isMuted, videoRef.current])
+
+  // Render dynamic cursor overlay and trigger synchronized click audio FX
+  useEffect(() => {
+    const canvas = cursorCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    const cursorConfig = project.cursorConfig || DEFAULT_CURSOR_CONFIG
+    if (!cursorConfig.enabled) return
+
+    const cursor = getInterpolatedCursorPosition(project.cursorData, runtime.currentTime)
+    if (cursor) {
+      renderCursorOnCanvas(
+        ctx,
+        cursor,
+        project.cursorData,
+        cursorConfig,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+        runtime.currentTime,
+        1.0
+      )
+    }
+
+    // Trigger click sound when playback crosses a click timestamp
+    if (runtime.isPlaying && cursorConfig.sound?.enabled && project.cursorData?.clicks) {
+      const prevMs = prevTimeRef.current * 1000
+      const currMs = runtime.currentTime * 1000
+      if (currMs > prevMs && currMs - prevMs < 500) {
+        const hasClick = project.cursorData.clicks.some(c => c.t >= prevMs && c.t <= currMs)
+        if (hasClick) {
+          clickSoundService.play(cursorConfig.sound.soundType, cursorConfig.sound.volume)
+        }
+      }
+    }
+    prevTimeRef.current = runtime.currentTime
+  }, [runtime.currentTime, runtime.isPlaying, project.cursorData, project.cursorConfig, frameW, frameH])
 
   // Mouse Down Drag Handler on Video Element
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -670,6 +717,14 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                     No Video Stream Loaded
                   </div>
                 )}
+
+                {/* Single-Cursor Replacement & Click Ripple Canvas */}
+                <canvas
+                  ref={cursorCanvasRef}
+                  width={frameW}
+                  height={frameH}
+                  className="absolute inset-0 pointer-events-none z-20 w-full h-full"
+                />
               </div>
             </div>
           </div>

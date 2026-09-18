@@ -108,9 +108,122 @@ export const calculateActiveZoom = (
   }
 }
 
+import { CursorTelemetryData, CursorClickEvent } from '../types/cursor'
+
 /**
- * Smart Auto-Zoom Generator Algorithm.
- * Creates intelligent auto zoom events across video duration.
+ * Clamps focal coordinates so the zoomed viewport does not reveal out-of-bounds space.
+ */
+export const clampFocalCoordinates = (x: number, y: number, scale: number): { x: number; y: number } => {
+  if (scale <= 1.01) {
+    return { x: 50, y: 50 }
+  }
+  const halfSpan = 50 / scale
+  const minX = halfSpan
+  const maxX = 100 - halfSpan
+  const minY = halfSpan
+  const maxY = 100 - halfSpan
+
+  return {
+    x: parseFloat(Math.max(minX, Math.min(maxX, x)).toFixed(1)),
+    y: parseFloat(Math.max(minY, Math.min(maxY, y)).toFixed(1))
+  }
+}
+
+/**
+ * Generates intelligent auto-zoom keyframes driven by real cursor clicks and dwell positions.
+ */
+export const generateAutoZoomsFromCursor = (
+  totalDuration: number,
+  cursorData?: CursorTelemetryData,
+  options: AutoZoomOptions = {}
+): ZoomEvent[] => {
+  if (!Number.isFinite(totalDuration) || totalDuration < 2.0) {
+    return []
+  }
+
+  // If no cursor telemetry or no click events, fallback to smart preset generation
+  if (!cursorData || !cursorData.clicks || cursorData.clicks.length === 0) {
+    return generateAutoZooms(totalDuration, options)
+  }
+
+  const density = options.density || 'balanced'
+  const maxScale = options.maxScale || 1.75
+  const easeSpeed = options.easeSpeed || 0.4
+
+  let minClusterGap = 3.5 // min seconds between separate zoom events
+  let defaultZoomDuration = 2.4
+
+  if (density === 'subtle') {
+    minClusterGap = 5.5
+    defaultZoomDuration = 2.8
+  } else if (density === 'dynamic') {
+    minClusterGap = 2.2
+    defaultZoomDuration = 1.8
+  }
+
+  // 1. Group rapid clicks into clusters
+  const clicks = [...cursorData.clicks].sort((a, b) => a.t - b.t)
+  const clusters: { startTime: number; clicks: CursorClickEvent[] }[] = []
+
+  for (const click of clicks) {
+    const clickSec = click.t / 1000
+    if (clickSec >= totalDuration - 0.5) continue
+
+    const lastCluster = clusters[clusters.length - 1]
+    if (lastCluster && clickSec - lastCluster.startTime < minClusterGap) {
+      lastCluster.clicks.push(click)
+    } else {
+      clusters.push({
+        startTime: clickSec,
+        clicks: [click]
+      })
+    }
+  }
+
+  // 2. Turn clusters into ZoomEvents
+  const events: ZoomEvent[] = []
+
+  clusters.forEach((cluster, idx) => {
+    // Average coordinate of clicks in this cluster
+    const avgX = (cluster.clicks.reduce((sum, c) => sum + c.x, 0) / cluster.clicks.length) * 100
+    const avgY = (cluster.clicks.reduce((sum, c) => sum + c.y, 0) / cluster.clicks.length) * 100
+
+    // Scale dynamically between 1.35 and maxScale
+    const scale = Math.min(maxScale, 1.4 + (cluster.clicks.length > 1 ? 0.25 : 0))
+    const clamped = clampFocalCoordinates(avgX, avgY, scale)
+
+    // Zoom lead-in: start 0.25s before click
+    const startTime = Math.max(0.2, cluster.startTime - 0.25)
+    const duration = Math.min(defaultZoomDuration, totalDuration - startTime - 0.2)
+
+    if (duration > 0.8) {
+      events.push({
+        id: `cursor_zoom_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        startTime: parseFloat(startTime.toFixed(2)),
+        duration: parseFloat(duration.toFixed(2)),
+        easeInDuration: easeSpeed,
+        easeOutDuration: easeSpeed,
+        x: clamped.x,
+        y: clamped.y,
+        scale: parseFloat(scale.toFixed(2)),
+        easing: 'ease-in-out',
+        type: 'auto',
+        label: `Click Focus #${idx + 1} (${Math.round(clamped.x)}%, ${Math.round(clamped.y)}%)`
+      })
+    }
+  })
+
+  // If no clusters generated (clicks occurred at start/end), fallback
+  if (events.length === 0) {
+    return generateAutoZooms(totalDuration, options)
+  }
+
+  return events
+}
+
+/**
+ * Smart Auto-Zoom Generator Algorithm using presets.
+ * Creates intelligent auto zoom events across video duration when no clicks exist.
  */
 export const generateAutoZooms = (
   totalDuration: number,
@@ -171,3 +284,5 @@ export const generateAutoZooms = (
 
   return newEvents
 }
+
+

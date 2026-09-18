@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { fileURLToPath } from 'url'
+import { cursorTracker, CursorTracker } from './cursorTracker'
 
 // This file is emitted as an ES module. `process.cwd()` is the directory of the
 // shell that launched Electron, not the directory that contains this main bundle.
@@ -397,6 +398,13 @@ ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: 
     await fs.promises.writeFile(filePath, uint8Array)
     console.log(`[BetterShot:Main] Saved recording successfully to: ${filePath}`)
 
+    // Auto-save cursor telemetry sidecar alongside the video file
+    try {
+      await cursorTracker.saveToFile(filePath)
+    } catch (cursorErr) {
+      console.warn('[BetterShot:Main] Could not auto-save cursor sidecar:', cursorErr)
+    }
+
     // Automatically trigger editor window creation upon saving recording
     try {
       createEditorWindow(filePath)
@@ -409,6 +417,26 @@ ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: 
     console.error('[BetterShot:Main] Error saving recording:', error)
     return { success: false, error: error.message }
   }
+})
+
+ipcMain.handle('start-cursor-tracking', (_event, options) => {
+  console.log('[BetterShot:Main] IPC handle: start-cursor-tracking', options)
+  cursorTracker.start(options)
+  return true
+})
+
+ipcMain.handle('stop-cursor-tracking', () => {
+  console.log('[BetterShot:Main] IPC handle: stop-cursor-tracking')
+  return cursorTracker.stop()
+})
+
+ipcMain.handle('load-cursor-telemetry', async (_event, videoPath: string) => {
+  return await CursorTracker.loadFromFile(videoPath)
+})
+
+ipcMain.handle('register-mouse-click', (_event, button: 'left' | 'right' | 'middle') => {
+  cursorTracker.registerClick(button)
+  return true
 })
 
 ipcMain.handle('open-editor-window', (_event, filePath?: string) => {

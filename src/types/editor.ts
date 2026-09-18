@@ -88,6 +88,8 @@ export interface ExportProgress {
   fileSize?: number
 }
 
+import { CursorConfig, CursorTelemetryData } from './cursor'
+
 export interface StudioProject {
   id: string
   title: string
@@ -107,6 +109,8 @@ export interface StudioProject {
     clips: ClipSegment[]
     zoomEvents: ZoomEvent[]
   }
+  cursorConfig?: CursorConfig
+  cursorData?: CursorTelemetryData
   exportSettings: ExportSettings
 }
 
@@ -117,7 +121,7 @@ export interface StudioRuntimeState {
   errorMessage?: string
   currentTime: number
   isPlaying: boolean
-  selectedTab: 'background' | 'layout' | 'zoom' | 'audio' | 'export'
+  selectedTab: 'background' | 'layout' | 'zoom' | 'cursor' | 'audio' | 'export'
   selectedClipId: string | null
   selectedZoomId?: string | null
   activeZoomMode?: 'manual' | 'auto'

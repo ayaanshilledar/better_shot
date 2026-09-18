@@ -141,6 +141,16 @@ const electronAPI = {
   showItemInFolder: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke('show-item-in-folder', filePath),
 
+  // Cursor Telemetry & Click Registration
+  startCursorTracking: (options?: any): Promise<boolean> =>
+    ipcRenderer.invoke('start-cursor-tracking', options),
+  stopCursorTracking: (): Promise<any> =>
+    ipcRenderer.invoke('stop-cursor-tracking'),
+  loadCursorTelemetry: (videoPath: string): Promise<any> =>
+    ipcRenderer.invoke('load-cursor-telemetry', videoPath),
+  registerMouseClick: (button: 'left' | 'right' | 'middle'): Promise<boolean> =>
+    ipcRenderer.invoke('register-mouse-click', button),
+
   // Event listeners
   onRecordingStateChanged: (callback: (state: string) => void): (() => void) => {
     const subscription = (_event: any, value: string) => callback(value)

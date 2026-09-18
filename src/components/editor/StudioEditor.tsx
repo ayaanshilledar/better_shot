@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { StudioProject, StudioRuntimeState, CropRegionData, ZoomEvent, ExportProgress } from '../../types/editor'
-import { createDefaultProject } from '../../services/projectService'
-import { generateAutoZooms, AutoZoomOptions } from '../../utils/zoomUtils'
+import { createDefaultProject, loadCursorTelemetryForVideo } from '../../services/projectService'
+import { generateAutoZoomsFromCursor, AutoZoomOptions } from '../../utils/zoomUtils'
 import { createExportProcess } from '../../services/exportService'
+import { CursorConfig, DEFAULT_CURSOR_CONFIG } from '../../types/cursor'
 import { EditorTopBar } from './EditorTopBar'
 import { StudioCanvas } from './StudioCanvas'
 import { EditorSidebar } from './EditorSidebar'
@@ -192,10 +193,32 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     }
   }, [videoRef.current])
 
+  // Automatically load sidecar cursor telemetry if available
+  useEffect(() => {
+    if (project.media.sourcePath) {
+      loadCursorTelemetryForVideo(project.media.sourcePath).then((data) => {
+        if (data && Array.isArray(data.samples)) {
+          updateProject((p) => ({ ...p, cursorData: data }), true)
+        }
+      })
+    }
+  }, [project.media.sourcePath])
+
+  const handleUpdateCursorConfig = (updates: Partial<CursorConfig>) => {
+    updateProject((p) => ({
+      ...p,
+      cursorConfig: {
+        ...(p.cursorConfig || DEFAULT_CURSOR_CONFIG),
+        ...updates
+      }
+    }))
+  }
+
   const handleSeek = (time: number) => {
     if (videoRef.current && Number.isFinite(time)) {
       videoRef.current.currentTime = time
     }
+
     setRuntime((r) => ({ ...r, currentTime: Number.isFinite(time) ? time : 0 }))
   }
 
@@ -347,7 +370,8 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
 
   const handleGenerateAutoZooms = (options?: AutoZoomOptions) => {
     const totalDuration = project.media.duration || 10
-    const rawAutoZooms = generateAutoZooms(totalDuration, options)
+    const rawAutoZooms = generateAutoZoomsFromCursor(totalDuration, project.cursorData, options)
+
 
     updateProject((p) => {
       const manualZooms = p.timeline.zoomEvents.filter((z) => z.type !== 'auto')
@@ -536,7 +560,9 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           onSelectZoomEvent={(zoomId) => setRuntime((r) => ({ ...r, selectedZoomId: zoomId }))}
           onGenerateAutoZooms={handleGenerateAutoZooms}
           onClearAutoZooms={handleClearAutoZooms}
+          onUpdateCursorConfig={handleUpdateCursorConfig}
         />
+
       </div>
 
       {/* Bottom Timeline Section */}

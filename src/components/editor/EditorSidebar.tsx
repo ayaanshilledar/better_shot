@@ -7,7 +7,13 @@ import {
   Volume2,
   VolumeX,
   ZoomIn,
-  Trash2
+  Trash2,
+  MousePointer,
+  Sparkles,
+  Volume1,
+  Circle,
+  Radio,
+  Check
 } from 'lucide-react'
 import {
   StudioProject,
@@ -28,6 +34,8 @@ import {
   estimateFileSize,
   formatBitrate
 } from '../../services/exportService'
+import { CursorConfig, CursorStyleType, ClickSoundType, DEFAULT_CURSOR_CONFIG } from '../../types/cursor'
+import { clickSoundService } from '../../services/clickSoundService'
 
 interface EditorSidebarProps {
   project: StudioProject
@@ -41,9 +49,11 @@ interface EditorSidebarProps {
   onSelectZoomEvent?: (zoomId: string | null) => void
   onGenerateAutoZooms?: (options?: AutoZoomOptions) => void
   onClearAutoZooms?: () => void
+  onUpdateCursorConfig?: (updates: Partial<CursorConfig>) => void
   onUpdateExportSettings?: (updates: Partial<StudioProject['exportSettings']>) => void
   onExport?: () => void
 }
+
 
 export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   project,
@@ -57,10 +67,13 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   onSelectZoomEvent,
   onGenerateAutoZooms,
   onClearAutoZooms,
+  onUpdateCursorConfig,
   onUpdateExportSettings,
   onExport
 }) => {
   const [zoomMode, setZoomMode] = useState<'manual' | 'auto'>('manual')
+
+  const cursorConfig = project.cursorConfig || DEFAULT_CURSOR_CONFIG
 
   // Auto Zoom local settings state
   const [autoDensity, setAutoDensity] = useState<'subtle' | 'balanced' | 'dynamic'>('balanced')
@@ -115,9 +128,11 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     { id: 'background', label: 'Bg', icon: Image },
     { id: 'layout', label: 'Layout', icon: Sliders },
     { id: 'zoom', label: 'Zoom', icon: ZoomIn },
+    { id: 'cursor', label: 'Cursor', icon: MousePointer },
     { id: 'audio', label: 'Audio', icon: Volume2 },
     { id: 'export', label: 'Export', icon: Download }
   ] as const
+
 
   const shadowOptions: { id: ShadowType; label: string }[] = [
     { id: 'none', label: 'None' },
@@ -151,7 +166,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     <aside className="w-80 bg-[#12141a] border-l border-white/10 flex flex-col select-none z-20">
       {/* Smooth Segmented Tab Switcher Bar */}
       <div className="p-3 bg-[#161922]">
-        <div className="grid grid-cols-5 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
+        <div className="grid grid-cols-6 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = runtime.selectedTab === tab.id
@@ -601,6 +616,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   />
                 </div>
 
+                {/* Cursor Click Detection Banner */}
+                {project.cursorData?.clicks && project.cursorData.clicks.length > 0 && (
+                  <div className="p-2.5 bg-blue-600/10 border border-blue-500/20 rounded-xl flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="text-[11px] text-blue-300 leading-snug">
+                      Detected <strong>{project.cursorData.clicks.length} real clicks</strong>! Zooms will center on your action points.
+                    </span>
+                  </div>
+                )}
+
                 {/* Generate Auto Zooms Button */}
                 <button
                   onClick={() =>
@@ -611,9 +636,10 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       easeSpeed: autoEaseSpeed
                     })
                   }
-                  className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Generate Auto Zooms
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{project.cursorData?.clicks?.length ? 'Generate Zooms from Clicks' : 'Generate Auto Zooms'}</span>
                 </button>
 
                 {/* Clear Auto Zooms Button */}
@@ -629,6 +655,273 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             )}
           </div>
         )}
+
+        {/* Cursor & Click FX Tab Content */}
+        {runtime.selectedTab === 'cursor' && (
+          <div className="flex flex-col gap-5">
+            {/* Header with Enable Switch */}
+            <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                  <MousePointer className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-200">Cursor & Click FX</div>
+                  <div className="text-[10px] text-gray-400">Single pointer replacement & audio</div>
+                </div>
+              </div>
+              <button
+                onClick={() =>
+                  onUpdateCursorConfig &&
+                  onUpdateCursorConfig({ enabled: !cursorConfig.enabled })
+                }
+                className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
+                  cursorConfig.enabled ? 'bg-blue-600' : 'bg-gray-700'
+                }`}
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                    cursorConfig.enabled ? 'left-5' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {cursorConfig.enabled && (
+              <>
+                {/* Cursor Style Options */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-gray-300">Cursor Style</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'macos-arrow', label: 'macOS Arrow', desc: 'Crisp vector pointer' },
+                      { id: 'halo', label: 'Halo Glow', desc: 'Soft luminous ring' },
+                      { id: 'spotlight', label: 'Spotlight', desc: 'Radial focal light' },
+                      { id: 'dot', label: 'Accent Dot', desc: 'Minimal dot indicator' },
+                      { id: 'original', label: 'Original', desc: 'Raw captured cursor' }
+                    ].map((styleOpt) => {
+                      const isSelected = cursorConfig.style === styleOpt.id
+                      return (
+                        <button
+                          key={styleOpt.id}
+                          onClick={() =>
+                            onUpdateCursorConfig &&
+                            onUpdateCursorConfig({ style: styleOpt.id as CursorStyleType })
+                          }
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                            isSelected
+                              ? 'bg-blue-600/20 border-blue-500/50 shadow-sm'
+                              : 'bg-[#161922] border-white/5 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-200">{styleOpt.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                          </div>
+                          <span className="text-[10px] text-gray-400">{styleOpt.desc}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Cursor Size Slider */}
+                {cursorConfig.style !== 'original' && (
+                  <div className="flex flex-col gap-2 bg-[#161922] p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-gray-300">Pointer Size</span>
+                      <span className="font-mono text-[11px] text-blue-400">{cursorConfig.size}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={16}
+                      max={54}
+                      step={2}
+                      value={cursorConfig.size}
+                      onChange={(e) =>
+                        onUpdateCursorConfig &&
+                        onUpdateCursorConfig({ size: Number(e.target.value) })
+                      }
+                      className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {/* Accent Color Palette */}
+                {['halo', 'spotlight', 'dot'].includes(cursorConfig.style) && (
+                  <div className="flex flex-col gap-2 bg-[#161922] p-3 rounded-xl border border-white/5">
+                    <span className="text-xs font-semibold text-gray-300">Accent Color</span>
+                    <div className="flex items-center gap-2">
+                      {['#3b82f6', '#6366f1', '#8b5cf6', '#10b981', '#f43f5e', '#f59e0b', '#ffffff'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() =>
+                            onUpdateCursorConfig &&
+                            onUpdateCursorConfig({ color, rippleColor: color })
+                          }
+                          className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
+                            cursorConfig.color === color ? 'scale-110 border-white shadow-md' : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Click Ripple Pulse Setting */}
+                <div className="flex items-center justify-between bg-[#161922] p-3 rounded-xl border border-white/5">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-semibold text-gray-200">Click Ripple Effect</span>
+                    <span className="text-[10px] text-gray-400">Expanding visual pulse on mouse clicks</span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      onUpdateCursorConfig &&
+                      onUpdateCursorConfig({ showClickRipple: !cursorConfig.showClickRipple })
+                    }
+                    className={`w-9 h-4.5 rounded-full transition-colors relative cursor-pointer ${
+                      cursorConfig.showClickRipple ? 'bg-blue-600' : 'bg-gray-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                        cursorConfig.showClickRipple ? 'left-4.5' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Click Sound FX Section */}
+                <div className="flex flex-col gap-3 bg-[#161922] p-3 rounded-xl border border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Volume1 className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs font-semibold text-gray-200">Click Sound FX</span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        onUpdateCursorConfig &&
+                        onUpdateCursorConfig({
+                          sound: {
+                            ...cursorConfig.sound,
+                            enabled: !cursorConfig.sound.enabled
+                          }
+                        })
+                      }
+                      className={`w-9 h-4.5 rounded-full transition-colors relative cursor-pointer ${
+                        cursorConfig.sound.enabled ? 'bg-blue-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                          cursorConfig.sound.enabled ? 'left-4.5' : 'left-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {cursorConfig.sound.enabled && (
+                    <div className="flex flex-col gap-3 pt-2 border-t border-white/5">
+                      {/* Sound Type Selection */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {[
+                          { id: 'mac', label: 'macOS Snap' },
+                          { id: 'tap', label: 'Tactile Tap' },
+                          { id: 'bubble', label: 'Soft Bubble' },
+                          { id: 'mechanical', label: 'Switch Click' }
+                        ].map((soundOpt) => {
+                          const isSel = cursorConfig.sound.soundType === soundOpt.id
+                          return (
+                            <button
+                              key={soundOpt.id}
+                              onClick={() => {
+                                onUpdateCursorConfig &&
+                                  onUpdateCursorConfig({
+                                    sound: {
+                                      ...cursorConfig.sound,
+                                      soundType: soundOpt.id as ClickSoundType
+                                    }
+                                  })
+                                clickSoundService.play(soundOpt.id as ClickSoundType, cursorConfig.sound.volume)
+                              }}
+                              className={`py-1.5 px-2 text-[11px] rounded-lg font-medium transition-all cursor-pointer text-center ${
+                                isSel
+                                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                                  : 'bg-[#12141a] text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              {soundOpt.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Sound Volume Slider & Test Button */}
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] text-gray-400">
+                            <span>Volume</span>
+                            <span className="font-mono text-blue-400">{cursorConfig.sound.volume}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={cursorConfig.sound.volume}
+                            onChange={(e) =>
+                              onUpdateCursorConfig &&
+                              onUpdateCursorConfig({
+                                sound: {
+                                  ...cursorConfig.sound,
+                                  volume: Number(e.target.value)
+                                }
+                              })
+                            }
+                            className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
+                          />
+                        </div>
+                        <button
+                          onClick={() =>
+                            clickSoundService.play(cursorConfig.sound.soundType, cursorConfig.sound.volume)
+                          }
+                          className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 border border-white/5"
+                        >
+                          Preview
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Telemetry Info Card */}
+                <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200">Recording Telemetry</span>
+                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                      project.cursorData?.samples?.length
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                    }`}>
+                      {project.cursorData?.samples?.length ? 'Synced' : 'No Sidecar'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-400 font-mono">
+                    <div className="bg-[#12141a] p-2 rounded-lg border border-white/5">
+                      <div className="text-gray-500 text-[9px] uppercase">Positions</div>
+                      <div className="text-white font-bold">{project.cursorData?.samples?.length || 0} pts</div>
+                    </div>
+                    <div className="bg-[#12141a] p-2 rounded-lg border border-white/5">
+                      <div className="text-gray-500 text-[9px] uppercase">Clicks</div>
+                      <div className="text-white font-bold">{project.cursorData?.clicks?.length || 0} hits</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
 
         {/* Audio Controls Tab Content */}
         {runtime.selectedTab === 'audio' && (
