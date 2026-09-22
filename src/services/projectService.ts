@@ -5,6 +5,7 @@ import { DEFAULT_CURSOR_CONFIG, CursorTelemetryData } from '../types/cursor'
 export const createDefaultProject = (sourcePath: string, fileName: string): StudioProject => {
   const defaultPreset = WALLPAPER_PRESETS[0]
   const id = `project_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  const isImage = /\.(png|jpe?g|webp|bmp|gif)$/i.test(fileName) || /\.(png|jpe?g|webp|bmp|gif)$/i.test(sourcePath)
 
   return {
     id,
@@ -15,9 +16,10 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
     media: {
       sourcePath,
       fileName,
-      duration: 0,
+      duration: isImage ? 1 : 0,
       width: 1920,
-      height: 1080
+      height: 1080,
+      mediaType: isImage ? 'image' : 'video'
     },
     background: {
       type: 'wallpaper',
@@ -28,8 +30,8 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       blurAmount: 0
     },
     layout: {
-      padding: 5, // 5% default padding
-      cornerRadius: 12, // 12px rounded corners
+      padding: isImage ? 8 : 5, // 8% default padding for screenshot to highlight wallpaper
+      cornerRadius: isImage ? 16 : 12, // 16px smooth rounded corners for screenshot
       shadow: 'medium',
       aspectRatio: 'auto',
       borderWidth: 1, // 1px clean subtle border
@@ -46,12 +48,12 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
     },
     cursorConfig: { ...DEFAULT_CURSOR_CONFIG },
     exportSettings: {
-      format: 'mp4',
+      format: isImage ? 'png' : 'mp4',
       resolution: '1080p',
       fps: 60,
       bitratePreset: 'high',
       customBitrateMbps: 12,
-      includeAudio: true,
+      includeAudio: !isImage,
       audioBitrateKbps: 192
     }
   }

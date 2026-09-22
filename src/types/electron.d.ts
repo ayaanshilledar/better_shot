@@ -14,6 +14,7 @@ declare global {
       saveRecording: (buffer: ArrayBuffer, fileName?: string) => Promise<{ success: boolean; filePath?: string; error?: string }>
       minimizeLauncher: () => void
       closeLauncher: () => void
+      setLauncherHeight: (height: number) => void
       closeEditorWindow: () => void
       openEditorWindow: (filePath?: string) => Promise<boolean>
       toggleMaximizeWindow: () => void
@@ -33,6 +34,15 @@ declare global {
       sendCountdownUpdate: (val: number) => void
       onCountdownUpdate: (callback: (val: number) => void) => () => void
 
+      // Camera Overlay Controls & Relay
+      startCameraBubble: (config?: any) => Promise<boolean>
+      stopCameraBubble: () => Promise<boolean>
+      setCameraBubblePosition: (position: string) => Promise<boolean>
+      sendCameraToggle: (enabled: boolean) => void
+      onCameraToggleUpdate: (callback: (enabled: boolean) => void) => () => void
+      sendCameraConfig: (config: any) => void
+      onCameraConfigUpdate: (callback: (config: any) => void) => () => void
+
       // Controls Relay
       sendOverlayControl: (cmd: string) => void
       onLauncherControl: (callback: (cmd: string) => void) => () => void
@@ -47,6 +57,16 @@ declare global {
         fileName?: string,
         targetPath?: string
       ) => Promise<{ success: boolean; filePath?: string; error?: string }>
+      saveExportedImage: (
+        buffer: ArrayBuffer,
+        fileName?: string,
+        targetPath?: string
+      ) => Promise<{ success: boolean; filePath?: string; error?: string }>
+      copyImageToClipboard: (buffer: ArrayBuffer) => Promise<boolean>
+      captureScreenshot: (options?: {
+        cropRegion?: CropRegion
+        copyToClipboard?: boolean
+      }) => Promise<{ success: boolean; filePath?: string; error?: string }>
       showSaveDialog: (
         defaultName: string,
         format: string

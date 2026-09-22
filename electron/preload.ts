@@ -32,6 +32,11 @@ const electronAPI = {
   cancelAreaSelection: (): Promise<boolean> => ipcRenderer.invoke('cancel-area-selection'),
   confirmAreaSelection: (cropRegion: CropRegion): Promise<boolean> =>
     ipcRenderer.invoke('confirm-area-selection', cropRegion),
+  captureScreenshot: (options?: {
+    cropRegion?: CropRegion | null
+    copyToClipboard?: boolean
+  }): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+    ipcRenderer.invoke('capture-screenshot', options),
   saveRecording: (buffer: ArrayBuffer, fileName?: string): Promise<{ success: boolean; filePath?: string; error?: string }> =>
     ipcRenderer.invoke('save-recording', buffer, fileName),
   minimizeLauncher: () => {
@@ -46,6 +51,13 @@ const electronAPI = {
       ipcRenderer.send('close-launcher')
     } catch (e) {
       console.error('Error closing launcher:', e)
+    }
+  },
+  setLauncherHeight: (height: number) => {
+    try {
+      ipcRenderer.send('set-launcher-height', height)
+    } catch (e) {
+      console.error('Error setting launcher height:', e)
     }
   },
   closeEditorWindow: () => {
@@ -111,6 +123,28 @@ const electronAPI = {
     }
   },
 
+  // Camera Overlay Controls & Relay
+  startCameraBubble: (config?: any): Promise<boolean> => ipcRenderer.invoke('start-camera-bubble', config),
+  stopCameraBubble: (): Promise<boolean> => ipcRenderer.invoke('stop-camera-bubble'),
+  setCameraBubblePosition: (position: string): Promise<boolean> =>
+    ipcRenderer.invoke('set-camera-bubble-position', position),
+  sendCameraToggle: (enabled: boolean) => ipcRenderer.send('relay-camera-toggle', enabled),
+  onCameraToggleUpdate: (callback: (enabled: boolean) => void): (() => void) => {
+    const subscription = (_event: any, val: boolean) => callback(val)
+    ipcRenderer.on('recording-camera-toggle-update', subscription)
+    return () => {
+      ipcRenderer.removeListener('recording-camera-toggle-update', subscription)
+    }
+  },
+  sendCameraConfig: (config: any) => ipcRenderer.send('relay-camera-config', config),
+  onCameraConfigUpdate: (callback: (config: any) => void): (() => void) => {
+    const subscription = (_event: any, cfg: any) => callback(cfg)
+    ipcRenderer.on('recording-camera-config-update', subscription)
+    return () => {
+      ipcRenderer.removeListener('recording-camera-config-update', subscription)
+    }
+  },
+
   // Controls Relay (Overlay -> Launcher)
   sendOverlayControl: (cmd: string) => ipcRenderer.send('relay-overlay-control', cmd),
   onLauncherControl: (callback: (cmd: string) => void): (() => void) => {
@@ -133,6 +167,14 @@ const electronAPI = {
     targetPath?: string
   ): Promise<{ success: boolean; filePath?: string; error?: string }> =>
     ipcRenderer.invoke('save-exported-video', buffer, fileName, targetPath),
+  saveExportedImage: (
+    buffer: ArrayBuffer,
+    fileName?: string,
+    targetPath?: string
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+    ipcRenderer.invoke('save-exported-image', buffer, fileName, targetPath),
+  copyImageToClipboard: (buffer: ArrayBuffer): Promise<boolean> =>
+    ipcRenderer.invoke('copy-image-to-clipboard', buffer),
   showSaveDialog: (
     defaultName: string,
     format: string
@@ -171,6 +213,16 @@ const electronAPI = {
     ipcRenderer.on('load-editor-media', subscription)
     return () => {
       ipcRenderer.removeListener('load-editor-media', subscription)
+    }
+  },
+
+  // Theme synchronization relay across windows
+  sendThemeChange: (theme: string) => ipcRenderer.send('relay-theme-change', theme),
+  onThemeChange: (callback: (theme: string) => void): (() => void) => {
+    const subscription = (_event: any, val: string) => callback(val)
+    ipcRenderer.on('theme-changed', subscription)
+    return () => {
+      ipcRenderer.removeListener('theme-changed', subscription)
     }
   }
 }

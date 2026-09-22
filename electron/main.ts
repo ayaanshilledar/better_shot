@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session, dialog, clipboard, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
@@ -74,6 +74,7 @@ let launcherWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let selectionWindow: BrowserWindow | null = null
 let editorWindow: BrowserWindow | null = null
+let cameraBubbleWindow: BrowserWindow | null = null
 
 function createEditorWindow(filePath?: string) {
   if (launcherWindow && !launcherWindow.isDestroyed()) {
@@ -146,8 +147,8 @@ function createEditorWindow(filePath?: string) {
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 300,
-    height: 255,
+    width: 320,
+    height: 345,
     resizable: false,
     frame: false,
     transparent: true,
@@ -256,6 +257,76 @@ function createSelectionWindow() {
   })
 }
 
+function getCameraBubbleBounds(size: 'small' | 'medium' | 'large' = 'medium', position: string = 'bottom-right') {
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
+
+  const dim = size === 'small' ? 180 : size === 'large' ? 260 : 210
+  const margin = 28
+
+  let x = displayX + screenW - dim - margin
+  let y = displayY + screenH - dim - margin
+
+  if (position === 'bottom-left') {
+    x = displayX + margin
+    y = displayY + screenH - dim - margin
+  } else if (position === 'top-right') {
+    x = displayX + screenW - dim - margin
+    y = displayY + margin
+  } else if (position === 'top-left') {
+    x = displayX + margin
+    y = displayY + margin
+  }
+
+  return { x, y, width: dim, height: dim }
+}
+
+function createCameraBubbleWindow(config?: any) {
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    const bounds = getCameraBubbleBounds(config?.size, config?.position)
+    cameraBubbleWindow.setBounds(bounds)
+    return cameraBubbleWindow
+  }
+
+  const bounds = getCameraBubbleBounds(config?.size, config?.position)
+
+  cameraBubbleWindow = new BrowserWindow({
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    resizable: false,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: preloadPath,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+      backgroundThrottling: false
+    }
+  })
+
+  cameraBubbleWindow.setAlwaysOnTop(true, 'screen-saver')
+
+  if (devServerUrl) {
+    cameraBubbleWindow.loadURL(`${devServerUrl}#camera-bubble`)
+  } else {
+    cameraBubbleWindow.loadFile(rendererIndexPath, { hash: 'camera-bubble' })
+  }
+
+  cameraBubbleWindow.on('closed', () => {
+    cameraBubbleWindow = null
+  })
+
+  return cameraBubbleWindow
+}
+
 app.whenReady().then(() => {
   if (isSmokeTest) {
     verifySmokeAssets()
@@ -353,6 +424,84 @@ ipcMain.handle('confirm-area-selection', (_event, cropRegion) => {
   return true
 })
 
+ipcMain.handle('capture-screenshot', async (_event, options?: { cropRegion?: any; copyToClipboard?: boolean }) => {
+  console.log('[BetterShot:Main] IPC handle: capture-screenshot requested', options)
+  try {
+    if (launcherWindow && !launcherWindow.isDestroyed()) {
+      launcherWindow.hide()
+    }
+    await new Promise((res) => setTimeout(res, 200))
+
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width, height } = primaryDisplay.bounds
+    const scaleFactor = primaryDisplay.scaleFactor || 1
+
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: Math.round(width * scaleFactor),
+        height: Math.round(height * scaleFactor)
+      }
+    })
+
+    if (!sources || sources.length === 0) {
+      if (launcherWindow && !launcherWindow.isDestroyed()) {
+        launcherWindow.show()
+        launcherWindow.focus()
+      }
+      return { success: false, error: 'No display source found' }
+    }
+
+    let img = sources[0].thumbnail
+
+    if (options?.cropRegion) {
+      const { x, y, width: cropW, height: cropH } = options.cropRegion
+      const cropX = Math.max(0, Math.round(x * scaleFactor))
+      const cropY = Math.max(0, Math.round(y * scaleFactor))
+      const targetW = Math.min(img.getSize().width - cropX, Math.round(cropW * scaleFactor))
+      const targetH = Math.min(img.getSize().height - cropY, Math.round(cropH * scaleFactor))
+
+      if (targetW > 0 && targetH > 0) {
+        img = img.crop({
+          x: cropX,
+          y: cropY,
+          width: targetW,
+          height: targetH
+        })
+      }
+    }
+
+    if (options?.copyToClipboard !== false) {
+      clipboard.writeImage(img)
+      console.log('[BetterShot:Main] Screenshot copied to system clipboard')
+    }
+
+    const picturesDir = path.join(os.homedir(), 'Pictures', 'BetterShot')
+    if (!fs.existsSync(picturesDir)) {
+      fs.mkdirSync(picturesDir, { recursive: true })
+    }
+
+    const filename = `BetterShot_${Date.now()}.png`
+    const filePath = path.join(picturesDir, filename)
+    await fs.promises.writeFile(filePath, img.toPNG())
+    console.log(`[BetterShot:Main] Screenshot saved successfully to: ${filePath}`)
+
+    if (launcherWindow && !launcherWindow.isDestroyed()) {
+      launcherWindow.show()
+      launcherWindow.focus()
+    }
+
+    return { success: true, filePath }
+  } catch (err: any) {
+    console.error('[BetterShot:Main] Error capturing screenshot:', err)
+    if (launcherWindow && !launcherWindow.isDestroyed()) {
+      launcherWindow.show()
+      launcherWindow.focus()
+    }
+    return { success: false, error: err.message }
+  }
+})
+
 ipcMain.handle('start-recording-mode', () => {
   console.log('[BetterShot:Main] IPC handle: start-recording-mode')
   if (launcherWindow && !launcherWindow.isDestroyed()) {
@@ -372,6 +521,9 @@ ipcMain.handle('stop-recording-mode', () => {
   console.log('[BetterShot:Main] IPC handle: stop-recording-mode')
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.hide()
+  }
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    cameraBubbleWindow.hide()
   }
   // Only show launcher if editorWindow is NOT active/open
   if (launcherWindow && !launcherWindow.isDestroyed()) {
@@ -473,20 +625,73 @@ ipcMain.handle('save-exported-video', async (_event, buffer: ArrayBuffer, fileNa
   }
 })
 
+ipcMain.handle('save-exported-image', async (_event, buffer: ArrayBuffer, fileName?: string, targetPath?: string) => {
+  console.log(`[BetterShot:Main] IPC handle: save-exported-image requested (${buffer.byteLength} bytes)`)
+  try {
+    let filePath = targetPath
+    if (!filePath) {
+      const picturesDir = path.join(os.homedir(), 'Pictures', 'BetterShot')
+      if (!fs.existsSync(picturesDir)) {
+        fs.mkdirSync(picturesDir, { recursive: true })
+      }
+      const defaultName = fileName || `BetterShot_${Date.now()}.png`
+      filePath = path.join(picturesDir, defaultName)
+    } else {
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    }
+
+    const uint8Array = new Uint8Array(buffer)
+    await fs.promises.writeFile(filePath, uint8Array)
+    console.log(`[BetterShot:Main] Saved exported screenshot to: ${filePath}`)
+    return { success: true, filePath }
+  } catch (error: any) {
+    console.error('[BetterShot:Main] Error saving exported image:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('copy-image-to-clipboard', async (_event, buffer: ArrayBuffer) => {
+  try {
+    const uint8 = Buffer.from(buffer)
+    const img = nativeImage.createFromBuffer(uint8)
+    clipboard.writeImage(img)
+    console.log('[BetterShot:Main] Exported screenshot copied to clipboard')
+    return true
+  } catch (err) {
+    console.error('[BetterShot:Main] Error copying image to clipboard:', err)
+    return false
+  }
+})
+
 ipcMain.handle('show-save-dialog', async (event, defaultName: string, format: string) => {
   const win = BrowserWindow.fromWebContents(event.sender) || editorWindow || launcherWindow
-  const exportsDir = path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
-  if (!fs.existsSync(exportsDir)) {
-    fs.mkdirSync(exportsDir, { recursive: true })
+  const isImg = ['png', 'jpg', 'jpeg', 'webp'].includes((format || '').toLowerCase())
+  const defaultDir = isImg
+    ? path.join(os.homedir(), 'Pictures', 'BetterShot')
+    : path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
+
+  if (!fs.existsSync(defaultDir)) {
+    fs.mkdirSync(defaultDir, { recursive: true })
   }
-  const ext = (format || 'mp4').toLowerCase() === 'webm' ? 'webm' : 'mp4'
-  const filters = ext === 'webm'
-    ? [{ name: 'WebM Video (*.webm)', extensions: ['webm'] }]
-    : [{ name: 'MP4 Video (*.mp4)', extensions: ['mp4'] }]
+
+  const fmt = (format || 'mp4').toLowerCase()
+  let filters = [{ name: 'MP4 Video (*.mp4)', extensions: ['mp4'] }]
+  if (fmt === 'webm') {
+    filters = [{ name: 'WebM Video (*.webm)', extensions: ['webm'] }]
+  } else if (fmt === 'png') {
+    filters = [{ name: 'PNG Image (*.png)', extensions: ['png'] }]
+  } else if (fmt === 'jpg' || fmt === 'jpeg') {
+    filters = [{ name: 'JPEG Image (*.jpg)', extensions: ['jpg', 'jpeg'] }]
+  } else if (fmt === 'webp') {
+    filters = [{ name: 'WEBP Image (*.webp)', extensions: ['webp'] }]
+  }
 
   const result = await dialog.showSaveDialog(win!, {
-    title: 'Export Video As',
-    defaultPath: path.join(exportsDir, defaultName),
+    title: isImg ? 'Export Screenshot As' : 'Export Video As',
+    defaultPath: path.join(defaultDir, defaultName),
     filters,
     properties: ['showOverwriteConfirmation', 'createDirectory']
   })
@@ -521,6 +726,24 @@ ipcMain.on('close-launcher', (event) => {
     return
   }
   app.exit(0)
+})
+
+ipcMain.on('set-launcher-height', (_event, height: number) => {
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    const [w, currentH] = launcherWindow.getSize()
+    if (currentH === height) return
+    const [x, y] = launcherWindow.getPosition()
+    const display = screen.getDisplayNearestPoint({ x, y })
+    const workArea = display.workArea
+    let newY = y
+    if (newY + height > workArea.y + workArea.height) {
+      newY = Math.max(workArea.y + 10, workArea.y + workArea.height - height - 10)
+    }
+    if (newY !== y) {
+      launcherWindow.setPosition(x, newY, false)
+    }
+    launcherWindow.setSize(w, height, false)
+  }
 })
 
 ipcMain.on('close-editor-window', (event) => {
@@ -609,10 +832,84 @@ ipcMain.on('relay-countdown-update', (_event, val: number) => {
   }
 })
 
+// Camera Bubble IPC Handlers
+ipcMain.handle('start-camera-bubble', (_event, config?: any) => {
+  console.log('[BetterShot:Main] IPC handle: start-camera-bubble', config)
+  const win = createCameraBubbleWindow(config)
+  if (win && !win.isDestroyed()) {
+    win.show()
+    win.setAlwaysOnTop(true, 'screen-saver')
+    if (config) {
+      win.webContents.send('recording-camera-config-update', config)
+    }
+  }
+  return true
+})
+
+ipcMain.handle('stop-camera-bubble', () => {
+  console.log('[BetterShot:Main] IPC handle: stop-camera-bubble')
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    cameraBubbleWindow.hide()
+  }
+  return true
+})
+
+ipcMain.handle('set-camera-bubble-position', (_event, position: string) => {
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    const currentBounds = cameraBubbleWindow.getBounds()
+    const size: 'small' | 'medium' | 'large' = currentBounds.width < 190 ? 'small' : currentBounds.width > 240 ? 'large' : 'medium'
+    const newBounds = getCameraBubbleBounds(size, position)
+    cameraBubbleWindow.setBounds(newBounds)
+  }
+  return true
+})
+
+ipcMain.on('relay-camera-toggle', (_event, enabled: boolean) => {
+  console.log('[BetterShot:Main] relay-camera-toggle:', enabled)
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    if (enabled) {
+      cameraBubbleWindow.show()
+    } else {
+      cameraBubbleWindow.hide()
+    }
+    cameraBubbleWindow.webContents.send('recording-camera-toggle-update', enabled)
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('recording-camera-toggle-update', enabled)
+  }
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    launcherWindow.webContents.send('recording-camera-toggle-update', enabled)
+  }
+})
+
+ipcMain.on('relay-camera-config', (_event, config: any) => {
+  console.log('[BetterShot:Main] relay-camera-config:', config)
+  if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
+    if (config.size || config.position) {
+      const bounds = getCameraBubbleBounds(config.size, config.position)
+      cameraBubbleWindow.setBounds(bounds)
+    }
+    cameraBubbleWindow.webContents.send('recording-camera-config-update', config)
+  }
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    launcherWindow.webContents.send('recording-camera-config-update', config)
+  }
+})
+
 // IPC Multi-Window Controls Relay (Overlay -> Launcher)
 ipcMain.on('relay-overlay-control', (_event, command: string) => {
   if (launcherWindow && !launcherWindow.isDestroyed()) {
     launcherWindow.webContents.send('launcher-control-command', command)
+  }
+})
+
+// IPC Multi-Window Theme Relay
+ipcMain.on('relay-theme-change', (_event, theme: string) => {
+  const windows = [launcherWindow, editorWindow, overlayWindow, selectionWindow]
+  for (const win of windows) {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('theme-changed', theme)
+    }
   }
 })
 

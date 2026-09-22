@@ -29,6 +29,15 @@ dist-electron/
 **/dist-electron/
 dist-ssr/
 **/dist-ssr/
+release/
+**/release/
+*.exe
+*.blockmap
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.asar
 
 # Rust / Cargo build artifacts
 target/

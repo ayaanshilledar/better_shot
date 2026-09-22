@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Launcher, CaptureMode } from './components/Launcher'
 import { RecordingOverlay } from './components/RecordingOverlay'
 import { SourcePickerModal } from './components/SourcePickerModal'
 import { AreaSelectorOverlay } from './components/AreaSelectorOverlay'
+import { CameraBubbleOverlay } from './components/CameraBubbleOverlay'
 import { StudioEditor } from './components/editor/StudioEditor'
 import { EditorErrorBoundary } from './components/editor/ErrorBoundary'
 import { recorderService, CaptureConfig } from './services/recorder'
 import { APP_CONFIG } from './config/appConfig'
 import { DesktopSource, CropRegion } from '../electron/preload'
+import { CameraOverlayConfig, DEFAULT_CAMERA_CONFIG } from './types/editor'
 
 export const App: React.FC = () => {
   const [route, setRoute] = useState<string>('launcher')
@@ -17,10 +19,17 @@ export const App: React.FC = () => {
   const [enableMic, setEnableMic] = useState<boolean>(true)
   const [enableSystemAudio, setEnableSystemAudio] = useState<boolean>(true)
   const [enableCamera, setEnableCamera] = useState<boolean>(false)
+  const [cameraConfig, setCameraConfig] = useState<CameraOverlayConfig>(DEFAULT_CAMERA_CONFIG)
 
   // Source Picker Modal states
   const [isSourcePickerOpen, setIsSourcePickerOpen] = useState<boolean>(false)
   const [selectedSource, setSelectedSource] = useState<DesktopSource | null>(null)
+
+  const areaPurposeRef = useRef<'recording' | 'screenshot'>('recording')
+  const screenshotOptionsRef = useRef<{ copyToClipboard: boolean; saveToFile: boolean }>({
+    copyToClipboard: true,
+    saveToFile: true
+  })
 
   useEffect(() => {
     const updateRoute = () => {
@@ -45,6 +54,9 @@ export const App: React.FC = () => {
       } else if (hashName === 'overlay') {
         console.log('[BetterShot:App] Setting active route to "overlay"')
         setRoute('overlay')
+      } else if (hashName === 'camera-bubble') {
+        console.log('[BetterShot:App] Setting active route to "camera-bubble"')
+        setRoute('camera-bubble')
       } else if (hashName === 'select-area') {
         console.log('[BetterShot:App] Setting active route to "select-area"')
         setRoute('select-area')
@@ -89,9 +101,21 @@ export const App: React.FC = () => {
   // Listen for area-selected event from main process when area selector confirms
   useEffect(() => {
     if (window.electronAPI?.onAreaSelected) {
-      const unsubscribe = window.electronAPI.onAreaSelected((cropRegion: CropRegion) => {
-        console.log('[BetterShot:App] Event onAreaSelected received:', cropRegion)
-        startAreaRecordingWithRegion(cropRegion)
+      const unsubscribe = window.electronAPI.onAreaSelected(async (cropRegion: CropRegion) => {
+        console.log('[BetterShot:App] Event onAreaSelected received:', cropRegion, 'Purpose:', areaPurposeRef.current)
+        if (areaPurposeRef.current === 'screenshot') {
+          if (window.electronAPI?.captureScreenshot) {
+            const res = await window.electronAPI.captureScreenshot({
+              cropRegion,
+              copyToClipboard: screenshotOptionsRef.current.copyToClipboard
+            })
+            if (res?.success && res.filePath && window.electronAPI?.openEditorWindow) {
+              window.electronAPI.openEditorWindow(res.filePath)
+            }
+          }
+        } else {
+          startAreaRecordingWithRegion(cropRegion)
+        }
       })
       return () => {
         unsubscribe()
@@ -130,6 +154,10 @@ export const App: React.FC = () => {
         } else if (cmd === 'unmute-mic') {
           recorderService.toggleMicMute(false)
           window.electronAPI?.sendMutedState(false)
+        } else if (cmd === 'mute-camera') {
+          recorderService.toggleCameraMute(true)
+        } else if (cmd === 'unmute-camera') {
+          recorderService.toggleCameraMute(false)
         } else if (cmd === 'restart') {
           await recorderService.restartRecording()
           window.electronAPI?.sendPausedState(false)
@@ -142,9 +170,33 @@ export const App: React.FC = () => {
     }
   }, [])
 
+  // Sync camera config updates from camera bubble or settings
+  useEffect(() => {
+    if (window.electronAPI?.onCameraConfigUpdate) {
+      const unsub = window.electronAPI.onCameraConfigUpdate((updates: any) => {
+        setCameraConfig((prev) => ({ ...prev, ...updates }))
+        recorderService.updateCameraConfig(updates)
+      })
+      return () => unsub()
+    }
+  }, [])
+
+  // Sync camera toggle updates
+  useEffect(() => {
+    if (window.electronAPI?.onCameraToggleUpdate) {
+      const unsub = window.electronAPI.onCameraToggleUpdate((enabled: boolean) => {
+        recorderService.toggleCameraMute(!enabled)
+      })
+      return () => unsub()
+    }
+  }, [])
+
   const runCountdownSequence = async (): Promise<boolean> => {
     if (window.electronAPI?.startRecordingMode) {
       await window.electronAPI.startRecordingMode()
+    }
+    if (enableCamera && window.electronAPI?.startCameraBubble) {
+      await window.electronAPI.startCameraBubble(cameraConfig)
     }
     if (window.electronAPI?.setOverlayMode) {
       await window.electronAPI.setOverlayMode('countdown')
@@ -182,7 +234,9 @@ export const App: React.FC = () => {
     const config: CaptureConfig = {
       sourceId: finalSourceId,
       isDisplay: true,
-      enableCamera: false,
+      enableCamera,
+      cameraConfig,
+      cameraId: cameraConfig.deviceId,
       enableMic,
       enableSystemAudio,
       cropRegion
@@ -200,6 +254,7 @@ export const App: React.FC = () => {
 
   const handleStartRecording = async (mode: CaptureMode, sourceId: string | null) => {
     console.log(`[BetterShot:App] handleStartRecording triggered for mode: ${mode}`)
+    areaPurposeRef.current = 'recording'
     if (mode === 'area') {
       if (window.electronAPI?.openAreaSelector) {
         console.log('[BetterShot:App] Opening Area Selector window...')
@@ -228,7 +283,9 @@ export const App: React.FC = () => {
     const config: CaptureConfig = {
       sourceId: finalSourceId,
       isDisplay: true,
-      enableCamera: false,
+      enableCamera,
+      cameraConfig,
+      cameraId: cameraConfig.deviceId,
       enableMic,
       enableSystemAudio
     }
@@ -248,6 +305,9 @@ export const App: React.FC = () => {
   const handleStopRecording = async () => {
     console.log('[BetterShot:App] handleStopRecording triggered...')
     try {
+      if (window.electronAPI?.stopCameraBubble) {
+        await window.electronAPI.stopCameraBubble()
+      }
       const buffer = await recorderService.stopRecording()
       if (buffer && window.electronAPI?.saveRecording) {
         const defaultFileName = `${APP_CONFIG.outputFolder}_${Date.now()}.webm`
@@ -269,6 +329,9 @@ export const App: React.FC = () => {
   const handleCancelRecording = async () => {
     console.log('[BetterShot:App] handleCancelRecording triggered...')
     try {
+      if (window.electronAPI?.stopCameraBubble) {
+        await window.electronAPI.stopCameraBubble()
+      }
       await recorderService.stopRecording()
       if (window.electronAPI?.stopRecordingMode) {
         await window.electronAPI.stopRecordingMode()
@@ -294,8 +357,38 @@ export const App: React.FC = () => {
     )
   }
 
+  if (route === 'camera-bubble') {
+    return <CameraBubbleOverlay />
+  }
+
   if (route === 'select-area') {
     return <AreaSelectorOverlay />
+  }
+
+  const handleTakeScreenshot = async (
+    mode: CaptureMode,
+    _sourceId: string | null,
+    options?: { copyToClipboard: boolean; saveToFile: boolean }
+  ) => {
+    console.log(`[BetterShot:App] handleTakeScreenshot called with mode: ${mode}, options:`, options)
+    if (options) {
+      screenshotOptionsRef.current = options
+    }
+    if (mode === 'area') {
+      areaPurposeRef.current = 'screenshot'
+      if (window.electronAPI?.openAreaSelector) {
+        await window.electronAPI.openAreaSelector()
+      }
+    } else {
+      if (window.electronAPI?.captureScreenshot) {
+        const res = await window.electronAPI.captureScreenshot({
+          copyToClipboard: options?.copyToClipboard ?? true
+        })
+        if (res?.success && res.filePath && window.electronAPI?.openEditorWindow) {
+          window.electronAPI.openEditorWindow(res.filePath)
+        }
+      }
+    }
   }
 
   return (
@@ -305,10 +398,15 @@ export const App: React.FC = () => {
           setAutoOpenHistory(false)
           handleStartRecording(mode, sourceId)
         }}
+        onTakeScreenshot={handleTakeScreenshot}
         enableMic={enableMic}
         setEnableMic={setEnableMic}
         enableSystemAudio={enableSystemAudio}
         setEnableSystemAudio={setEnableSystemAudio}
+        enableCamera={enableCamera}
+        setEnableCamera={setEnableCamera}
+        cameraConfig={cameraConfig}
+        setCameraConfig={setCameraConfig}
         selectedSource={selectedSource}
         onOpenSourcePicker={() => setIsSourcePickerOpen(true)}
         autoOpenHistory={autoOpenHistory}

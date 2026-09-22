@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Image,
   Sliders,
@@ -13,7 +13,18 @@ import {
   Volume1,
   Circle,
   Radio,
-  Check
+  Check,
+  Clipboard,
+  Bot,
+  Send,
+  ArrowUp,
+  Clock,
+  RotateCcw,
+  RefreshCw,
+  Key,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2
 } from 'lucide-react'
 import {
   StudioProject,
@@ -36,8 +47,11 @@ import {
 } from '../../services/exportService'
 import { CursorConfig, CursorStyleType, ClickSoundType, DEFAULT_CURSOR_CONFIG } from '../../types/cursor'
 import { clickSoundService } from '../../services/clickSoundService'
+import { getAIConfig } from '../../services/aiService'
+import { AIChatMessage } from '../../types/ai'
 
 interface EditorSidebarProps {
+  width?: number
   project: StudioProject
   runtime: StudioRuntimeState
   onUpdateBackground: (updates: Partial<StudioProject['background']>) => void
@@ -52,10 +66,22 @@ interface EditorSidebarProps {
   onUpdateCursorConfig?: (updates: Partial<CursorConfig>) => void
   onUpdateExportSettings?: (updates: Partial<StudioProject['exportSettings']>) => void
   onExport?: () => void
+  onExportImage?: (action: 'save' | 'copy') => void
+  onToggleAI?: () => void
+  isAIOpen?: boolean
+  onOpenAISettings?: () => void
+  onSendMessage?: (text: string) => Promise<void>
+  onConfirmPlan?: (messageId: string) => Promise<void> | void
+  onDismissPlan?: (messageId: string) => void
+  isAIExecuting?: boolean
+  onUndoLastAIEdit?: () => void
+  canUndoAI?: boolean
+  aiMessages?: AIChatMessage[]
 }
 
 
 export const EditorSidebar: React.FC<EditorSidebarProps> = ({
+  width = 340,
   project,
   runtime,
   onUpdateBackground,
@@ -69,16 +95,52 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   onClearAutoZooms,
   onUpdateCursorConfig,
   onUpdateExportSettings,
-  onExport
+  onExport,
+  onExportImage,
+  onToggleAI,
+  isAIOpen = false,
+  onOpenAISettings,
+  onSendMessage,
+  onConfirmPlan,
+  onDismissPlan,
+  isAIExecuting = false,
+  onUndoLastAIEdit,
+  canUndoAI = false,
+  aiMessages = []
 }) => {
   const [zoomMode, setZoomMode] = useState<'manual' | 'auto'>('manual')
+  const [aiPrompt, setAiPrompt] = useState<string>('')
+  const [aiConfig, setAiConfig] = useState(getAIConfig())
+  const [promptHistory, setPromptHistory] = useState<string[]>([])
+  const [expandedThoughtMap, setExpandedThoughtMap] = useState<Record<string, boolean>>({})
+  const [expandedDiffMap, setExpandedDiffMap] = useState<Record<string, boolean>>({})
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto Zoom Config Sliders state
+  const [autoDensity, setAutoDensity] = useState<'subtle' | 'balanced' | 'dynamic'>('balanced')
+  const [autoMaxScale, setAutoMaxScale] = useState<number>(1.8)
+  const [autoEaseSpeed, setAutoEaseSpeed] = useState<number>(0.4)
+
+  const formatTimestamp = (sec: number) => {
+    const m = Math.floor(sec / 60)
+    const s = Math.floor(sec % 60)
+    const ds = Math.floor((sec % 1) * 10)
+    return `${m}:${s.toString().padStart(2, '0')}.${ds}`
+  }
+
+  useEffect(() => {
+    const handleConfigChange = () => setAiConfig(getAIConfig())
+    window.addEventListener('bettershot-ai-config-changed', handleConfigChange)
+    return () => window.removeEventListener('bettershot-ai-config-changed', handleConfigChange)
+  }, [])
+
+  useEffect(() => {
+    if (runtime.selectedTab === 'ai') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [aiMessages, isAIExecuting, runtime.selectedTab])
 
   const cursorConfig = project.cursorConfig || DEFAULT_CURSOR_CONFIG
-
-  // Auto Zoom local settings state
-  const [autoDensity, setAutoDensity] = useState<'subtle' | 'balanced' | 'dynamic'>('balanced')
-  const [autoMaxScale, setAutoMaxScale] = useState<number>(1.6)
-  const [autoEaseSpeed, setAutoEaseSpeed] = useState<number>(0.4)
 
   // Export Settings normalization and dynamic calculations
   const exportSettings = {
@@ -124,14 +186,21 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     }
   }
 
-  const tabs = [
+  const isImage = Boolean(project.media.mediaType === 'image' || /\.(png|jpe?g|webp|bmp|gif)$/i.test(project.media.sourcePath))
+
+  const allTabs = [
     { id: 'background', label: 'Bg', icon: Image },
     { id: 'layout', label: 'Layout', icon: Sliders },
     { id: 'zoom', label: 'Zoom', icon: ZoomIn },
     { id: 'cursor', label: 'Cursor', icon: MousePointer },
     { id: 'audio', label: 'Audio', icon: Volume2 },
+    { id: 'ai', label: 'AI', icon: Sparkles },
     { id: 'export', label: 'Export', icon: Download }
   ] as const
+
+  const tabs = isImage
+    ? allTabs.filter(t => t.id === 'background' || t.id === 'layout' || t.id === 'ai' || t.id === 'export')
+    : allTabs
 
 
   const shadowOptions: { id: ShadowType; label: string }[] = [
@@ -163,22 +232,30 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   )
 
   return (
-    <aside className="w-80 bg-[#12141a] border-l border-white/10 flex flex-col select-none z-20">
+    <aside
+      style={{ width: `${width}px` }}
+      className="bg-white dark:bg-[#12141a] border-l border-slate-200 dark:border-white/10 flex flex-col select-none z-20 text-slate-800 dark:text-gray-100 shrink-0 overflow-hidden"
+    >
       {/* Smooth Segmented Tab Switcher Bar */}
-      <div className="p-3 bg-[#161922]">
-        <div className="grid grid-cols-6 gap-1 bg-[#12141a] p-1 rounded-xl border border-white/5 shadow-inner">
+      <div className="p-3 bg-slate-50 dark:bg-[#161922] border-b border-slate-200/80 dark:border-transparent">
+        <div
+          className="grid gap-1 bg-slate-200/70 dark:bg-[#12141a] p-1 rounded-xl border border-black/5 dark:border-white/5 shadow-inner"
+          style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = runtime.selectedTab === tab.id
             return (
               <button
                 key={tab.id}
+                data-tab={tab.id}
                 onClick={() => onSelectTab(tab.id as any)}
-                className={`py-1.5 px-1 rounded-lg flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
+                className={`py-1.5 px-0.5 rounded-lg flex flex-col items-center justify-center gap-1 text-[9.5px] font-semibold transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
                 }`}
+                title={tab.label}
               >
                 <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">{tab.label}</span>
@@ -189,12 +266,19 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
       </div>
 
       {/* Main Settings Panel Content */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 custom-scrollbar">
+      <div
+        className={`flex-1 ${
+          runtime.selectedTab === 'ai'
+            ? 'overflow-hidden p-3 flex flex-col min-h-0'
+            : 'overflow-y-auto p-4 flex flex-col gap-5 custom-scrollbar'
+        }`}
+      >
         {/* Background Tab Content - Wallpapers Grid with None option */}
         {runtime.selectedTab === 'background' && (
           <div className="grid grid-cols-2 gap-2.5">
             {/* "None" Wallpaper Option Card */}
             <button
+              data-preset-id="none"
               onClick={() => {
                 onUpdateBackground({ type: 'none', presetId: 'none', gradient: '', color: 'transparent', blurAmount: 0 })
                 onUpdateLayout({ padding: 0 })
@@ -219,6 +303,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               return (
                 <button
                   key={preset.id}
+                  data-preset-id={preset.id}
                   onClick={() =>
                     onUpdateBackground({
                       presetId: preset.id,
@@ -274,6 +359,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <span className="font-mono text-blue-400 font-semibold">{project.layout.padding.toFixed(1)}%</span>
               </div>
               <input
+                data-control="padding"
                 type="range"
                 min="0"
                 max="40"
@@ -290,6 +376,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <span className="font-mono text-blue-400 font-semibold">{project.layout.cornerRadius}px</span>
               </div>
               <input
+                data-control="cornerRadius"
                 type="range"
                 min="0"
                 max="32"
@@ -340,6 +427,8 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 {shadowOptions.map((opt) => (
                   <button
                     key={opt.id}
+                    data-control="shadow"
+                    data-shadow-id={opt.id}
                     onClick={() => onUpdateLayout({ shadow: opt.id })}
                     className={`py-1 text-[11px] font-semibold rounded-lg capitalize transition-all ${
                       project.layout.shadow === opt.id
@@ -972,166 +1061,595 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
           </div>
         )}
 
+        {/* Elevated AI Chat Panel */}
+        {runtime.selectedTab === 'ai' && (
+          <div className="flex flex-col flex-1 min-h-0 justify-between gap-2.5">
+            {/* Minimal Header / Status Bar */}
+            <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/5 shrink-0 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-700 dark:text-zinc-300">
+                <Sparkles className="w-3.5 h-3.5 opacity-80" />
+                <span className="font-semibold text-[11px]">AI Assistant</span>
+                <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate max-w-[130px]">
+                  • {aiConfig.apiKey ? (aiConfig.selectedModel || 'Connected') : 'Local'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {canUndoAI && (
+                  <button
+                    type="button"
+                    onClick={onUndoLastAIEdit}
+                    className="text-[10px] text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Undo last AI edit"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>Undo</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onOpenAISettings}
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Configure AI API Key"
+                >
+                  <Key className="w-3 h-3 text-slate-400 hover:text-slate-700 dark:hover:text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Chat Messages Feed */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0 custom-scrollbar text-xs">
+              {/* Optional Tip Banner if No API Key */}
+              {!aiConfig.apiKey && (aiMessages || []).length <= 2 && (
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 flex items-start gap-2 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium text-slate-800 dark:text-zinc-200">
+                      Smart Offline Planner Active
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+                      Basic commands work offline. Add an API key in settings for advanced reasoning.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onOpenAISettings}
+                      className="mt-1.5 px-2 py-0.5 text-[9.5px] font-medium bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded cursor-pointer transition-colors"
+                    >
+                      Configure Key
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(aiMessages || []).length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center py-6 px-2 text-slate-400 dark:text-zinc-500">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-zinc-300 flex items-center justify-center mb-2">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 mb-0.5">
+                    {isImage ? 'AI Screenshot Copilot' : 'AI Video Editor'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-[210px] leading-relaxed mb-4">
+                    Direct your edits naturally or tap a quick starter below:
+                  </p>
+
+                  {/* Context-Aware Quick Action Chips */}
+                  <div className="flex flex-col gap-1.5 w-full max-w-[240px]">
+                    {(isImage
+                      ? [
+                          { label: 'Clean Framing', text: 'Apply 16% padding, rounded corners, and soft drop shadow' },
+                          { label: 'Aurora Wallpaper', text: 'Set aurora wallpaper with soft shadow' },
+                          { label: '1:1 Square Format', text: 'Set 1:1 aspect ratio for Instagram/X' }
+                        ]
+                      : [
+                          { label: 'One-Click Polish', text: 'Apply modern wallpaper, 12% padding, rounded corners and drop shadow' },
+                          {
+                            label: runtime.currentTime > 0 ? `Zoom at ${formatTimestamp(runtime.currentTime)}` : 'Zoom at 2s',
+                            text: runtime.currentTime > 0 ? `Add 1.8x zoom at ${runtime.currentTime.toFixed(1)}s` : 'Add 1.8x focal zoom at 2s'
+                          },
+                          { label: '9:16 Vertical Video', text: 'Make 9:16 vertical for TikTok and Shorts' },
+                          { label: 'Clear All Zooms', text: 'Clear all zoom keyframes from timeline' }
+                        ]
+                    ).map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          if (isAIExecuting) return
+                          onSendMessage?.(chip.text)
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-100/80 dark:bg-[#161924] hover:bg-slate-200/80 dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[11px] text-slate-700 dark:text-zinc-300 transition-all cursor-pointer flex items-center justify-between group"
+                      >
+                        <span className="font-medium truncate">{chip.label}</span>
+                        <ArrowUp className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-slate-500 dark:text-zinc-400 transition-opacity shrink-0 ml-1" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                aiMessages.map((m) => {
+                  const isThoughtOpen = expandedThoughtMap[m.id] ?? false
+                  const isDiffOpen = expandedDiffMap[m.id] ?? false
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col gap-1.5 ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
+                    >
+                      <div
+                        className={`max-w-[92%] p-2.5 text-[11px] leading-relaxed select-text ${
+                          m.sender === 'user'
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 rounded-2xl rounded-tr-xs shadow-xs'
+                            : 'bg-slate-100/90 dark:bg-[#181a26] text-slate-800 dark:text-zinc-200 border border-black/5 dark:border-white/5 rounded-2xl rounded-tl-xs'
+                        }`}
+                      >
+                        {/* 1. Chain-of-Thought Disclosure */}
+                        {m.thoughtProcess && (
+                          <div className="mb-2 rounded-lg bg-black/5 dark:bg-white/5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedThoughtMap((prev) => ({ ...prev, [m.id]: !isThoughtOpen }))}
+                              className="w-full flex items-center justify-between p-1.5 text-[9.5px] font-medium text-slate-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                              <span>Reasoning</span>
+                              {isThoughtOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                            </button>
+
+                            {isThoughtOpen && (
+                              <div className="p-2 pt-0 space-y-1 text-[9.5px] text-slate-500 dark:text-zinc-400 border-t border-black/5 dark:border-white/5">
+                                {m.thoughtProcess.analysis && (
+                                  <div>
+                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Analysis:</span>
+                                    <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.analysis}</p>
+                                  </div>
+                                )}
+
+                                {m.thoughtProcess.reasoning && (
+                                  <div>
+                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Rationale:</span>
+                                    <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.reasoning}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="whitespace-pre-wrap">{m.content}</div>
+
+                        {/* Interactive Action Receipts Badges */}
+                        {m.actions && m.actions.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2 pt-1.5 border-t border-black/5 dark:border-white/10">
+                            {m.actions.map((act, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-700 dark:text-zinc-300 text-[9.5px] font-medium border border-black/5 dark:border-white/5"
+                                title={act.label}
+                              >
+                                <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-zinc-500" />
+                                <span className="truncate max-w-[130px]">{act.label}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Confirmation Bar in Sidebar */}
+                        {m.status === 'awaiting_confirmation' && onConfirmPlan && onDismissPlan && (
+                          <div className="mt-2.5 p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex flex-col gap-1.5">
+                            <span className="text-[9.5px] font-medium text-slate-700 dark:text-zinc-300">
+                              Review changes:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => onConfirmPlan(m.id)}
+                                className="flex-1 py-1 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-slate-950 text-[10px] font-medium flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
+                              >
+                                <span>Apply</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDismissPlan(m.id)}
+                                className="py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-600 dark:text-zinc-400 text-[10px] cursor-pointer transition-colors"
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Verification Diff Badge in Sidebar */}
+                        {m.verification && (
+                          <div className="mt-2 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedDiffMap((prev) => ({ ...prev, [m.id]: !isDiffOpen }))}
+                              className="w-full flex items-center justify-between p-1.5 text-[9.5px] font-medium text-slate-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span className="truncate max-w-[170px]">{m.verification.summary}</span>
+                              </div>
+                              {isDiffOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                            </button>
+
+                            {isDiffOpen && (
+                              <div className="p-2 pt-0 space-y-1 text-[9px] border-t border-black/5 dark:border-white/5">
+                                {m.verification.diffs.map((diff, i) => (
+                                  <div key={i} className="flex items-center justify-between text-slate-600 dark:text-zinc-400">
+                                    <span>{diff.property}:</span>
+                                    <span className="font-mono text-slate-900 dark:text-zinc-200">{diff.actual}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Thinking Indicator */}
+                        {m.status === 'thinking' && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-zinc-400 mt-1">
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                            <span>Analyzing and polishing layout...</span>
+                          </div>
+                        )}
+
+                        {/* Inline Revert Button */}
+                        {canUndoAI && m.sender === 'assistant' && m.status !== 'thinking' && (
+                          <div className="mt-1.5 pt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={onUndoLastAIEdit}
+                              className="text-[9.5px] text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:underline flex items-center gap-1 cursor-pointer"
+                              title="Undo this specific edit"
+                            >
+                              <RotateCcw className="w-2.5 h-2.5" />
+                              <span>Revert</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Follow-up Suggestions in Sidebar */}
+                      {m.suggestions && m.suggestions.length > 0 && m.status === 'completed' && (
+                        <div className="flex flex-wrap gap-1 pl-1 max-w-[95%]">
+                          {m.suggestions.map((sug, sIdx) => (
+                            <button
+                              key={sIdx}
+                              type="button"
+                              onClick={() => {
+                                if (isAIExecuting) return
+                                onSendMessage?.(sug)
+                              }}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200/60 dark:border-white/5 text-[9px] text-slate-600 dark:text-zinc-300 truncate max-w-[200px] cursor-pointer"
+                            >
+                              {sug}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Playhead Badge & Quick Undo Strip */}
+            {!isImage && (
+              <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 dark:text-zinc-500 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAiPrompt((prev) => `${prev} at ${runtime.currentTime.toFixed(1)}s`.trim())}
+                  className="hover:text-slate-700 dark:hover:text-zinc-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Click to insert current playhead timestamp into prompt"
+                >
+                  <span>Playhead:</span>
+                  <span className="font-mono font-medium text-slate-700 dark:text-zinc-300">
+                    {formatTimestamp(runtime.currentTime)}
+                  </span>
+                </button>
+                {canUndoAI && (
+                  <button
+                    type="button"
+                    onClick={onUndoLastAIEdit}
+                    className="hover:text-slate-700 dark:hover:text-zinc-300 flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Undo last edit"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>Undo</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Message Input at Bottom */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!aiPrompt.trim() || isAIExecuting) return
+                const text = aiPrompt.trim()
+                setPromptHistory((prev) => [...prev, text])
+                setAiPrompt('')
+                onSendMessage?.(text)
+              }}
+              className="relative shrink-0 pt-1 border-t border-black/5 dark:border-white/5"
+            >
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp' && !aiPrompt && promptHistory.length > 0) {
+                      e.preventDefault()
+                      setAiPrompt(promptHistory[promptHistory.length - 1])
+                    }
+                  }}
+                  placeholder={
+                    isAIExecuting
+                      ? 'Executing edits...'
+                      : isImage
+                      ? 'Ask to polish screenshot...'
+                      : 'Ask to zoom, trim, format layout...'
+                  }
+                  disabled={isAIExecuting}
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-100 dark:bg-[#161922] border border-slate-300 dark:border-white/10 rounded-xl text-xs outline-none focus:border-slate-400 dark:focus:border-white/20 transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 text-slate-800 dark:text-zinc-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!aiPrompt.trim() || isAIExecuting}
+                  className="absolute right-1.5 p-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-slate-950 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs"
+                  title="Send message"
+                >
+                  {isAIExecuting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Simplified, Clean Export Section */}
         {runtime.selectedTab === 'export' && (
-          <div className="flex flex-col gap-4">
-            {/* Format Segmented Row */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Format
-              </span>
-              <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
-                {(['mp4', 'webm'] as const).map((fmt) => {
-                  const isActive = exportSettings.format === fmt
-                  return (
-                    <button
-                      key={fmt}
-                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ format: fmt })}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center uppercase ${
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {fmt}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Resolution Selector (Equal 4 Columns, Clean Fit) */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
+          isImage ? (
+            <div className="flex flex-col gap-4">
+              {/* Image Format */}
+              <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Resolution
+                  Format
                 </span>
-                <span className="text-[10px] font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                  {currentDimensions.width} × {currentDimensions.height}
-                </span>
+                <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {(['png', 'jpeg'] as const).map((fmt) => {
+                    const isActive = (exportSettings.format || 'png') === fmt
+                    return (
+                      <button
+                        key={fmt}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ format: fmt })}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center uppercase ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
-                {(['4k', '1080p', '720p', 'original'] as const).map((res) => {
-                  const isActive = exportSettings.resolution === res
-                  const label = res === 'original' ? 'Native' : res.toUpperCase()
-                  return (
-                    <button
-                      key={res}
-                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res })}
-                      className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
+
+              {/* Resolution Selector */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Resolution
+                  </span>
+                  <span className="text-[10px] font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                    {currentDimensions.width} × {currentDimensions.height}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {(['original', '2k', '4k'] as const).map((res) => {
+                    const isActive = (exportSettings.resolution || 'original') === res
+                    const label = res === 'original' ? '1x Native' : res === '2k' ? '2x Retina' : '4K Ultra'
+                    return (
+                      <button
+                        key={res}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res as any })}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                          isActive
+                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons: Copy to Clipboard & Save */}
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={() => onExportImage && onExportImage('copy')}
+                  className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold text-xs rounded-xl shadow-md active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Clipboard className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Copy Image to Clipboard</span>
+                </button>
+
+                <button
+                  onClick={() => onExportImage && onExportImage('save')}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Save Framed Screenshot</span>
+                </button>
               </div>
             </div>
-
-            {/* Frame Rate (Smooth 60 vs Standard 30) */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Frame Rate
-              </span>
-              <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
-                {([60, 30] as const).map((f) => {
-                  const isActive = exportSettings.fps === f
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ fps: f })}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {f} FPS {f === 60 ? '(Smooth)' : '(Standard)'}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Quality Preset (Clean 3 Levels) */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
+          ) : (
+            <div className="flex flex-col gap-4">
+              {/* Format Segmented Row */}
+              <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Quality
+                  Format
                 </span>
-                <span className="text-[10px] font-mono text-cyan-400 font-semibold">
-                  {formatBitrate(currentBitrate)}
-                </span>
+                <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {(['mp4', 'webm'] as const).map((fmt) => {
+                    const isActive = exportSettings.format === fmt
+                    return (
+                      <button
+                        key={fmt}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ format: fmt })}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center uppercase ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
-                {(['ultra', 'high', 'standard'] as const).map((preset) => {
-                  const isActive = exportSettings.bitratePreset === preset
-                  const labels = { ultra: 'Ultra', high: 'High', standard: 'Standard' }
-                  return (
-                    <button
-                      key={preset}
-                      onClick={() => onUpdateExportSettings && onUpdateExportSettings({ bitratePreset: preset })}
-                      className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {labels[preset]}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
 
-            {/* Audio Toggle (Simple Single Row) */}
-            <div className="flex items-center justify-between p-3 bg-[#161924] rounded-xl border border-white/5">
-              <span className="text-xs font-medium text-gray-200">Audio Track</span>
-              <button
-                onClick={() =>
-                  onUpdateExportSettings &&
-                  onUpdateExportSettings({ includeAudio: !exportSettings.includeAudio })
-                }
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
-                  exportSettings.includeAudio ? 'bg-blue-600' : 'bg-gray-700'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                    exportSettings.includeAudio ? 'translate-x-4' : 'translate-x-0'
+              {/* Resolution Selector (Equal 4 Columns, Clean Fit) */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Resolution
+                  </span>
+                  <span className="text-[10px] font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                    {currentDimensions.width} × {currentDimensions.height}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {(['4k', '1080p', '720p', 'original'] as const).map((res) => {
+                    const isActive = exportSettings.resolution === res
+                    const label = res === 'original' ? 'Native' : res.toUpperCase()
+                    return (
+                      <button
+                        key={res}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res })}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                          isActive
+                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Frame Rate (Smooth 60 vs Standard 30) */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Frame Rate
+                </span>
+                <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {([60, 30] as const).map((f) => {
+                    const isActive = exportSettings.fps === f
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ fps: f })}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                          isActive
+                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {f} FPS {f === 60 ? '(Smooth)' : '(Standard)'}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Quality Preset (Clean 3 Levels) */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Quality
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                    {formatBitrate(currentBitrate)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                  {(['ultra', 'high', 'standard'] as const).map((preset) => {
+                    const isActive = exportSettings.bitratePreset === preset
+                    const labels = { ultra: 'Ultra', high: 'High', standard: 'Standard' }
+                    return (
+                      <button
+                        key={preset}
+                        onClick={() => onUpdateExportSettings && onUpdateExportSettings({ bitratePreset: preset })}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                          isActive
+                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {labels[preset]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Audio Toggle (Simple Single Row) */}
+              <div className="flex items-center justify-between p-3 bg-[#161924] rounded-xl border border-white/5">
+                <span className="text-xs font-medium text-gray-200">Audio Track</span>
+                <button
+                  onClick={() =>
+                    onUpdateExportSettings &&
+                    onUpdateExportSettings({ includeAudio: !exportSettings.includeAudio })
+                  }
+                  className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                    exportSettings.includeAudio ? 'bg-blue-600' : 'bg-gray-700'
                   }`}
-                />
-              </button>
-            </div>
-
-            {/* Quick Summary Strip & Save As */}
-            <div className="flex items-center justify-between px-3 py-2 bg-[#141720] rounded-xl border border-white/5 text-[11px]">
-              <div className="flex items-center gap-1.5 text-gray-400">
-                <span>Est. Size:</span>
-                <span className="font-mono font-bold text-emerald-400">
-                  {estimatedSize}
-                </span>
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                      exportSettings.includeAudio ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
+
+              {/* Quick Summary Strip & Save As */}
+              <div className="flex items-center justify-between px-3 py-2 bg-[#141720] rounded-xl border border-white/5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <span>Est. Size:</span>
+                  <span className="font-mono font-bold text-emerald-400">
+                    {estimatedSize}
+                  </span>
+                </div>
+                <button
+                  onClick={handleSelectSaveLocation}
+                  className="text-[10px] font-semibold text-gray-400 hover:text-white transition-colors cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md"
+                  title="Choose custom export folder"
+                >
+                  {exportSettings.saveLocation ? 'Custom Path' : 'Save As...'}
+                </button>
+              </div>
+
+              {/* Primary Action Export Button */}
               <button
-                onClick={handleSelectSaveLocation}
-                className="text-[10px] font-semibold text-gray-400 hover:text-white transition-colors cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md"
-                title="Choose custom export folder"
+                onClick={() => onExport && onExport()}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer text-center mt-1"
               >
-                {exportSettings.saveLocation ? 'Custom Path' : 'Save As...'}
+                Export Video
               </button>
             </div>
-
-            {/* Primary Action Export Button */}
-            <button
-              onClick={() => onExport && onExport()}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer text-center mt-1"
-            >
-              Export Video
-            </button>
-          </div>
+          )
         )}
       </div>
     </aside>

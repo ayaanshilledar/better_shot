@@ -286,7 +286,7 @@ function drawShadow(
  */
 export function renderFrameToCanvas(
   ctx: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
+  video: HTMLVideoElement | HTMLImageElement,
   project: StudioProject,
   currentTime: number,
   exportW: number,
@@ -330,8 +330,8 @@ export function renderFrameToCanvas(
   }
 
   // 3. Calculate Video Dimensions & Frame Geometry
-  const nativeW = project.media.width || video.videoWidth || 1920
-  const nativeH = project.media.height || video.videoHeight || 1080
+  const nativeW = project.media.width || (video as HTMLVideoElement).videoWidth || (video as HTMLImageElement).naturalWidth || 1920
+  const nativeH = project.media.height || (video as HTMLVideoElement).videoHeight || (video as HTMLImageElement).naturalHeight || 1080
 
   const crop = project.layout.cropRegion
   const isCropped = Boolean(
@@ -448,7 +448,7 @@ export function renderFrameToCanvas(
 /**
  * Detects supported MediaRecorder MIME types with fallback.
  */
-export function getSupportedMimeType(preferredFormat: 'mp4' | 'webm'): { mimeType: string; format: 'mp4' | 'webm' } {
+export function getSupportedMimeType(preferredFormat?: string): { mimeType: string; format: 'mp4' | 'webm' } {
   if (typeof MediaRecorder === 'undefined') {
     return { mimeType: 'video/webm', format: 'webm' }
   }
@@ -714,7 +714,8 @@ export function createExportProcess(
       }
 
       const outputStream = new MediaStream(combinedTracks)
-      const { mimeType, format: resolvedFormat } = getSupportedMimeType(settings.format)
+      const videoFormat = settings.format === 'mp4' ? 'mp4' : 'webm'
+      const { mimeType, format: resolvedFormat } = getSupportedMimeType(videoFormat)
 
       mediaRecorder = new MediaRecorder(outputStream, {
         mimeType,
@@ -731,18 +732,23 @@ export function createExportProcess(
 
       // 7. Start Playback and Frame Recording Loop
       const exportStartTime = performance.now()
+      const trimStart = project.timeline.trimRange?.start ?? 0
+      const rawEnd = project.timeline.trimRange?.end ?? duration
+      const trimEnd = Math.min(duration, Math.max(trimStart + 0.1, rawEnd))
+      const targetDuration = trimEnd - trimStart
+
       mediaRecorder.start(250)
 
       onProgress({
         progress: 0,
         currentTime: 0,
-        totalDuration: duration,
+        totalDuration: targetDuration,
         fps: settings.fps,
-        etaSeconds: Math.round(duration),
+        etaSeconds: Math.round(targetDuration),
         phase: 'rendering'
       })
 
-      hiddenVideo.currentTime = 0
+      hiddenVideo.currentTime = trimStart
       await hiddenVideo.play()
 
       let lastExportClickMs = -1
@@ -774,27 +780,27 @@ export function createExportProcess(
             }
           }
 
-
           if (onPreviewFrame) {
             onPreviewFrame(canvas)
           }
 
-          const progressPercent = Math.min(99, Math.max(0, Math.round((currTime / duration) * 100)))
+          const progressPercent = Math.min(99, Math.max(0, Math.round(((currTime - trimStart) / targetDuration) * 100)))
           const elapsedSec = (performance.now() - exportStartTime) / 1000
-          const rate = currTime > 0 ? elapsedSec / currTime : 1
-          const rawRemaining = (duration - currTime) * rate
+          const processedDuration = currTime - trimStart
+          const rate = processedDuration > 0 ? elapsedSec / processedDuration : 1
+          const rawRemaining = (targetDuration - processedDuration) * rate
           const remainingSec = Number.isFinite(rawRemaining) ? Math.max(0, Math.round(rawRemaining)) : 0
 
           onProgress({
             progress: progressPercent,
-            currentTime: currTime,
-            totalDuration: duration,
+            currentTime: processedDuration,
+            totalDuration: targetDuration,
             fps: settings.fps,
             etaSeconds: remainingSec,
             phase: 'rendering'
           })
 
-          if (currTime >= duration - 0.05 || hiddenVideo!.ended) {
+          if (currTime >= trimEnd - 0.05 || hiddenVideo!.ended) {
             cancelAnimationFrame(animFrameId)
             resolve()
           } else {
@@ -911,4 +917,46 @@ export function createExportProcess(
   })()
 
   return { promise, cancel }
+}
+
+/**
+ * Renders a pixel-perfect export of a static screenshot/image project with backgrounds, padding, and drop shadows.
+ */
+export async function exportScreenshotImage(
+  project: StudioProject,
+  resolution: ExportResolution = 'original'
+): Promise<Blob> {
+  const mediaPath = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
+  const img = await preloadImage(mediaPath)
+  const dims = calculateExportDimensions(
+    project.layout.aspectRatio,
+    resolution,
+    img.naturalWidth || project.media.width || 1920,
+    img.naturalHeight || project.media.height || 1080
+  )
+
+  const canvas = document.createElement('canvas')
+  canvas.width = dims.width
+  canvas.height = dims.height
+  const ctx = canvas.getContext('2d')!
+
+  let bgImage: HTMLImageElement | null = null
+  const bgSource = resolveBackgroundSource(project)
+  if (bgSource.type === 'image') {
+    try {
+      bgImage = await preloadImage(bgSource.value)
+    } catch (e) {
+      console.warn('Could not preload background image:', e)
+    }
+  }
+
+  renderFrameToCanvas(ctx, img, project, 0, dims.width, dims.height, bgImage)
+
+  const mime = project.exportSettings?.format === 'jpeg' ? 'image/jpeg' : 'image/png'
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('Canvas toBlob failed'))
+    }, mime, 0.95)
+  })
 }

@@ -60,10 +60,31 @@ export interface LayoutConfig {
   isMuted?: boolean
 }
 
+export type CameraOverlayShape = 'circle' | 'rect'
+export type CameraOverlayPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+export type CameraOverlaySize = 'small' | 'medium' | 'large'
+
+export interface CameraOverlayConfig {
+  enabled: boolean
+  deviceId?: string
+  shape: CameraOverlayShape
+  position: CameraOverlayPosition
+  size: CameraOverlaySize
+  mirror: boolean
+}
+
+export const DEFAULT_CAMERA_CONFIG: CameraOverlayConfig = {
+  enabled: false,
+  shape: 'circle',
+  position: 'bottom-right',
+  size: 'medium',
+  mirror: true
+}
+
 export type ExportResolution = 'original' | '4k' | '2k' | '1080p' | '720p'
 export type ExportFps = 60 | 30 | 24
 export type ExportBitratePreset = 'ultra' | 'high' | 'standard' | 'economy' | 'custom'
-export type ExportFormat = 'mp4' | 'webm'
+export type ExportFormat = 'mp4' | 'webm' | 'png' | 'jpeg' | 'webp'
 
 export interface ExportSettings {
   format: ExportFormat
@@ -102,12 +123,17 @@ export interface StudioProject {
     duration: number
     width: number
     height: number
+    mediaType?: 'video' | 'image'
   }
   background: BackgroundConfig
   layout: LayoutConfig
   timeline: {
     clips: ClipSegment[]
     zoomEvents: ZoomEvent[]
+    trimRange?: {
+      start: number
+      end: number
+    }
   }
   cursorConfig?: CursorConfig
   cursorData?: CursorTelemetryData
@@ -121,7 +147,7 @@ export interface StudioRuntimeState {
   errorMessage?: string
   currentTime: number
   isPlaying: boolean
-  selectedTab: 'background' | 'layout' | 'zoom' | 'cursor' | 'audio' | 'export'
+  selectedTab: 'background' | 'layout' | 'zoom' | 'cursor' | 'audio' | 'ai' | 'export'
   selectedClipId: string | null
   selectedZoomId?: string | null
   activeZoomMode?: 'manual' | 'auto'

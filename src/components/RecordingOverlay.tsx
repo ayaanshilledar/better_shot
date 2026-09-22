@@ -7,7 +7,9 @@ import {
   Play,
   RotateCcw,
   Trash2,
-  GripVertical
+  GripVertical,
+  Video,
+  VideoOff
 } from 'lucide-react'
 import { recorderService } from '../services/recorder'
 
@@ -23,6 +25,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
   const [seconds, setSeconds] = useState<number>(0)
   const [isPaused, setIsPaused] = useState<boolean>(false)
   const [isMuted, setIsMuted] = useState<boolean>(false)
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(true)
   const [audioLevel, setAudioLevel] = useState<number>(0)
   const [countdown, setCountdown] = useState<number | null>(null)
 
@@ -43,11 +46,15 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
       const unsubMuted = window.electronAPI.onMutedStateUpdate?.((muted) => {
         setIsMuted(muted)
       })
+      const unsubCam = window.electronAPI.onCameraToggleUpdate?.((enabled) => {
+        setIsCameraActive(enabled)
+      })
       return () => {
         unsubTimer()
         if (unsubAudio) unsubAudio()
         if (unsubPaused) unsubPaused()
         if (unsubMuted) unsubMuted()
+        if (unsubCam) unsubCam()
       }
     }
   }, [])
@@ -118,6 +125,16 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
     console.log(`[BetterShot:Overlay] Mic mute toggle clicked -> IPC relay (${nextMuted ? 'MUTE' : 'UNMUTE'})`)
     setIsMuted(nextMuted)
     window.electronAPI?.sendOverlayControl(nextMuted ? 'mute-mic' : 'unmute-mic')
+  }
+
+  const handleToggleCamera = () => {
+    const nextState = !isCameraActive
+    console.log(`[BetterShot:Overlay] Camera toggle clicked -> IPC relay (${nextState ? 'ENABLE' : 'DISABLE'})`)
+    setIsCameraActive(nextState)
+    window.electronAPI?.sendOverlayControl(nextState ? 'unmute-camera' : 'mute-camera')
+    if (window.electronAPI?.sendCameraToggle) {
+      window.electronAPI.sendCameraToggle(nextState)
+    }
   }
 
   const handleStopRecording = () => {
@@ -207,6 +224,19 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
             </div>
           )}
         </div>
+
+        {/* Camera toggle */}
+        <button
+          onClick={handleToggleCamera}
+          className="no-drag p-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          title={isCameraActive ? 'Hide Camera Overlay' : 'Show Camera Overlay'}
+        >
+          {isCameraActive ? (
+            <Video className="w-4 h-4 text-blue-400" />
+          ) : (
+            <VideoOff className="w-4 h-4 text-gray-400" />
+          )}
+        </button>
 
         {/* Pause / Resume Button */}
         <button

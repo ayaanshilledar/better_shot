@@ -1,4 +1,5 @@
 import { CropRegion } from '../../electron/preload'
+import { CameraOverlayConfig, DEFAULT_CAMERA_CONFIG } from '../types/editor'
 
 export interface CaptureConfig {
   sourceId: string | null
@@ -9,6 +10,7 @@ export interface CaptureConfig {
   cameraId?: string
   micId?: string
   cropRegion?: CropRegion
+  cameraConfig?: CameraOverlayConfig
 }
 
 class ScreenRecorderService {
@@ -16,6 +18,7 @@ class ScreenRecorderService {
   private recordedChunks: Blob[] = []
   private combinedStream: MediaStream | null = null
   private rawDesktopStream: MediaStream | null = null
+  private cameraStream: MediaStream | null = null
   private micAudioTracks: MediaStreamTrack[] = []
   private systemAudioTracks: MediaStreamTrack[] = []
   private audioContext: AudioContext | null = null
@@ -24,12 +27,15 @@ class ScreenRecorderService {
   private animFrameId: number | null = null
   private cropAnimFrameId: number | null = null
   private cropVideoElement: HTMLVideoElement | null = null
+  private cameraVideoElement: HTMLVideoElement | null = null
   private audioLevelCallback: ((level: number) => void) | null = null
   private timerCallback: ((seconds: number) => void) | null = null
   private startTime: number = 0
   private timerInterval: NodeJS.Timeout | null = null
   private elapsedTime: number = 0
   private isPaused: boolean = false
+  private isCameraMuted: boolean = false
+  private activeCameraConfig: CameraOverlayConfig = DEFAULT_CAMERA_CONFIG
   private lastConfig: CaptureConfig | null = null
 
   public async startRecording(config: CaptureConfig): Promise<boolean> {
@@ -127,13 +133,38 @@ class ScreenRecorderService {
         throw new Error('No video stream source found')
       }
 
-      // 2b. Process Area Crop Mode if cropRegion is specified
-      if (config.cropRegion && videoTrack) {
-        console.log('[BetterShot:Recorder] Setting up real-time Area Canvas Cropping...', config.cropRegion)
-        const croppedTrack = await this.setupAreaCropping(videoTrack, config.cropRegion)
-        if (croppedTrack) {
-          videoTrack = croppedTrack
-          console.log('[BetterShot:Recorder] Canvas Area Cropped video track active!')
+      // 2b. Camera Stream (Webcam Overlay)
+      let camTrack: MediaStreamTrack | null = null
+      if (config.enableCamera) {
+        try {
+          console.log('[BetterShot:Recorder] Capturing Webcam Stream...')
+          const camStream = await navigator.mediaDevices.getUserMedia({
+            video: config.cameraId ? { deviceId: { exact: config.cameraId } } : true,
+            audio: false
+          })
+          this.cameraStream = camStream
+          if (config.cameraConfig) {
+            this.activeCameraConfig = { ...config.cameraConfig }
+          }
+          camTrack = camStream.getVideoTracks()[0] || null
+          if (camTrack) {
+            camTrack.onended = () => {
+              console.warn('[BetterShot:Recorder] Webcam disconnected mid-recording')
+              this.isCameraMuted = true
+            }
+          }
+        } catch (camErr) {
+          console.warn('[BetterShot:Recorder] Webcam stream error or permission denied:', camErr)
+        }
+      }
+
+      // 2c. Real-Time Compositing Pipeline (Area Crop and/or Camera Overlay)
+      if ((config.cropRegion || camTrack) && videoTrack) {
+        console.log('[BetterShot:Recorder] Setting up real-time Video Compositor (Crop + Camera Overlay)...')
+        const compositedTrack = await this.setupCompositedVideoTrack(videoTrack, config.cropRegion, camTrack)
+        if (compositedTrack) {
+          videoTrack = compositedTrack
+          console.log('[BetterShot:Recorder] Composited video track active!')
         }
       }
 
@@ -235,8 +266,13 @@ class ScreenRecorderService {
     }
   }
 
-  private async setupAreaCropping(rawVideoTrack: MediaStreamTrack, crop: CropRegion): Promise<MediaStreamTrack | null> {
+  private async setupCompositedVideoTrack(
+    rawVideoTrack: MediaStreamTrack,
+    crop?: CropRegion,
+    cameraTrack?: MediaStreamTrack | null
+  ): Promise<MediaStreamTrack | null> {
     return new Promise((resolve) => {
+      // 1. Offscreen video element for desktop/screen stream
       const video = document.createElement('video')
       video.autoplay = true
       video.muted = true
@@ -253,52 +289,195 @@ class ScreenRecorderService {
       video.srcObject = new MediaStream([rawVideoTrack])
       this.cropVideoElement = video
 
+      // 2. Offscreen video element for camera stream (if cameraTrack provided)
+      let camVideo: HTMLVideoElement | null = null
+      if (cameraTrack) {
+        camVideo = document.createElement('video')
+        camVideo.autoplay = true
+        camVideo.muted = true
+        camVideo.playsInline = true
+        camVideo.style.position = 'fixed'
+        camVideo.style.top = '-9999px'
+        camVideo.style.left = '-9999px'
+        camVideo.style.width = '1px'
+        camVideo.style.height = '1px'
+        camVideo.style.opacity = '0'
+        camVideo.style.pointerEvents = 'none'
+        document.body.appendChild(camVideo)
+
+        camVideo.srcObject = new MediaStream([cameraTrack])
+        this.cameraVideoElement = camVideo
+      }
+
       let isResolved = false
 
-      const startCropping = async () => {
+      const startCompositing = async () => {
         if (isResolved) return
         isResolved = true
 
         try {
           await video.play()
         } catch (e) {
-          console.warn('[BetterShot:Recorder] Video play error during area crop setup:', e)
+          console.warn('[BetterShot:Recorder] Desktop video play error during compositor setup:', e)
         }
 
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-        const targetW = Math.max(2, Math.round(crop.width))
-        const targetH = Math.max(2, Math.round(crop.height))
-        canvas.width = targetW
-        canvas.height = targetH
-
-        const videoW = video.videoWidth > 0 ? video.videoWidth : crop.screenWidth
-        const videoH = video.videoHeight > 0 ? video.videoHeight : crop.screenHeight
-
-        const scaleX = videoW / crop.screenWidth
-        const scaleY = videoH / crop.screenHeight
-
-        const srcX = Math.round(crop.x * scaleX)
-        const srcY = Math.round(crop.y * scaleY)
-        const srcW = Math.round(crop.width * scaleX)
-        const srcH = Math.round(crop.height * scaleY)
-
-        console.log(`[BetterShot:Recorder] Canvas crop mapping: Screen ${crop.screenWidth}x${crop.screenHeight}, Video ${videoW}x${videoH}, Crop (${srcX}, ${srcY}, ${srcW}, ${srcH}) -> Canvas (${targetW}x${targetH})`)
-
-        const renderFrame = () => {
-          if (ctx) {
-            try {
-              ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, targetW, targetH)
-            } catch (err) {
-              console.warn('[BetterShot:Recorder] drawImage error:', err)
-            }
+        if (camVideo) {
+          try {
+            await camVideo.play()
+          } catch (e) {
+            console.warn('[BetterShot:Recorder] Camera video play error during compositor setup:', e)
           }
         }
 
-        // Render initial frame
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { alpha: false })
+
+        const videoW = video.videoWidth > 0 ? video.videoWidth : (crop ? crop.screenWidth : 1920)
+        const videoH = video.videoHeight > 0 ? video.videoHeight : (crop ? crop.screenHeight : 1080)
+
+        let targetW = videoW
+        let targetH = videoH
+        let srcX = 0
+        let srcY = 0
+        let srcW = videoW
+        let srcH = videoH
+
+        if (crop) {
+          targetW = Math.max(2, Math.round(crop.width))
+          targetH = Math.max(2, Math.round(crop.height))
+          const scaleX = videoW / crop.screenWidth
+          const scaleY = videoH / crop.screenHeight
+          srcX = Math.round(crop.x * scaleX)
+          srcY = Math.round(crop.y * scaleY)
+          srcW = Math.round(crop.width * scaleX)
+          srcH = Math.round(crop.height * scaleY)
+        }
+
+        canvas.width = targetW
+        canvas.height = targetH
+
+        console.log(`[BetterShot:Recorder] Compositor initialized: Canvas (${targetW}x${targetH}), Camera: ${Boolean(camVideo)}`)
+
+        const renderFrame = () => {
+          if (!ctx) return
+          try {
+            // 1. Draw Base Screen Video Frame
+            if (crop) {
+              ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, targetW, targetH)
+            } else {
+              ctx.drawImage(video, 0, 0, targetW, targetH)
+            }
+
+            // 2. Draw Camera Overlay (if camera active and not muted)
+            if (camVideo && !this.isCameraMuted && camVideo.readyState >= 2) {
+              const camCfg = this.activeCameraConfig
+              const baseW = targetW
+              const baseH = targetH
+
+              // Scale bubble proportionally to recording dimensions
+              const sizeMultiplier = camCfg.size === 'small' ? 0.14 : camCfg.size === 'large' ? 0.22 : 0.18
+              const bubbleSize = Math.max(120, Math.min(Math.round(baseW * sizeMultiplier), Math.round(baseH * 0.42)))
+              const pad = Math.max(16, Math.round(baseW * 0.022))
+
+              let bubbleX = targetW - bubbleSize - pad
+              let bubbleY = targetH - bubbleSize - pad
+
+              if (camCfg.position === 'bottom-left') {
+                bubbleX = pad
+                bubbleY = targetH - bubbleSize - pad
+              } else if (camCfg.position === 'top-right') {
+                bubbleX = targetW - bubbleSize - pad
+                bubbleY = pad
+              } else if (camCfg.position === 'top-left') {
+                bubbleX = pad
+                bubbleY = pad
+              }
+
+              // Draw Drop Shadow
+              ctx.save()
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'
+              ctx.shadowBlur = Math.round(18 * (bubbleSize / 200))
+              ctx.shadowOffsetY = Math.round(6 * (bubbleSize / 200))
+
+              ctx.beginPath()
+              if (camCfg.shape === 'circle') {
+                const cx = bubbleX + bubbleSize / 2
+                const cy = bubbleY + bubbleSize / 2
+                ctx.arc(cx, cy, bubbleSize / 2, 0, Math.PI * 2)
+              } else {
+                const r = Math.round(bubbleSize * 0.16)
+                if ((ctx as any).roundRect) {
+                  (ctx as any).roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, r)
+                } else {
+                  ctx.rect(bubbleX, bubbleY, bubbleSize, bubbleSize)
+                }
+              }
+              ctx.fillStyle = '#0f1117'
+              ctx.fill()
+              ctx.restore()
+
+              // Clip and Draw Video Frame
+              ctx.save()
+              ctx.beginPath()
+              if (camCfg.shape === 'circle') {
+                const cx = bubbleX + bubbleSize / 2
+                const cy = bubbleY + bubbleSize / 2
+                ctx.arc(cx, cy, bubbleSize / 2, 0, Math.PI * 2)
+              } else {
+                const r = Math.round(bubbleSize * 0.16)
+                if ((ctx as any).roundRect) {
+                  (ctx as any).roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, r)
+                } else {
+                  ctx.rect(bubbleX, bubbleY, bubbleSize, bubbleSize)
+                }
+              }
+              ctx.clip()
+
+              // Mirror camera horizontally if enabled
+              if (camCfg.mirror !== false) {
+                const cx = bubbleX + bubbleSize / 2
+                ctx.translate(cx, 0)
+                ctx.scale(-1, 1)
+                ctx.translate(-cx, 0)
+              }
+
+              // Center-crop camera feed (cover behavior)
+              const cW = camVideo.videoWidth || 640
+              const cH = camVideo.videoHeight || 480
+              const minDim = Math.min(cW, cH)
+              const sx = Math.round((cW - minDim) / 2)
+              const sy = Math.round((cH - minDim) / 2)
+              ctx.drawImage(camVideo, sx, sy, minDim, minDim, bubbleX, bubbleY, bubbleSize, bubbleSize)
+              ctx.restore()
+
+              // Draw Sleek Outer Ring Border
+              ctx.save()
+              ctx.beginPath()
+              if (camCfg.shape === 'circle') {
+                const cx = bubbleX + bubbleSize / 2
+                const cy = bubbleY + bubbleSize / 2
+                ctx.arc(cx, cy, bubbleSize / 2, 0, Math.PI * 2)
+              } else {
+                const r = Math.round(bubbleSize * 0.16)
+                if ((ctx as any).roundRect) {
+                  (ctx as any).roundRect(bubbleX, bubbleY, bubbleSize, bubbleSize, r)
+                } else {
+                  ctx.rect(bubbleX, bubbleY, bubbleSize, bubbleSize)
+                }
+              }
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)'
+              ctx.lineWidth = Math.max(2, Math.round(3 * (bubbleSize / 200)))
+              ctx.stroke()
+              ctx.restore()
+            }
+          } catch (err) {
+            console.warn('[BetterShot:Recorder] Compositor frame render error:', err)
+          }
+        }
+
         renderFrame()
 
-        // Use setInterval (60fps) so rendering continues reliably even when launcher window is hidden
+        // 60fps compositor interval
         if (this.cropAnimFrameId) {
           clearInterval(this.cropAnimFrameId as any)
           cancelAnimationFrame(this.cropAnimFrameId)
@@ -306,17 +485,17 @@ class ScreenRecorderService {
         this.cropAnimFrameId = window.setInterval(renderFrame, 1000 / 60) as any
 
         const canvasStream = canvas.captureStream(60)
-        const croppedTrack = canvasStream.getVideoTracks()[0] || null
-        resolve(croppedTrack)
+        const compositedTrack = canvasStream.getVideoTracks()[0] || null
+        resolve(compositedTrack)
       }
 
       if (video.readyState >= 1 && video.videoWidth > 0) {
-        startCropping()
+        startCompositing()
       } else {
-        video.onloadedmetadata = () => startCropping()
-        video.onloadeddata = () => startCropping()
+        video.onloadedmetadata = () => startCompositing()
+        video.onloadeddata = () => startCompositing()
         setTimeout(() => {
-          startCropping()
+          startCompositing()
         }, 300)
       }
     })
@@ -342,6 +521,23 @@ class ScreenRecorderService {
     this.systemAudioTracks.forEach(track => {
       track.enabled = !muted
     })
+  }
+
+  public toggleCameraMute(muted: boolean) {
+    console.log(`[BetterShot:Recorder] toggleCameraMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
+    this.isCameraMuted = muted
+  }
+
+  public isCameraMutedState(): boolean {
+    return this.isCameraMuted
+  }
+
+  public updateCameraConfig(updates: Partial<CameraOverlayConfig>) {
+    this.activeCameraConfig = {
+      ...this.activeCameraConfig,
+      ...updates
+    }
+    console.log('[BetterShot:Recorder] Camera config updated:', this.activeCameraConfig)
   }
 
   public async restartRecording(): Promise<boolean> {
@@ -471,6 +667,11 @@ class ScreenRecorderService {
       this.cropVideoElement.srcObject = null
       this.cropVideoElement = null
     }
+    if (this.cameraVideoElement) {
+      this.cameraVideoElement.pause()
+      this.cameraVideoElement.srcObject = null
+      this.cameraVideoElement = null
+    }
     if (this.audioContext) {
       this.audioContext.close().catch(() => {})
       this.audioContext = null
@@ -488,6 +689,11 @@ class ScreenRecorderService {
     if (this.rawDesktopStream) {
       this.rawDesktopStream.getTracks().forEach(track => track.stop())
       this.rawDesktopStream = null
+    }
+
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(track => track.stop())
+      this.cameraStream = null
     }
 
     this.micAudioTracks = []

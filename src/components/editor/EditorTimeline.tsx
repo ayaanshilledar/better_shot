@@ -191,17 +191,17 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
   }
 
   return (
-    <div className="h-52 bg-[#101216] border-t border-white/10 flex flex-col select-none z-30">
+    <div className="h-52 bg-white dark:bg-[#101216] border-t border-slate-200 dark:border-white/10 flex flex-col select-none z-30 text-slate-800 dark:text-gray-200">
       {/* Timeline Controls & Header */}
-      <div className="h-9 px-3 border-b border-white/5 bg-[#14161f] flex items-center justify-between">
+      <div className="h-9 px-3 border-b border-slate-200/80 dark:border-white/5 bg-slate-50 dark:bg-[#14161f] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
             disabled={!canAddZoomAtCurrentTime}
             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border transition-all ${
               canAddZoomAtCurrentTime
-                ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-semibold border-blue-500/30 cursor-pointer'
-                : 'bg-white/5 text-gray-500 border-white/5 cursor-not-allowed opacity-50'
+                ? 'bg-blue-600/10 dark:bg-blue-600/20 hover:bg-blue-600/20 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-300 font-semibold border-blue-500/30 cursor-pointer'
+                : 'bg-black/5 dark:bg-white/5 text-slate-400 dark:text-gray-500 border-black/5 dark:border-white/5 cursor-not-allowed opacity-50'
             }`}
             title={
               canAddZoomAtCurrentTime
@@ -216,7 +216,7 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
+        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400 font-mono">
           <span>
             {Math.floor(runtime.currentTime / 60)}:
             {(runtime.currentTime % 60).toFixed(2).padStart(5, '0')} / {Math.floor(duration / 60)}:
@@ -228,12 +228,12 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
       {/* Main Track Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Track Labels Column */}
-        <div className="w-28 bg-[#12141a] border-r border-white/10 flex flex-col pt-7 z-10">
-          <div className="h-9 px-3 flex items-center text-xs font-semibold text-gray-300 border-b border-white/5">
+        <div className="w-28 bg-slate-50 dark:bg-[#12141a] border-r border-slate-200 dark:border-white/10 flex flex-col pt-7 z-10 text-slate-700 dark:text-gray-300">
+          <div className="h-9 px-3 flex items-center text-xs font-semibold text-slate-700 dark:text-gray-300 border-b border-slate-200/80 dark:border-white/5">
             <span>Video</span>
           </div>
 
-          <div className="h-10 px-3 flex items-center justify-between text-xs font-semibold text-gray-300 border-b border-white/5 group">
+          <div className="h-10 px-3 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-gray-300 border-b border-slate-200/80 dark:border-white/5 group">
             <span>Zoom</span>
             <button
               onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
@@ -291,18 +291,65 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
             </div>
 
             {/* Track 1: Video Track Layer */}
-            <div className="h-9 border-b border-white/5 relative flex items-center px-1">
-              <div
-                className="h-7 bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center px-3 gap-2 text-xs font-semibold text-blue-200 shadow-sm transition-all"
-                style={{ width: '100%' }}
-              >
-                <span>Clip {Math.round(duration)}s</span>
-                <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300 font-mono">1x</span>
-              </div>
+            <div data-track="video" className="h-9 border-b border-white/5 relative flex items-center px-1">
+              {/* Dimmed Inactive Zone Before Trim Start */}
+              {project.timeline.trimRange && project.timeline.trimRange.start > 0 && (
+                <div
+                  className="absolute left-0 top-1 bottom-1 bg-black/60 backdrop-blur-[1px] border-r-2 border-amber-500/70 z-10 flex items-center justify-center pointer-events-none"
+                  style={{ width: `${(project.timeline.trimRange.start / duration) * 100}%` }}
+                >
+                  <span className="text-[9px] text-amber-400/80 font-mono">Trimmed</span>
+                </div>
+              )}
+
+              {/* Active Video Clip Segment Bar */}
+              {(() => {
+                const trimStart = project.timeline.trimRange?.start ?? 0
+                const trimEnd = project.timeline.trimRange?.end ?? duration
+                const activeDur = Math.max(0.1, trimEnd - trimStart)
+                const leftPos = (trimStart / duration) * 100
+                const widthPercent = (activeDur / duration) * 100
+                const isTrimmed = Boolean(project.timeline.trimRange && (trimStart > 0 || trimEnd < duration))
+
+                return (
+                  <div
+                    className={`h-7 rounded-lg flex items-center justify-between px-3 gap-2 text-xs font-semibold shadow-sm transition-all border ${
+                      isTrimmed
+                        ? 'bg-gradient-to-r from-blue-600/40 via-indigo-600/40 to-blue-600/40 border-blue-400 text-white shadow-blue-500/20'
+                        : 'bg-blue-600/30 border-blue-500/50 text-blue-200'
+                    }`}
+                    style={{
+                      marginLeft: `${leftPos}%`,
+                      width: `${widthPercent}%`
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span>Clip {activeDur.toFixed(1)}s</span>
+                      {isTrimmed && (
+                        <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded border border-amber-500/30">
+                          Trimmed
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300 font-mono shrink-0">1x</span>
+                  </div>
+                )
+              })()}
+
+              {/* Dimmed Inactive Zone After Trim End */}
+              {project.timeline.trimRange && project.timeline.trimRange.end < duration && (
+                <div
+                  className="absolute right-0 top-1 bottom-1 bg-black/60 backdrop-blur-[1px] border-l-2 border-amber-500/70 z-10 flex items-center justify-center pointer-events-none"
+                  style={{ width: `${((duration - project.timeline.trimRange.end) / duration) * 100}%` }}
+                >
+                  <span className="text-[9px] text-amber-400/80 font-mono">Trimmed</span>
+                </div>
+              )}
             </div>
 
             {/* Track 2: Zoom Track Layer with Interactive Hover & Add Option */}
             <div
+              data-track="zoom"
               onMouseMove={handleTrackMouseMove}
               onMouseLeave={handleTrackMouseLeave}
               onClick={handleTrackClick}

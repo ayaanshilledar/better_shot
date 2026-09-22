@@ -170,6 +170,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
   // Streamable local media source URL
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
+  const isImage = Boolean(project.media.mediaType === 'image' || /\.(png|jpe?g|webp|bmp|gif)$/i.test(project.media.sourcePath))
 
   const videoW = actualVideoDims.width || project.media.width || 1920
   const videoH = actualVideoDims.height || project.media.height || 1080
@@ -443,7 +444,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     <div
       ref={containerRef}
       onClick={handleCanvasClick}
-      className="flex-1 bg-[#090b0e] relative flex flex-col items-center justify-between overflow-hidden select-none"
+      className="flex-1 bg-slate-200/60 dark:bg-[#090b0e] relative flex flex-col items-center justify-between overflow-hidden select-none"
     >
       {/* Top Canvas Header (Clean & Borderless, Left: Crop Video | Right: Preview Scale Pill) */}
       <div className="w-full h-12 px-6 flex items-center justify-between select-none z-20 border-b-0 bg-transparent shrink-0">
@@ -455,46 +456,44 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               e.stopPropagation()
               if (onToggleCrop) onToggleCrop()
             }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${
-              isCropped
-                ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30 shadow-blue-500/10'
-                : 'bg-[#14161f] hover:bg-[#1a1d28] text-gray-300 hover:text-white border-white/10 hover:border-white/20'
-            }`}
-            title={isCropped ? `Cropped (${cropW}x${cropH}) - Click to adjust crop` : 'Crop Video'}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${isCropped
+                ? 'bg-blue-600/15 dark:bg-blue-600/20 border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-blue-600/25 dark:hover:bg-blue-600/30 shadow-blue-500/10'
+                : 'bg-white dark:bg-[#14161f] hover:bg-slate-50 dark:hover:bg-[#1a1d28] text-slate-700 hover:text-slate-950 dark:text-gray-300 dark:hover:text-white border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+              }`}
+            title={isCropped ? `Cropped (${cropW}x${cropH}) - Click to adjust crop` : (isImage ? 'Crop Image' : 'Crop Video')}
           >
-            <Crop className="w-3.5 h-3.5 text-blue-400" />
-            <span>Crop Video</span>
+            <Crop className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>{isImage ? 'Crop Image' : 'Crop Video'}</span>
             {isCropped && (
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             )}
           </button>
 
-          {/* Frame Aspect Ratio Dropdown Button */}
+
           <div className="relative" ref={frameMenuRef}>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setIsFrameMenuOpen((prev) => !prev)
               }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${
-                isFrameMenuOpen || activeAspectRatio !== 'auto'
-                  ? 'bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30 shadow-blue-500/10'
-                  : 'bg-[#14161f] hover:bg-[#1a1d28] text-gray-300 hover:text-white border-white/10 hover:border-white/20'
-              }`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${isFrameMenuOpen || activeAspectRatio !== 'auto'
+                  ? 'bg-blue-600/15 dark:bg-blue-600/20 border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-blue-600/25 dark:hover:bg-blue-600/30 shadow-blue-500/10'
+                  : 'bg-white dark:bg-[#14161f] hover:bg-slate-50 dark:hover:bg-[#1a1d28] text-slate-700 hover:text-slate-950 dark:text-gray-300 dark:hover:text-white border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                }`}
               title="Change canvas aspect ratio frame"
             >
-              <Frame className="w-3.5 h-3.5 text-blue-400" />
-              <span>Frame: <span className="font-mono text-white">{activeAspectRatio.toUpperCase()}</span></span>
-              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isFrameMenuOpen ? 'rotate-180' : ''}`} />
+              <Frame className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Frame: <span className="font-mono text-slate-900 dark:text-white">{activeAspectRatio.toUpperCase()}</span></span>
+              <ChevronDown className={`w-3 h-3 text-slate-500 dark:text-gray-400 transition-transform ${isFrameMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Floating Dropdown Menu */}
             {isFrameMenuOpen && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute left-0 top-full mt-1.5 w-52 bg-[#12141a] border border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150"
+                className="absolute left-0 top-full mt-1.5 w-52 bg-white dark:bg-[#12141a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150"
               >
-                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-white/5 mb-0.5">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-gray-400 border-b border-slate-100 dark:border-white/5 mb-0.5">
                   Canvas Aspect Ratio
                 </div>
                 {FRAME_PRESETS.map((preset) => {
@@ -508,18 +507,17 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                         }
                         setIsFrameMenuOpen(false)
                       }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${
-                        isActive
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${isActive
                           ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
-                          : 'text-gray-300 hover:text-white hover:bg-white/5'
-                      }`}
+                          : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5'
+                        }`}
                     >
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-bold text-xs">{preset.label}</span>
-                          <span className={`text-[11px] ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>• {preset.ratioText}</span>
+                          <span className={`text-[11px] ${isActive ? 'text-blue-100' : 'text-slate-400 dark:text-gray-400'}`}>• {preset.ratioText}</span>
                         </div>
-                        <span className={`text-[10px] ${isActive ? 'text-blue-200' : 'text-gray-500'}`}>{preset.subLabel}</span>
+                        <span className={`text-[10px] ${isActive ? 'text-blue-200' : 'text-slate-400 dark:text-gray-500'}`}>{preset.subLabel}</span>
                       </div>
                       {isActive && (
                         <Check className="w-3.5 h-3.5 text-white shrink-0 ml-2" />
@@ -535,7 +533,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Right End: Preview Scale Segmented Pill Switcher (Matching Provided Screenshot) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center bg-[#14161f] p-1 rounded-xl border border-white/5 shadow-inner gap-0.5"
+          className="flex items-center bg-white/90 dark:bg-[#14161f] p-1 rounded-xl border border-slate-200/80 dark:border-white/5 shadow-sm gap-0.5"
         >
           {(['full', 'half', 'quarter'] as const).map((scale) => {
             const labels = {
@@ -548,11 +546,10 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               <button
                 key={scale}
                 onClick={() => onScaleChange && onScaleChange(scale)}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  isActive
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                }`}
+                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
+                  }`}
               >
                 {labels[scale]}
               </button>
@@ -568,9 +565,8 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
       >
         {/* Outer Studio Background Canvas Frame with Preview Scale transform */}
         <div
-          className={`relative rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-200 p-3 sm:p-4 ${
-            project.background.type === 'none' ? 'border-none' : 'border border-white/10'
-          }`}
+          className={`relative rounded-2xl flex items-center justify-center overflow-hidden transition-all duration-200 p-3 sm:p-4 ${project.background.type === 'none' ? 'border-none' : 'border border-white/10'
+            }`}
           style={{
             boxSizing: 'border-box',
             width: `${canvasW}px`,
@@ -581,257 +577,282 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             transformOrigin: 'center center'
           }}
         >
-        {/* Dedicated Background Layer (Blur filter applies ONLY to background, never video) */}
-        {project.background.type !== 'none' && (
-          <div
-            className="absolute inset-0 transition-all duration-300 pointer-events-none"
-            style={{
-              background: getBgStyle(),
-              filter: project.background.blurAmount > 0
-                ? `blur(${project.background.blurAmount * 0.25}px)`
-                : 'none',
-              transform: project.background.blurAmount > 0 ? 'scale(1.08)' : 'none'
-            }}
-          >
-            {/* Subtle background overlay grid */}
-            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
-          </div>
-        )}
-
-        {/* Media Frame Container (Stays crisp & unblurred above background layer) */}
-        <div
-          className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full w-full h-full"
-        >
-          {/* Framed HTML5 Video Element (Hardware 60FPS with selection & free drag transform) */}
-          <div
-            ref={videoWrapperRef}
-            onMouseDown={handleMouseDown}
-            className={`transition-shadow duration-200 relative group flex items-center justify-center cursor-grab active:cursor-grabbing ${
-              isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black/50 shadow-2xl z-20' : ''
-            }`}
-            style={{
-              borderRadius: `${project.layout.cornerRadius}px`,
-              boxShadow: isSelected ? undefined : getShadowStyle(),
-              transform: `translate(${posX}px, ${posY}px) scale(${objectScale}) translateZ(0)`,
-              transformOrigin: 'center center',
-              aspectRatio: containerAspect,
-              width: `${frameW}px`,
-              height: `${frameH}px`,
-              maxWidth: '100%',
-              maxHeight: '100%'
-            }}
-          >
-            {/* Visual Handles when video is selected */}
-            {isSelected && (
-              <>
-                <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
-                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
-                <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
-                <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
-              </>
-            )}
-
-            {/* Visual Target Reticle Overlay for Zoom Focal Point */}
-            {(runtime.selectedTab === 'zoom' || selectedZoomEvent || activeZoomState.activeEventId) && (
-              <div
-                onMouseDown={handleReticleMouseDown}
-                className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group transition-transform ${
-                  selectedZoomEvent ? 'pointer-events-auto hover:scale-110' : 'pointer-events-none'
-                }`}
-                style={{
-                  left: `${reticleX}%`,
-                  top: `${reticleY}%`
-                }}
-                title="Drag to position zoom focus target"
-              >
-                {/* Minimal Target Circle Pin */}
-                <div className="w-5 h-5 rounded-full border-2 border-white bg-blue-600/80 shadow-md flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
-                </div>
-              </div>
-            )}
-
-            {/* Outer Border Stroke Layer (Expands strictly OUTSIDE the video frame) */}
-            {borderWidth > 0 && borderOpacity > 0 && (
-              <div
-                className="absolute pointer-events-none z-30 transition-all duration-150"
-                style={{
-                  top: `-${borderWidth}px`,
-                  left: `-${borderWidth}px`,
-                  right: `-${borderWidth}px`,
-                  bottom: `-${borderWidth}px`,
-                  borderRadius: `${project.layout.cornerRadius + borderWidth}px`,
-                  border: `${borderWidth}px solid rgba(255, 255, 255, ${borderOpacity / 100})`,
-                  boxSizing: 'border-box'
-                }}
-              />
-            )}
-
-            {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
+          {/* Dedicated Background Layer (Blur filter applies ONLY to background, never video) */}
+          {project.background.type !== 'none' && (
             <div
-              className="w-full h-full relative overflow-hidden"
+              className="absolute inset-0 transition-all duration-300 pointer-events-none"
               style={{
-                borderRadius: `${project.layout.cornerRadius}px`
+                background: getBgStyle(),
+                filter: project.background.blurAmount > 0
+                  ? `blur(${project.background.blurAmount * 0.25}px)`
+                  : 'none',
+                transform: project.background.blurAmount > 0 ? 'scale(1.08)' : 'none'
               }}
             >
-              {/* Inner Zoom Layer (Scales video content smoothly without overflowing outer frame or affecting padding) */}
+              {/* Subtle background overlay grid */}
+              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
+            </div>
+          )}
+
+          {/* Media Frame Container (Stays crisp & unblurred above background layer) */}
+          <div
+            className="relative z-10 transition-all duration-300 flex items-center justify-center max-w-full max-h-full w-full h-full"
+          >
+            {/* Framed HTML5 Video Element (Hardware 60FPS with selection & free drag transform) */}
+            <div
+              ref={videoWrapperRef}
+              onMouseDown={handleMouseDown}
+              className={`transition-shadow duration-200 relative group flex items-center justify-center cursor-grab active:cursor-grabbing ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black/50 shadow-2xl z-20' : ''
+                }`}
+              style={{
+                borderRadius: `${project.layout.cornerRadius}px`,
+                boxShadow: isSelected ? undefined : getShadowStyle(),
+                transform: `translate(${posX}px, ${posY}px) scale(${objectScale}) translateZ(0)`,
+                transformOrigin: 'center center',
+                aspectRatio: containerAspect,
+                width: `${frameW}px`,
+                height: `${frameH}px`,
+                maxWidth: '100%',
+                maxHeight: '100%'
+              }}
+            >
+              {/* Visual Handles when video is selected */}
+              {isSelected && (
+                <>
+                  <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                  <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                  <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                  <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow-md pointer-events-none z-30" />
+                </>
+              )}
+
+              {/* Visual Target Reticle Overlay for Zoom Focal Point */}
+              {(runtime.selectedTab === 'zoom' || selectedZoomEvent || activeZoomState.activeEventId) && (
+                <div
+                  onMouseDown={handleReticleMouseDown}
+                  className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group transition-transform ${selectedZoomEvent ? 'pointer-events-auto hover:scale-110' : 'pointer-events-none'
+                    }`}
+                  style={{
+                    left: `${reticleX}%`,
+                    top: `${reticleY}%`
+                  }}
+                  title="Drag to position zoom focus target"
+                >
+                  {/* Minimal Target Circle Pin */}
+                  <div className="w-5 h-5 rounded-full border-2 border-white bg-blue-600/80 shadow-md flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                  </div>
+                </div>
+              )}
+
+              {/* Outer Border Stroke Layer (Expands strictly OUTSIDE the video frame) */}
+              {borderWidth > 0 && borderOpacity > 0 && (
+                <div
+                  className="absolute pointer-events-none z-30 transition-all duration-150"
+                  style={{
+                    top: `-${borderWidth}px`,
+                    left: `-${borderWidth}px`,
+                    right: `-${borderWidth}px`,
+                    bottom: `-${borderWidth}px`,
+                    borderRadius: `${project.layout.cornerRadius + borderWidth}px`,
+                    border: `${borderWidth}px solid rgba(255, 255, 255, ${borderOpacity / 100})`,
+                    boxSizing: 'border-box'
+                  }}
+                />
+              )}
+
+              {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
               <div
                 className="w-full h-full relative overflow-hidden"
                 style={{
-                  transform: `scale(${zoomScale}) translateZ(0)`,
-                  transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
-                  willChange: 'transform'
+                  borderRadius: `${project.layout.cornerRadius}px`
                 }}
               >
-                {mediaUrl ? (
-                  <video
-                    ref={videoRef}
-                    src={mediaUrl}
-                    playsInline
-                    className={isCropped ? "absolute max-w-none max-h-none block" : "w-full h-full object-cover block"}
-                    style={{
-                      width: isCropped ? `${(videoW / cropW) * 100}%` : '100%',
-                      height: isCropped ? `${(videoH / cropH) * 100}%` : '100%',
-                      left: isCropped ? `${-(cropX / cropW) * 100}%` : '0%',
-                      top: isCropped ? `${-(cropY / cropH) * 100}%` : '0%',
-                      objectFit: isCropped ? 'fill' : 'cover',
-                      borderRadius: `${project.layout.cornerRadius}px`,
-                      transform: 'translateZ(0)',
-                      willChange: 'transform',
-                      backfaceVisibility: 'hidden'
-                    }}
-                    onLoadedMetadata={(e) => {
-                      const el = e.currentTarget
-                      if (el.videoWidth && el.videoHeight) {
-                        setActualVideoDims({ width: el.videoWidth, height: el.videoHeight })
-                      }
-                    }}
-                    onTimeUpdate={() => {
-                      if (videoRef.current) {
-                        onTimeUpdate(videoRef.current.currentTime)
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
-                    No Video Stream Loaded
-                  </div>
-                )}
+                {/* Inner Zoom Layer (Scales video content smoothly without overflowing outer frame or affecting padding) */}
+                <div
+                  className="w-full h-full relative overflow-hidden"
+                  style={{
+                    transform: `scale(${zoomScale}) translateZ(0)`,
+                    transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
+                    willChange: 'transform'
+                  }}
+                >
+                  {mediaUrl ? (
+                    isImage ? (
+                      <img
+                        src={mediaUrl}
+                        alt="Screenshot"
+                        className={isCropped ? "absolute max-w-none max-h-none block select-none pointer-events-none" : "w-full h-full object-cover block select-none pointer-events-none"}
+                        style={{
+                          width: isCropped ? `${(videoW / cropW) * 100}%` : '100%',
+                          height: isCropped ? `${(videoH / cropH) * 100}%` : '100%',
+                          left: isCropped ? `${-(cropX / cropW) * 100}%` : '0%',
+                          top: isCropped ? `${-(cropY / cropH) * 100}%` : '0%',
+                          objectFit: isCropped ? 'fill' : 'cover',
+                          borderRadius: `${project.layout.cornerRadius}px`,
+                          transform: 'translateZ(0)',
+                          willChange: 'transform',
+                          backfaceVisibility: 'hidden'
+                        }}
+                        onLoad={(e) => {
+                          const el = e.currentTarget
+                          if (el.naturalWidth && el.naturalHeight) {
+                            setActualVideoDims({ width: el.naturalWidth, height: el.naturalHeight })
+                          }
+                        }}
+                      />
+                    ) : (
+                      <video
+                        ref={videoRef}
+                        src={mediaUrl}
+                        playsInline
+                        className={isCropped ? "absolute max-w-none max-h-none block" : "w-full h-full object-cover block"}
+                        style={{
+                          width: isCropped ? `${(videoW / cropW) * 100}%` : '100%',
+                          height: isCropped ? `${(videoH / cropH) * 100}%` : '100%',
+                          left: isCropped ? `${-(cropX / cropW) * 100}%` : '0%',
+                          top: isCropped ? `${-(cropY / cropH) * 100}%` : '0%',
+                          objectFit: isCropped ? 'fill' : 'cover',
+                          borderRadius: `${project.layout.cornerRadius}px`,
+                          transform: 'translateZ(0)',
+                          willChange: 'transform',
+                          backfaceVisibility: 'hidden'
+                        }}
+                        onLoadedMetadata={(e) => {
+                          const el = e.currentTarget
+                          if (el.videoWidth && el.videoHeight) {
+                            setActualVideoDims({ width: el.videoWidth, height: el.videoHeight })
+                          }
+                        }}
+                        onTimeUpdate={() => {
+                          if (videoRef.current) {
+                            onTimeUpdate(videoRef.current.currentTime)
+                          }
+                        }}
+                      />
+                    )
+                  ) : (
+                    <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
+                      No Media Loaded
+                    </div>
+                  )}
 
-                {/* Single-Cursor Replacement & Click Ripple Canvas */}
-                <canvas
-                  ref={cursorCanvasRef}
-                  width={frameW}
-                  height={frameH}
-                  className="absolute inset-0 pointer-events-none z-20 w-full h-full"
-                />
+                  {/* Single-Cursor Replacement & Click Ripple Canvas */}
+                  <canvas
+                    ref={cursorCanvasRef}
+                    width={frameW}
+                    height={frameH}
+                    className="absolute inset-0 pointer-events-none z-20 w-full h-full"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-      {/* Bottom Transport Bar (Clean Aligned Placement) */}
-      <div className="w-full h-12 bg-[#0b0c10]/95 border-t-0 px-6 flex items-center justify-between relative select-none z-20">
-        {/* Far Left: Timecode Readout */}
-        <div className="flex items-center min-w-[110px]">
-          <span className="font-mono text-xs font-normal text-gray-400 tracking-tight">
-            {formatTime(runtime.currentTime)} / {formatTime(project.media.duration || 4.43)}
-          </span>
-        </div>
+      {/* Bottom Transport Bar (Video Only) */}
+      {!isImage && (
+        <div className="w-full h-12 bg-white/90 dark:bg-[#0b0c10]/95 border-t border-slate-200/80 dark:border-transparent px-6 flex items-center justify-between relative select-none z-20">
+          {/* Far Left: Timecode Readout */}
+          <div className="flex items-center min-w-[110px]">
+            <span className="font-mono text-xs font-normal text-slate-600 dark:text-gray-400 tracking-tight">
+              {formatTime(runtime.currentTime)} / {formatTime(project.media.duration || 4.43)}
+            </span>
+          </div>
 
-        {/* Absolute Center: Transport Play Controls */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                const t = Math.max(0, videoRef.current.currentTime - 1)
-                videoRef.current.currentTime = t
-                onSeek(t)
-              }
-            }}
-            className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Step back 1 sec"
-          >
-            <SkipBack className="w-4 h-4 fill-gray-400 hover:fill-white" />
-          </button>
-
-          <button
-            onClick={onTogglePlay}
-            className="w-8 h-8 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg cursor-pointer"
-            title={runtime.isPlaying ? 'Pause' : 'Play'}
-          >
-            {runtime.isPlaying ? (
-              <Pause className="w-3.5 h-3.5 fill-black text-black" />
-            ) : (
-              <Play className="w-3.5 h-3.5 fill-black text-black ml-0.5" />
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                const d = project.media.duration || 5
-                const t = Math.min(d, videoRef.current.currentTime + 1)
-                videoRef.current.currentTime = t
-                onSeek(t)
-              }
-            }}
-            className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Step forward 1 sec"
-          >
-            <SkipForward className="w-4 h-4 fill-gray-400 hover:fill-white" />
-          </button>
-        </div>
-
-        {/* Far Right: Scissors & Zoom Controls */}
-        <div className="flex items-center gap-3">
-          <button
-            className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Split clip at playhead"
-          >
-            <Scissors className="w-3.5 h-3.5" />
-          </button>
-
-          <div className="h-3.5 w-px bg-white/10 mx-0.5" />
-
-          <div className="flex items-center gap-2">
+          {/* Absolute Center: Transport Play Controls */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
             <button
               onClick={() => {
-                const current = runtime.timelineZoom || 1.0
-                const next = Math.max(1.0, current - 0.2)
-                if (onZoomChange) onZoomChange(next)
+                if (videoRef.current) {
+                  const t = Math.max(0, videoRef.current.currentTime - 1)
+                  videoRef.current.currentTime = t
+                  onSeek(t)
+                }
               }}
-              className="p-0.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
-              title="Zoom out timeline"
+              className="p-1 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+              title="Step back 1 sec"
             >
-              <ZoomOut className="w-3.5 h-3.5" />
+              <SkipBack className="w-4 h-4 fill-current" />
             </button>
-            <input
-              type="range"
-              min="1.0"
-              max="3.0"
-              step="0.1"
-              value={runtime.timelineZoom || 1.0}
-              onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
-              className="w-24 accent-blue-500 cursor-pointer h-1 bg-gray-700 rounded-lg"
-              title="Adjust timeline track scale"
-            />
+
+            <button
+              onClick={onTogglePlay}
+              className="w-8 h-8 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-black rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg cursor-pointer"
+              title={runtime.isPlaying ? 'Pause' : 'Play'}
+            >
+              {runtime.isPlaying ? (
+                <Pause className="w-3.5 h-3.5 fill-current" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+              )}
+            </button>
+
             <button
               onClick={() => {
-                const current = runtime.timelineZoom || 1.0
-                const next = Math.min(3.0, current + 0.2)
-                if (onZoomChange) onZoomChange(next)
+                if (videoRef.current) {
+                  const d = project.media.duration || 5
+                  const t = Math.min(d, videoRef.current.currentTime + 1)
+                  videoRef.current.currentTime = t
+                  onSeek(t)
+                }
               }}
-              className="p-0.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
-              title="Zoom in timeline"
+              className="p-1 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+              title="Step forward 1 sec"
             >
-              <ZoomIn className="w-3.5 h-3.5" />
+              <SkipForward className="w-4 h-4 fill-current" />
             </button>
           </div>
+
+          {/* Far Right: Scissors & Zoom Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              className="p-1 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+              title="Split clip at playhead"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-white/10 mx-0.5" />
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const current = runtime.timelineZoom || 1.0
+                  const next = Math.max(1.0, current - 0.2)
+                  if (onZoomChange) onZoomChange(next)
+                }}
+                className="p-0.5 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+                title="Zoom out timeline"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <input
+                type="range"
+                min="1.0"
+                max="3.0"
+                step="0.1"
+                value={runtime.timelineZoom || 1.0}
+                onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
+                className="w-24 accent-blue-600 dark:accent-blue-500 cursor-pointer h-1 bg-slate-300 dark:bg-gray-700 rounded-lg"
+                title="Adjust timeline track scale"
+              />
+              <button
+                onClick={() => {
+                  const current = runtime.timelineZoom || 1.0
+                  const next = Math.min(3.0, current + 0.2)
+                  if (onZoomChange) onZoomChange(next)
+                }}
+                className="p-0.5 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+                title="Zoom in timeline"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
