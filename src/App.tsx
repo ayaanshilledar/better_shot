@@ -392,7 +392,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="w-screen h-screen p-2 bg-transparent overflow-hidden relative">
+    <div className="w-full h-full p-2 bg-transparent overflow-hidden relative flex flex-col items-stretch">
       <Launcher
         onStartRecording={(mode, sourceId) => {
           setAutoOpenHistory(false)

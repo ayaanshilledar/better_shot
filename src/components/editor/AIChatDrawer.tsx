@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   Loader2
 } from 'lucide-react'
+import { MatrixOrb } from '../common/MatrixOrb'
 import { AIChatMessage, AIAction } from '../../types/ai'
 import { getAIConfig, saveAIConfig, PROVIDER_INFO } from '../../services/aiService'
 
@@ -160,12 +161,9 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       {/* Header */}
       <div className="h-12 px-3.5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-white/[0.02]">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-slate-900 shadow-sm">
-            <Sparkles className="w-3 h-3" />
-          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight">
-              Assistant
+              Velo AI
             </span>
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-500 dark:text-zinc-400 font-medium truncate max-w-[120px] border border-black/5 dark:border-white/5">
               {config.apiKey ? (config.selectedModel || 'Connected') : 'Local'}
@@ -210,7 +208,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            title="Close Assistant"
+            title="Close Velo AI"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -220,8 +218,11 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
         {messages.length === 0 ? (
-          <div className="flex flex-col py-4 px-1 gap-4">
-            <div className="flex flex-col gap-1">
+          <div className="flex flex-col py-4 px-1 gap-4 items-center text-center">
+            <div className="flex items-center justify-center my-1">
+              <MatrixOrb state={isExecuting ? 'thinking' : 'idle'} size={48} color="#3b82f6" />
+            </div>
+            <div className="flex flex-col gap-1 max-w-[280px]">
               <h4 className="text-xs font-semibold text-slate-900 dark:text-white">
                 How can I help with this video?
               </h4>
@@ -231,7 +232,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             </div>
 
             {/* Starter Suggestions */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 w-full text-left">
               <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-500 px-0.5">
                 Suggested actions
               </span>
@@ -290,44 +291,55 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   )}
 
                   {/* Message Content */}
-                  <div className="whitespace-pre-wrap">{m.content}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
 
-                  {/* Reasoning Disclosure */}
-                  {m.thoughtProcess && m.status === 'completed' && (
-                    <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5">
-                      <button
-                        onClick={() => setExpandedThoughtMap((prev) => ({ ...prev, [m.id]: !isThoughtOpen }))}
-                        className="text-[10px] font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <span>Reasoning</span>
-                        {isThoughtOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-                      </button>
-
-                      {isThoughtOpen && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-black/5 dark:bg-white/5 text-[10px] text-slate-600 dark:text-zinc-400 space-y-1">
-                          {m.thoughtProcess.analysis && <p><strong>Analysis:</strong> {m.thoughtProcess.analysis}</p>}
-                          {m.thoughtProcess.reasoning && <p><strong>Rationale:</strong> {m.thoughtProcess.reasoning}</p>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Action Checklist */}
+                  {/* Clean Parameter Key-Value Grid */}
                   {m.actions && m.actions.length > 0 && m.status !== 'thinking' && m.status !== 'executing' && (
-                    <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5 flex flex-col gap-1">
-                      <span className="text-[9.5px] font-medium text-slate-400 dark:text-zinc-500 flex items-center gap-1">
-                        <SlidersHorizontal className="w-2.5 h-2.5" /> Planned Changes
-                      </span>
-                      {m.actions.map((act, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-zinc-300"
-                        >
-                          <Check className="w-2.5 h-2.5 text-slate-400 dark:text-zinc-500 shrink-0" />
-                          <span className="truncate">{act.label || getActionReason(act)}</span>
+                    (() => {
+                      const meaningfulActions = m.actions
+                        .map((act) => {
+                          if (act.type === 'switch_tab' || act.type === 'undo') return null
+                          if (act.type === 'set_padding') return { key: 'Padding', val: `${act.padding}%` }
+                          if (act.type === 'set_corner_radius') return { key: 'Corners', val: `${act.cornerRadius}px` }
+                          if (act.type === 'set_shadow') return { key: 'Shadow', val: String(act.shadow) }
+                          if (act.type === 'set_background') return { key: 'Wallpaper', val: act.presetId === 'none' ? 'None' : (act.presetId || 'Custom') }
+                          if (act.type === 'set_aspect_ratio') return { key: 'Aspect', val: act.aspectRatio }
+                          if (act.type === 'add_zoom') return { key: 'Zoom', val: `${act.scale || 1.8}x` }
+                          if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s-${act.end?.toFixed(1) || 0}s` }
+                          if (act.type === 'clear_zooms') return { key: 'Zooms', val: 'Reset' }
+
+                          if (act.label) {
+                            if (/^returning to/i.test(act.label)) return null
+                            if (/^switching/i.test(act.label)) return null
+                            const clean = act.label.replace(/^Setting\s+/i, '').replace(/^Switching to\s+/i, '')
+                            const parts = clean.split(/\s+to\s+/i)
+                            if (parts.length === 2) {
+                              return { key: parts[0], val: parts[1] }
+                            }
+                            return { key: 'Edit', val: clean }
+                          }
+                          return { key: 'Edit', val: act.type }
+                        })
+                        .filter((a): a is { key: string; val: string } => Boolean(a))
+
+                      if (meaningfulActions.length === 0) return null
+
+                      return (
+                        <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex flex-col gap-1.5">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {meaningfulActions.map((act, idx) => (
+                              <div
+                                key={idx}
+                                className="px-2 py-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]"
+                              >
+                                <span className="text-slate-500 dark:text-zinc-400 font-medium truncate">{act.key}</span>
+                                <span className="text-slate-900 dark:text-zinc-200 font-semibold font-mono truncate ml-1">{act.val}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })()
                   )}
 
                   {/* Confirmation Bar */}
@@ -356,27 +368,26 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
                   {/* Verification Diff */}
                   {m.verification && (
-                    <div className="mt-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden">
+                    <div className="mt-3 rounded-xl bg-emerald-500/[0.05] border border-emerald-500/20 overflow-hidden">
                       <button
                         onClick={() => setExpandedDiffMap((prev) => ({ ...prev, [m.id]: !isDiffOpen }))}
-                        className="w-full flex items-center justify-between p-2 text-[10px] font-medium text-slate-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3 h-3 text-emerald-500" />
-                          <span>{m.verification.summary}</span>
-                        </div>
-                        {isDiffOpen ? <ChevronUp className="w-2.5 h-2.5 text-slate-400" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-400" />}
+                        <span>
+                          {m.verification.diffs?.length ? `${m.verification.diffs.length} parameters verified` : 'Parameters verified'}
+                        </span>
+                        {isDiffOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
                       </button>
 
                       {isDiffOpen && (
-                        <div className="p-2.5 pt-0 space-y-1 text-[9.5px] border-t border-black/5 dark:border-white/5">
+                        <div className="px-2.5 pb-2 pt-1 space-y-1 text-[9.5px] border-t border-emerald-500/10">
                           {m.verification.diffs.map((diff, i) => (
                             <div
                               key={i}
-                              className="flex items-center justify-between py-0.5 text-slate-600 dark:text-zinc-400"
+                              className="flex items-center justify-between text-slate-600 dark:text-zinc-300"
                             >
-                              <span>{diff.property}:</span>
-                              <span className="font-mono text-slate-900 dark:text-zinc-200">{diff.actual}</span>
+                              <span className="text-slate-500 dark:text-zinc-400 capitalize">{diff.property.replace(/([A-Z])/g, ' $1')}</span>
+                              <span className="font-mono text-slate-800 dark:text-zinc-200 font-medium">{diff.actual}</span>
                             </div>
                           ))}
                         </div>
@@ -387,15 +398,16 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
                 {/* Follow-Up Suggestions */}
                 {m.suggestions && m.suggestions.length > 0 && m.status === 'completed' && (
-                  <div className="flex flex-wrap gap-1.5 pl-0.5 pt-0.5 max-w-[95%]">
+                  <div className="flex flex-col gap-1 w-full max-w-[96%] pt-1">
                     {m.suggestions.map((sug, sIdx) => (
                       <button
                         key={sIdx}
                         onClick={() => onSendMessage(sug)}
                         disabled={isExecuting}
-                        className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200/80 dark:border-white/5 text-[10px] text-slate-600 dark:text-zinc-300 transition-all cursor-pointer truncate max-w-[280px]"
+                        className="w-full text-left px-3 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-200 dark:bg-[#161924] dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[10.5px] text-slate-700 dark:text-zinc-300 leading-normal transition-all cursor-pointer flex items-center justify-between group"
                       >
-                        {sug}
+                        <span className="pr-2">{sug}</span>
+                        <ArrowUp className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-slate-400 dark:text-zinc-400 transition-opacity shrink-0" />
                       </button>
                     ))}
                   </div>

@@ -835,7 +835,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 step="0.1"
                 value={runtime.timelineZoom || 1.0}
                 onChange={(e) => onZoomChange && onZoomChange(parseFloat(e.target.value))}
-                className="w-24 accent-blue-600 dark:accent-blue-500 cursor-pointer h-1 bg-slate-300 dark:bg-gray-700 rounded-lg"
+                className="w-24 studio-slider cursor-pointer"
                 title="Adjust timeline track scale"
               />
               <button

@@ -21,11 +21,13 @@ import {
   Clock,
   RotateCcw,
   RefreshCw,
-  Key,
   ChevronDown,
   ChevronUp,
-  CheckCircle2
+  CheckCircle2,
+  Key
 } from 'lucide-react'
+import { MatrixOrb } from '../common/MatrixOrb'
+import { SliderRow } from '../common/SliderRow'
 import {
   StudioProject,
   StudioRuntimeState,
@@ -194,7 +196,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     { id: 'zoom', label: 'Zoom', icon: ZoomIn },
     { id: 'cursor', label: 'Cursor', icon: MousePointer },
     { id: 'audio', label: 'Audio', icon: Volume2 },
-    { id: 'ai', label: 'AI', icon: Sparkles },
+    { id: 'ai', label: 'AI', icon: Bot },
     { id: 'export', label: 'Export', icon: Download }
   ] as const
 
@@ -333,107 +335,78 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
         {/* Layout & Framing Controls */}
         {runtime.selectedTab === 'layout' && (
-          <div className="flex flex-col gap-5">
-            {/* Blur Slider */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Blur</span>
-                <span className="font-mono text-blue-400 font-semibold">
-                  {project.background.blurAmount.toFixed(1)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={project.background.blurAmount}
-                onChange={(e) => onUpdateBackground({ blurAmount: parseFloat(e.target.value) })}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+          <div className="flex flex-col gap-4">
+            <SliderRow
+              label="Blur"
+              value={project.background.blurAmount}
+              min={0}
+              max={100}
+              step={0.5}
+              unit="%"
+              decimals={1}
+              onChange={(blurAmount) => onUpdateBackground({ blurAmount })}
+            />
 
-            {/* Padding Slider */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Padding</span>
-                <span className="font-mono text-blue-400 font-semibold">{project.layout.padding.toFixed(1)}%</span>
-              </div>
-              <input
-                data-control="padding"
-                type="range"
-                min="0"
-                max="40"
-                value={project.layout.padding}
-                onChange={(e) => onUpdateLayout({ padding: parseFloat(e.target.value) })}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+            <SliderRow
+              dataControl="padding"
+              label="Padding"
+              value={project.layout.padding}
+              min={0}
+              max={40}
+              step={0.1}
+              unit="%"
+              decimals={1}
+              onChange={(padding) => onUpdateLayout({ padding })}
+            />
 
-            {/* Corner Radius Slider */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Corner Radius</span>
-                <span className="font-mono text-blue-400 font-semibold">{project.layout.cornerRadius}px</span>
-              </div>
-              <input
-                data-control="cornerRadius"
-                type="range"
-                min="0"
-                max="32"
-                value={project.layout.cornerRadius}
-                onChange={(e) => onUpdateLayout({ cornerRadius: parseInt(e.target.value, 10) })}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+            <SliderRow
+              dataControl="cornerRadius"
+              label="Corner Radius"
+              value={project.layout.cornerRadius}
+              min={0}
+              max={32}
+              step={1}
+              unit="px"
+              decimals={0}
+              onChange={(cornerRadius) => onUpdateLayout({ cornerRadius })}
+            />
 
-            {/* Border Width Slider */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Border Width</span>
-                <span className="font-mono text-blue-400 font-semibold">{project.layout.borderWidth ?? 1}px</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="8"
-                step="1"
-                value={project.layout.borderWidth ?? 1}
-                onChange={(e) => onUpdateLayout({ borderWidth: parseInt(e.target.value, 10) })}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+            <SliderRow
+              label="Border Width"
+              value={project.layout.borderWidth ?? 1}
+              min={0}
+              max={8}
+              step={1}
+              unit="px"
+              decimals={0}
+              onChange={(borderWidth) => onUpdateLayout({ borderWidth })}
+            />
 
-            {/* Border Opacity Slider */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Border Opacity</span>
-                <span className="font-mono text-blue-400 font-semibold">{project.layout.borderOpacity ?? 25}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={project.layout.borderOpacity ?? 25}
-                onChange={(e) => onUpdateLayout({ borderOpacity: parseInt(e.target.value, 10) })}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+            <SliderRow
+              label="Border Opacity"
+              value={project.layout.borderOpacity ?? 25}
+              min={0}
+              max={100}
+              step={5}
+              unit="%"
+              decimals={0}
+              onChange={(borderOpacity) => onUpdateLayout({ borderOpacity })}
+            />
 
             {/* Drop Shadow Preset Buttons */}
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-gray-300">Drop Shadow</span>
-              <div className="grid grid-cols-5 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
+            <div className="flex flex-col gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+              <span className="text-xs font-semibold text-slate-800 dark:text-gray-300">Drop Shadow</span>
+              <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-[#161922] p-1 rounded-xl border border-black/5 dark:border-white/5">
                 {shadowOptions.map((opt) => (
                   <button
                     key={opt.id}
                     data-control="shadow"
                     data-shadow-id={opt.id}
                     onClick={() => onUpdateLayout({ shadow: opt.id })}
-                    className={`py-1 text-[11px] font-semibold rounded-lg capitalize transition-all ${
+                    className={`py-1 text-[11px] font-semibold rounded-lg capitalize transition-all cursor-pointer ${
                       project.layout.shadow === opt.id
                         ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-gray-400 hover:text-white'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'
                     }`}
                   >
                     {opt.label}
@@ -546,24 +519,19 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     </div>
 
                     {/* Scale Level Slider & Quick Presets */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-gray-300">Zoom Scale</span>
-                        <span className="font-mono text-blue-400 font-bold">
-                          {selectedZoomEvent.scale.toFixed(2)}x
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1.1"
-                        max="4.0"
-                        step="0.05"
+                    <div className="flex flex-col gap-2">
+                      <SliderRow
+                        label="Zoom Scale"
                         value={selectedZoomEvent.scale}
-                        onChange={(e) =>
+                        min={1.1}
+                        max={4.0}
+                        step={0.05}
+                        unit="x"
+                        decimals={2}
+                        onChange={(scale) =>
                           onUpdateZoomEvent &&
-                          onUpdateZoomEvent(selectedZoomEvent.id, { scale: parseFloat(e.target.value) })
+                          onUpdateZoomEvent(selectedZoomEvent.id, { scale })
                         }
-                        className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
                       />
                       {/* Scale Presets */}
                       <div className="grid grid-cols-4 gap-1">
@@ -689,21 +657,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 </div>
 
                 {/* Max Auto Scale Limit */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-gray-300">Max Auto Scale</span>
-                    <span className="font-mono text-blue-400 font-semibold">{autoMaxScale.toFixed(2)}x</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1.2"
-                    max="2.5"
-                    step="0.05"
-                    value={autoMaxScale}
-                    onChange={(e) => setAutoMaxScale(parseFloat(e.target.value))}
-                    className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-                  />
-                </div>
+                <SliderRow
+                  label="Max Scale"
+                  value={autoMaxScale}
+                  min={1.2}
+                  max={2.5}
+                  step={0.05}
+                  unit="x"
+                  decimals={2}
+                  onChange={(val) => setAutoMaxScale(val)}
+                />
 
                 {/* Cursor Click Detection Banner */}
                 {project.cursorData?.clicks && project.cursorData.clicks.length > 0 && (
@@ -816,22 +779,19 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
                 {/* Cursor Size Slider */}
                 {cursorConfig.style !== 'original' && (
-                  <div className="flex flex-col gap-2 bg-[#161922] p-3 rounded-xl border border-white/5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-gray-300">Pointer Size</span>
-                      <span className="font-mono text-[11px] text-blue-400">{cursorConfig.size}px</span>
-                    </div>
-                    <input
-                      type="range"
+                  <div className="bg-[#161922] p-3 rounded-xl border border-white/5">
+                    <SliderRow
+                      label="Pointer Size"
+                      value={cursorConfig.size}
                       min={16}
                       max={54}
                       step={2}
-                      value={cursorConfig.size}
-                      onChange={(e) =>
+                      unit="px"
+                      decimals={0}
+                      onChange={(size) =>
                         onUpdateCursorConfig &&
-                        onUpdateCursorConfig({ size: Number(e.target.value) })
+                        onUpdateCursorConfig({ size })
                       }
-                      className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
                     />
                   </div>
                 )}
@@ -947,34 +907,32 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       </div>
 
                       {/* Sound Volume Slider & Test Button */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <div className="flex-1 flex flex-col gap-1">
-                          <div className="flex items-center justify-between text-[11px] text-gray-400">
-                            <span>Volume</span>
-                            <span className="font-mono text-blue-400">{cursorConfig.sound.volume}%</span>
-                          </div>
-                          <input
-                            type="range"
+                      <div className="flex items-center gap-3 pt-1">
+                        <div className="flex-1">
+                          <SliderRow
+                            label="Volume"
+                            value={cursorConfig.sound.volume}
                             min={0}
                             max={100}
-                            value={cursorConfig.sound.volume}
-                            onChange={(e) =>
+                            step={1}
+                            unit="%"
+                            decimals={0}
+                            onChange={(volume) =>
                               onUpdateCursorConfig &&
                               onUpdateCursorConfig({
                                 sound: {
                                   ...cursorConfig.sound,
-                                  volume: Number(e.target.value)
+                                  volume
                                 }
                               })
                             }
-                            className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
                           />
                         </div>
                         <button
                           onClick={() =>
                             clickSoundService.play(cursorConfig.sound.soundType, cursorConfig.sound.volume)
                           }
-                          className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 border border-white/5"
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-gray-300 hover:text-black dark:hover:text-white rounded-lg text-[11px] font-semibold transition-all cursor-pointer shrink-0 border border-black/5 dark:border-white/5"
                         >
                           Preview
                         </button>
@@ -1036,28 +994,21 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               </button>
             </div>
 
-            <div className="flex flex-col gap-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-gray-300">Volume Level</span>
-                <span className="font-mono text-blue-400 font-semibold">
-                  {project.layout.isMuted ? 'Muted' : `${Math.round(project.layout.volume ?? 100)}%`}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={project.layout.isMuted ? 0 : (project.layout.volume ?? 100)}
-                onChange={(e) => {
-                  const newVol = parseInt(e.target.value, 10)
-                  onUpdateLayout({
-                    volume: newVol,
-                    isMuted: newVol === 0
-                  })
-                }}
-                className="accent-blue-500 cursor-pointer h-1.5 bg-[#1e222e] rounded-lg"
-              />
-            </div>
+            <SliderRow
+              label="Volume Level"
+              value={project.layout.isMuted ? 0 : (project.layout.volume ?? 100)}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              decimals={0}
+              onChange={(newVol) => {
+                onUpdateLayout({
+                  volume: newVol,
+                  isMuted: newVol === 0
+                })
+              }}
+            />
           </div>
         )}
 
@@ -1067,8 +1018,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             {/* Minimal Header / Status Bar */}
             <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/5 shrink-0 text-xs">
               <div className="flex items-center gap-1.5 text-slate-700 dark:text-zinc-300">
-                <Sparkles className="w-3.5 h-3.5 opacity-80" />
-                <span className="font-semibold text-[11px]">AI Assistant</span>
+                <span className="font-semibold text-[11px]">Velo AI</span>
                 <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate max-w-[130px]">
                   • {aiConfig.apiKey ? (aiConfig.selectedModel || 'Connected') : 'Local'}
                 </span>
@@ -1120,33 +1070,58 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               )}
 
               {(aiMessages || []).length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-6 px-2 text-slate-400 dark:text-zinc-500">
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-zinc-300 flex items-center justify-center mb-2">
-                    <Sparkles className="w-4 h-4" />
+                <div className="h-full flex flex-col items-center justify-center text-center py-5 px-1 text-slate-400 dark:text-zinc-500">
+                  <div className="mb-3 flex items-center justify-center">
+                    <MatrixOrb state={isAIExecuting ? 'thinking' : 'idle'} size={52} color="#3b82f6" />
                   </div>
                   <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 mb-0.5">
-                    {isImage ? 'AI Screenshot Copilot' : 'AI Video Editor'}
+                    Velo AI
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-[210px] leading-relaxed mb-4">
-                    Direct your edits naturally or tap a quick starter below:
+                    Direct your edits naturally or select a workflow:
                   </p>
 
-                  {/* Context-Aware Quick Action Chips */}
-                  <div className="flex flex-col gap-1.5 w-full max-w-[240px]">
+                  {/* Clean Context-Aware Quick Action Cards - Pure Typographic, No Cheesy Icons */}
+                  <div className="flex flex-col gap-1.5 w-full">
                     {(isImage
                       ? [
-                          { label: 'Clean Framing', text: 'Apply 16% padding, rounded corners, and soft drop shadow' },
-                          { label: 'Aurora Wallpaper', text: 'Set aurora wallpaper with soft shadow' },
-                          { label: '1:1 Square Format', text: 'Set 1:1 aspect ratio for Instagram/X' }
+                          {
+                            title: 'Studio Polish Framing',
+                            desc: '16% padding, rounded corners & shadow',
+                            text: 'Apply 16% padding, rounded corners, and soft drop shadow'
+                          },
+                          {
+                            title: '1:1 Square Format',
+                            desc: 'Crop to square for social feed',
+                            text: 'Set 1:1 aspect ratio for social media'
+                          },
+                          {
+                            title: 'Sunset Glow Wallpaper',
+                            desc: 'Apply vibrant gradient backdrop',
+                            text: 'Set Sunset Glow wallpaper background'
+                          }
                         ]
                       : [
-                          { label: 'One-Click Polish', text: 'Apply modern wallpaper, 12% padding, rounded corners and drop shadow' },
                           {
-                            label: runtime.currentTime > 0 ? `Zoom at ${formatTimestamp(runtime.currentTime)}` : 'Zoom at 2s',
-                            text: runtime.currentTime > 0 ? `Add 1.8x zoom at ${runtime.currentTime.toFixed(1)}s` : 'Add 1.8x focal zoom at 2s'
+                            title: 'Studio Polish Framing',
+                            desc: '12% padding, rounded corners & shadow',
+                            text: 'Apply 12% padding, rounded corners, soft shadow and modern wallpaper'
                           },
-                          { label: '9:16 Vertical Video', text: 'Make 9:16 vertical for TikTok and Shorts' },
-                          { label: 'Clear All Zooms', text: 'Clear all zoom keyframes from timeline' }
+                          {
+                            title: runtime.currentTime > 0 ? `Focal Zoom at ${formatTimestamp(runtime.currentTime)}` : 'Focal Zoom at Playhead',
+                            desc: 'Add 1.8x focal keyframe',
+                            text: runtime.currentTime > 0 ? `Add 1.8x focal zoom at ${runtime.currentTime.toFixed(1)}s` : 'Add 1.8x focal zoom at 2s'
+                          },
+                          {
+                            title: 'Format for 9:16 Shorts / Reels',
+                            desc: 'Fit vertical mobile canvas',
+                            text: 'Make 9:16 vertical for TikTok and Shorts'
+                          },
+                          {
+                            title: 'Sunset Glow Wallpaper',
+                            desc: 'Apply vibrant gradient backdrop',
+                            text: 'Set Sunset Glow gradient background'
+                          }
                         ]
                     ).map((chip, idx) => (
                       <button
@@ -1156,10 +1131,13 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           if (isAIExecuting) return
                           onSendMessage?.(chip.text)
                         }}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-100/80 dark:bg-[#161924] hover:bg-slate-200/80 dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[11px] text-slate-700 dark:text-zinc-300 transition-all cursor-pointer flex items-center justify-between group"
+                        className="w-full text-left px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-[#161924] hover:bg-slate-200/80 dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[11px] text-slate-700 dark:text-zinc-300 transition-all cursor-pointer flex flex-col gap-0.5 group"
                       >
-                        <span className="font-medium truncate">{chip.label}</span>
-                        <ArrowUp className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-slate-500 dark:text-zinc-400 transition-opacity shrink-0 ml-1" />
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-semibold text-slate-900 dark:text-zinc-200">{chip.title}</span>
+                          <ArrowUp className="w-3 h-3 opacity-0 group-hover:opacity-100 text-slate-400 dark:text-zinc-400 transition-opacity shrink-0 ml-1" />
+                        </div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 truncate">{chip.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -1169,42 +1147,67 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   const isThoughtOpen = expandedThoughtMap[m.id] ?? false
                   const isDiffOpen = expandedDiffMap[m.id] ?? false
 
+                  const meaningfulActions = (m.actions || [])
+                    .map((act) => {
+                      if (act.type === 'switch_tab' || act.type === 'undo') return null
+                      if (act.type === 'set_padding') return { key: 'Padding', val: `${act.padding}%` }
+                      if (act.type === 'set_corner_radius') return { key: 'Corners', val: `${act.cornerRadius}px` }
+                      if (act.type === 'set_shadow') return { key: 'Shadow', val: String(act.shadow) }
+                      if (act.type === 'set_background') return { key: 'Wallpaper', val: act.presetId === 'none' ? 'None' : (act.presetId || 'Custom') }
+                      if (act.type === 'set_aspect_ratio') return { key: 'Aspect', val: act.aspectRatio }
+                      if (act.type === 'add_zoom') return { key: 'Zoom', val: `${act.scale || 1.8}x` }
+                      if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s-${act.end?.toFixed(1) || 0}s` }
+                      if (act.type === 'clear_zooms') return { key: 'Zooms', val: 'Reset' }
+
+                      if (act.label) {
+                        if (/^returning to/i.test(act.label)) return null
+                        if (/^switching/i.test(act.label)) return null
+                        const clean = act.label.replace(/^Setting\s+/i, '').replace(/^Switching to\s+/i, '')
+                        const parts = clean.split(/\s+to\s+/i)
+                        if (parts.length === 2) {
+                          return { key: parts[0], val: parts[1] }
+                        }
+                        return { key: 'Edit', val: clean }
+                      }
+                      return { key: 'Edit', val: act.type }
+                    })
+                    .filter((a): a is { key: string; val: string } => Boolean(a))
+
                   return (
                     <div
                       key={m.id}
-                      className={`flex flex-col gap-1.5 ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
+                      className={`flex flex-col gap-2 ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
                     >
                       <div
-                        className={`max-w-[92%] p-2.5 text-[11px] leading-relaxed select-text ${
+                        className={`max-w-[96%] p-3 text-[11.5px] leading-relaxed select-text ${
                           m.sender === 'user'
-                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 rounded-2xl rounded-tr-xs shadow-xs'
-                            : 'bg-slate-100/90 dark:bg-[#181a26] text-slate-800 dark:text-zinc-200 border border-black/5 dark:border-white/5 rounded-2xl rounded-tl-xs'
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 rounded-2xl rounded-tr-xs shadow-xs font-medium'
+                            : 'bg-slate-100/90 dark:bg-[#151821] text-slate-800 dark:text-zinc-200 border border-slate-200/70 dark:border-white/5 rounded-2xl rounded-tl-xs shadow-xs'
                         }`}
                       >
                         {/* 1. Chain-of-Thought Disclosure */}
                         {m.thoughtProcess && (
-                          <div className="mb-2 rounded-lg bg-black/5 dark:bg-white/5 overflow-hidden">
+                          <div className="mb-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 overflow-hidden">
                             <button
                               type="button"
                               onClick={() => setExpandedThoughtMap((prev) => ({ ...prev, [m.id]: !isThoughtOpen }))}
-                              className="w-full flex items-center justify-between p-1.5 text-[9.5px] font-medium text-slate-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
                             >
                               <span>Reasoning</span>
-                              {isThoughtOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                              {isThoughtOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
                             </button>
 
                             {isThoughtOpen && (
-                              <div className="p-2 pt-0 space-y-1 text-[9.5px] text-slate-500 dark:text-zinc-400 border-t border-black/5 dark:border-white/5">
+                              <div className="px-2.5 pb-2.5 pt-1 space-y-1.5 text-[10px] text-slate-500 dark:text-zinc-400 border-t border-black/5 dark:border-white/5">
                                 {m.thoughtProcess.analysis && (
                                   <div>
-                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Analysis:</span>
+                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Analysis</span>
                                     <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.analysis}</p>
                                   </div>
                                 )}
-
                                 {m.thoughtProcess.reasoning && (
                                   <div>
-                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Rationale:</span>
+                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Rationale</span>
                                     <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.reasoning}</p>
                                   </div>
                                 )}
@@ -1213,42 +1216,43 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           </div>
                         )}
 
-                        <div className="whitespace-pre-wrap">{m.content}</div>
+                        <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
 
-                        {/* Interactive Action Receipts Badges */}
-                        {m.actions && m.actions.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2 pt-1.5 border-t border-black/5 dark:border-white/10">
-                            {m.actions.map((act, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-slate-700 dark:text-zinc-300 text-[9.5px] font-medium border border-black/5 dark:border-white/5"
-                                title={act.label}
-                              >
-                                <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-zinc-500" />
-                                <span className="truncate max-w-[130px]">{act.label}</span>
-                              </span>
-                            ))}
+                        {/* 2. Clean Key-Value Parameter Changes */}
+                        {meaningfulActions.length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex flex-col gap-1.5">
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {meaningfulActions.map((act, idx) => (
+                                <div
+                                  key={idx}
+                                  className="px-2 py-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]"
+                                >
+                                  <span className="text-slate-500 dark:text-zinc-400 font-medium truncate">{act.key}</span>
+                                  <span className="text-slate-900 dark:text-zinc-200 font-semibold font-mono truncate ml-1">{act.val}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
-                        {/* Confirmation Bar in Sidebar */}
+                        {/* 3. Confirmation Bar in Sidebar */}
                         {m.status === 'awaiting_confirmation' && onConfirmPlan && onDismissPlan && (
-                          <div className="mt-2.5 p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex flex-col gap-1.5">
-                            <span className="text-[9.5px] font-medium text-slate-700 dark:text-zinc-300">
-                              Review changes:
+                          <div className="mt-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex flex-col gap-2">
+                            <span className="text-[10px] font-medium text-slate-700 dark:text-zinc-300">
+                              Apply proposed adjustments:
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => onConfirmPlan(m.id)}
-                                className="flex-1 py-1 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-slate-950 text-[10px] font-medium flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
+                                className="flex-1 py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-slate-950 text-[10.5px] font-medium transition-all cursor-pointer shadow-xs"
                               >
-                                <span>Apply</span>
+                                Apply
                               </button>
                               <button
                                 type="button"
                                 onClick={() => onDismissPlan(m.id)}
-                                className="py-1 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-600 dark:text-zinc-400 text-[10px] cursor-pointer transition-colors"
+                                className="py-1.5 px-3 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-600 dark:text-zinc-400 text-[10.5px] cursor-pointer transition-colors"
                               >
                                 Dismiss
                               </button>
@@ -1256,27 +1260,26 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           </div>
                         )}
 
-                        {/* Verification Diff Badge in Sidebar */}
+                        {/* 4. Verification Diff Section */}
                         {m.verification && (
-                          <div className="mt-2 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 overflow-hidden">
+                          <div className="mt-3 rounded-xl bg-emerald-500/[0.05] border border-emerald-500/20 overflow-hidden">
                             <button
                               type="button"
                               onClick={() => setExpandedDiffMap((prev) => ({ ...prev, [m.id]: !isDiffOpen }))}
-                              className="w-full flex items-center justify-between p-1.5 text-[9.5px] font-medium text-slate-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
                             >
-                              <div className="flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                                <span className="truncate max-w-[170px]">{m.verification.summary}</span>
-                              </div>
-                              {isDiffOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                              <span>
+                                {m.verification.diffs?.length ? `${m.verification.diffs.length} parameters verified` : 'Parameters verified'}
+                              </span>
+                              {isDiffOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
                             </button>
 
                             {isDiffOpen && (
-                              <div className="p-2 pt-0 space-y-1 text-[9px] border-t border-black/5 dark:border-white/5">
+                              <div className="px-2.5 pb-2 pt-1 space-y-1 text-[9.5px] border-t border-emerald-500/10">
                                 {m.verification.diffs.map((diff, i) => (
-                                  <div key={i} className="flex items-center justify-between text-slate-600 dark:text-zinc-400">
-                                    <span>{diff.property}:</span>
-                                    <span className="font-mono text-slate-900 dark:text-zinc-200">{diff.actual}</span>
+                                  <div key={i} className="flex items-center justify-between text-slate-600 dark:text-zinc-300">
+                                    <span className="text-slate-500 dark:text-zinc-400 capitalize">{diff.property.replace(/([A-Z])/g, ' $1')}</span>
+                                    <span className="font-mono text-slate-800 dark:text-zinc-200 font-medium">{diff.actual}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1284,22 +1287,22 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           </div>
                         )}
 
-                        {/* Thinking Indicator */}
+                        {/* 5. Thinking Indicator */}
                         {m.status === 'thinking' && (
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-zinc-400 mt-1">
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-zinc-400 mt-2">
                             <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                            <span>Analyzing and polishing layout...</span>
+                            <span>Analyzing layout parameters...</span>
                           </div>
                         )}
 
-                        {/* Inline Revert Button */}
+                        {/* 6. Footer with Revert Action */}
                         {canUndoAI && m.sender === 'assistant' && m.status !== 'thinking' && (
-                          <div className="mt-1.5 pt-1 flex justify-end">
+                          <div className="mt-2.5 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 dark:text-zinc-500 font-mono text-[9px]">Completed</span>
                             <button
                               type="button"
                               onClick={onUndoLastAIEdit}
-                              className="text-[9.5px] text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:underline flex items-center gap-1 cursor-pointer"
-                              title="Undo this specific edit"
+                              className="text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white font-medium hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                             >
                               <RotateCcw className="w-2.5 h-2.5" />
                               <span>Revert</span>
@@ -1308,9 +1311,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                         )}
                       </div>
 
-                      {/* Follow-up Suggestions in Sidebar */}
+                      {/* 7. Follow-up Suggestions (Full readable width, no ugly ellipses cutoff) */}
                       {m.suggestions && m.suggestions.length > 0 && m.status === 'completed' && (
-                        <div className="flex flex-wrap gap-1 pl-1 max-w-[95%]">
+                        <div className="flex flex-col gap-1 w-full max-w-[96%] pt-1">
                           {m.suggestions.map((sug, sIdx) => (
                             <button
                               key={sIdx}
@@ -1319,9 +1322,10 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                 if (isAIExecuting) return
                                 onSendMessage?.(sug)
                               }}
-                              className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200/60 dark:border-white/5 text-[9px] text-slate-600 dark:text-zinc-300 truncate max-w-[200px] cursor-pointer"
+                              className="w-full text-left px-3 py-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-200 dark:bg-[#161924] dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[10.5px] text-slate-700 dark:text-zinc-300 leading-normal transition-all cursor-pointer flex items-center justify-between group"
                             >
-                              {sug}
+                              <span className="pr-2">{sug}</span>
+                              <ArrowUp className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-slate-400 dark:text-zinc-400 transition-opacity shrink-0" />
                             </button>
                           ))}
                         </div>
