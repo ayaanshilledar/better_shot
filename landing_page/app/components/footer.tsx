@@ -56,7 +56,7 @@ export default function Footer() {
           <div className="flex flex-col items-start max-w-sm">
             <div className="flex items-center gap-2.5 mb-2">
               <span className="text-base font-semibold tracking-tight text-white">
-                BetterShot
+                Velo
               </span>
               <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04]">
                 v1.0 Windows
@@ -106,7 +106,7 @@ export default function Footer() {
         {/* Creative Bold Typography Watermark */}
         <div className="w-full pt-2 pb-2 flex justify-center select-none overflow-hidden">
           <h1 className="text-[13vw] font-bold tracking-tighter uppercase leading-none text-transparent bg-clip-text bg-gradient-to-b from-white/15 via-white/5 to-transparent text-center scale-y-110">
-            BetterShot
+            Velo
           </h1>
         </div>
 

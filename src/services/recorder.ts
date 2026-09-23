@@ -39,7 +39,7 @@ class ScreenRecorderService {
   private lastConfig: CaptureConfig | null = null
 
   public async startRecording(config: CaptureConfig): Promise<boolean> {
-    console.log('[BetterShot:Recorder] Starting recording with config:', config)
+    console.log('[Velo:Recorder] Starting recording with config:', config)
     try {
       this.lastConfig = config
       this.recordedChunks = []
@@ -53,7 +53,7 @@ class ScreenRecorderService {
 
       // 1. Camera Only Mode
       if (config.enableCamera && !config.sourceId && config.isDisplay === false) {
-        console.log('[BetterShot:Recorder] Capturing Camera Stream...')
+        console.log('[Velo:Recorder] Capturing Camera Stream...')
         const camStream = await navigator.mediaDevices.getUserMedia({
           video: config.cameraId ? { deviceId: { exact: config.cameraId } } : true,
           audio: false
@@ -62,7 +62,7 @@ class ScreenRecorderService {
       }
       // 2. Screen / Display or Window Capture Stream
       else if (config.sourceId) {
-        console.log(`[BetterShot:Recorder] Capturing Desktop Stream for sourceId: ${config.sourceId}`)
+        console.log(`[Velo:Recorder] Capturing Desktop Stream for sourceId: ${config.sourceId}`)
         let desktopStream: MediaStream | null = null
         try {
           desktopStream = await (navigator.mediaDevices as any).getUserMedia({
@@ -84,7 +84,7 @@ class ScreenRecorderService {
             }
           })
         } catch (err) {
-          console.warn('[BetterShot:Recorder] Desktop getUserMedia with system audio failed, retrying video only:', err)
+          console.warn('[Velo:Recorder] Desktop getUserMedia with system audio failed, retrying video only:', err)
           desktopStream = await (navigator.mediaDevices as any).getUserMedia({
             audio: false,
             video: {
@@ -101,7 +101,7 @@ class ScreenRecorderService {
           const vTracks = desktopStream.getVideoTracks()
           if (vTracks.length > 0) {
             videoTrack = vTracks[0]
-            console.log(`[BetterShot:Recorder] Desktop video track acquired (${vTracks[0].label})`)
+            console.log(`[Velo:Recorder] Desktop video track acquired (${vTracks[0].label})`)
           }
 
           if (config.enableSystemAudio) {
@@ -109,13 +109,13 @@ class ScreenRecorderService {
             if (sysTracks.length > 0) {
               this.systemAudioTracks = sysTracks
               rawAudioTracks.push(...sysTracks)
-              console.log(`[BetterShot:Recorder] System audio tracks acquired (${sysTracks.length})`)
+              console.log(`[Velo:Recorder] System audio tracks acquired (${sysTracks.length})`)
             }
           }
         }
       } else {
         // Fallback or Display media standard API
-        console.log('[BetterShot:Recorder] Capturing standard displayMedia stream...')
+        console.log('[Velo:Recorder] Capturing standard displayMedia stream...')
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: config.enableSystemAudio
@@ -137,7 +137,7 @@ class ScreenRecorderService {
       let camTrack: MediaStreamTrack | null = null
       if (config.enableCamera) {
         try {
-          console.log('[BetterShot:Recorder] Capturing Webcam Stream...')
+          console.log('[Velo:Recorder] Capturing Webcam Stream...')
           const camStream = await navigator.mediaDevices.getUserMedia({
             video: config.cameraId ? { deviceId: { exact: config.cameraId } } : true,
             audio: false
@@ -149,28 +149,28 @@ class ScreenRecorderService {
           camTrack = camStream.getVideoTracks()[0] || null
           if (camTrack) {
             camTrack.onended = () => {
-              console.warn('[BetterShot:Recorder] Webcam disconnected mid-recording')
+              console.warn('[Velo:Recorder] Webcam disconnected mid-recording')
               this.isCameraMuted = true
             }
           }
         } catch (camErr) {
-          console.warn('[BetterShot:Recorder] Webcam stream error or permission denied:', camErr)
+          console.warn('[Velo:Recorder] Webcam stream error or permission denied:', camErr)
         }
       }
 
       // 2c. Real-Time Compositing Pipeline (Area Crop and/or Camera Overlay)
       if ((config.cropRegion || camTrack) && videoTrack) {
-        console.log('[BetterShot:Recorder] Setting up real-time Video Compositor (Crop + Camera Overlay)...')
+        console.log('[Velo:Recorder] Setting up real-time Video Compositor (Crop + Camera Overlay)...')
         const compositedTrack = await this.setupCompositedVideoTrack(videoTrack, config.cropRegion, camTrack)
         if (compositedTrack) {
           videoTrack = compositedTrack
-          console.log('[BetterShot:Recorder] Composited video track active!')
+          console.log('[Velo:Recorder] Composited video track active!')
         }
       }
 
       // 3. Microphone Stream
       try {
-        console.log(`[BetterShot:Recorder] Capturing Microphone Stream (enableMic = ${config.enableMic})...`)
+        console.log(`[Velo:Recorder] Capturing Microphone Stream (enableMic = ${config.enableMic})...`)
         const micStream = await navigator.mediaDevices.getUserMedia({
           audio: config.micId ? { deviceId: { exact: config.micId } } : true,
           video: false
@@ -185,9 +185,9 @@ class ScreenRecorderService {
 
         rawAudioTracks.push(...mTracks)
         this.setupAudioMeter(micStream)
-        console.log(`[BetterShot:Recorder] Microphone stream acquired (${mTracks.length} tracks), initial enabled = ${config.enableMic}`)
+        console.log(`[Velo:Recorder] Microphone stream acquired (${mTracks.length} tracks), initial enabled = ${config.enableMic}`)
       } catch (micErr) {
-        console.warn('[BetterShot:Recorder] Microphone stream error or permission denied:', micErr)
+        console.warn('[Velo:Recorder] Microphone stream error or permission denied:', micErr)
       }
 
       // 4. Combine & Mix Audio Tracks
@@ -196,7 +196,7 @@ class ScreenRecorderService {
       let finalAudioTrack: MediaStreamTrack | null = null
 
       if (rawAudioTracks.length > 1) {
-        console.log(`[BetterShot:Recorder] Mixing ${rawAudioTracks.length} audio tracks using Web Audio API...`)
+        console.log(`[Velo:Recorder] Mixing ${rawAudioTracks.length} audio tracks using Web Audio API...`)
         const mixContext = new (window.AudioContext || (window as any).webkitAudioContext)()
         this.mixAudioContext = mixContext
         const destination = mixContext.createMediaStreamDestination()
@@ -210,7 +210,7 @@ class ScreenRecorderService {
         const mixedTracks = destination.stream.getAudioTracks()
         if (mixedTracks.length > 0) {
           finalAudioTrack = mixedTracks[0]
-          console.log('[BetterShot:Recorder] Web Audio API track mixing successful!')
+          console.log('[Velo:Recorder] Web Audio API track mixing successful!')
         }
       } else if (rawAudioTracks.length === 1) {
         finalAudioTrack = rawAudioTracks[0]
@@ -231,7 +231,7 @@ class ScreenRecorderService {
         'video/mp4'
       ]
       const selectedMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm'
-      console.log(`[BetterShot:Recorder] Selected MediaRecorder MIME type: ${selectedMime}`)
+      console.log(`[Velo:Recorder] Selected MediaRecorder MIME type: ${selectedMime}`)
 
       this.mediaRecorder = new MediaRecorder(this.combinedStream, {
         mimeType: selectedMime,
@@ -241,7 +241,7 @@ class ScreenRecorderService {
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           this.recordedChunks.push(event.data)
-          console.log(`[BetterShot:Recorder] Chunk received: ${event.data.size} bytes (Total chunks: ${this.recordedChunks.length})`)
+          console.log(`[Velo:Recorder] Chunk received: ${event.data.size} bytes (Total chunks: ${this.recordedChunks.length})`)
         }
       }
 
@@ -253,14 +253,14 @@ class ScreenRecorderService {
         (window as any).electronAPI.startCursorTracking({
           sourceId: config.sourceId,
           cropRegion: config.cropRegion
-        }).catch((err: any) => console.warn('[BetterShot:Recorder] Error starting cursor tracking:', err))
+        }).catch((err: any) => console.warn('[Velo:Recorder] Error starting cursor tracking:', err))
       }
 
-      console.log('[BetterShot:Recorder] MediaRecorder started successfully!')
+      console.log('[Velo:Recorder] MediaRecorder started successfully!')
 
       return true
     } catch (error) {
-      console.error('[BetterShot:Recorder] Failed to start recording:', error)
+      console.error('[Velo:Recorder] Failed to start recording:', error)
       this.cleanup()
       throw error
     }
@@ -318,14 +318,14 @@ class ScreenRecorderService {
         try {
           await video.play()
         } catch (e) {
-          console.warn('[BetterShot:Recorder] Desktop video play error during compositor setup:', e)
+          console.warn('[Velo:Recorder] Desktop video play error during compositor setup:', e)
         }
 
         if (camVideo) {
           try {
             await camVideo.play()
           } catch (e) {
-            console.warn('[BetterShot:Recorder] Camera video play error during compositor setup:', e)
+            console.warn('[Velo:Recorder] Camera video play error during compositor setup:', e)
           }
         }
 
@@ -356,7 +356,7 @@ class ScreenRecorderService {
         canvas.width = targetW
         canvas.height = targetH
 
-        console.log(`[BetterShot:Recorder] Compositor initialized: Canvas (${targetW}x${targetH}), Camera: ${Boolean(camVideo)}`)
+        console.log(`[Velo:Recorder] Compositor initialized: Canvas (${targetW}x${targetH}), Camera: ${Boolean(camVideo)}`)
 
         const renderFrame = () => {
           if (!ctx) return
@@ -471,7 +471,7 @@ class ScreenRecorderService {
               ctx.restore()
             }
           } catch (err) {
-            console.warn('[BetterShot:Recorder] Compositor frame render error:', err)
+            console.warn('[Velo:Recorder] Compositor frame render error:', err)
           }
         }
 
@@ -510,21 +510,21 @@ class ScreenRecorderService {
   }
 
   public toggleMicMute(muted: boolean) {
-    console.log(`[BetterShot:Recorder] toggleMicMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
+    console.log(`[Velo:Recorder] toggleMicMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
     this.micAudioTracks.forEach(track => {
       track.enabled = !muted
     })
   }
 
   public toggleSystemAudioMute(muted: boolean) {
-    console.log(`[BetterShot:Recorder] toggleSystemAudioMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
+    console.log(`[Velo:Recorder] toggleSystemAudioMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
     this.systemAudioTracks.forEach(track => {
       track.enabled = !muted
     })
   }
 
   public toggleCameraMute(muted: boolean) {
-    console.log(`[BetterShot:Recorder] toggleCameraMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
+    console.log(`[Velo:Recorder] toggleCameraMute: ${muted ? 'MUTED' : 'UNMUTED'}`)
     this.isCameraMuted = muted
   }
 
@@ -537,11 +537,11 @@ class ScreenRecorderService {
       ...this.activeCameraConfig,
       ...updates
     }
-    console.log('[BetterShot:Recorder] Camera config updated:', this.activeCameraConfig)
+    console.log('[Velo:Recorder] Camera config updated:', this.activeCameraConfig)
   }
 
   public async restartRecording(): Promise<boolean> {
-    console.log('[BetterShot:Recorder] Restarting recording...')
+    console.log('[Velo:Recorder] Restarting recording...')
     this.cleanup()
     if (this.lastConfig) {
       return this.startRecording(this.lastConfig)
@@ -550,7 +550,7 @@ class ScreenRecorderService {
   }
 
   public pauseRecording() {
-    console.log('[BetterShot:Recorder] Pausing recording...')
+    console.log('[Velo:Recorder] Pausing recording...')
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.pause()
       this.isPaused = true
@@ -559,7 +559,7 @@ class ScreenRecorderService {
   }
 
   public resumeRecording() {
-    console.log('[BetterShot:Recorder] Resuming recording...')
+    console.log('[Velo:Recorder] Resuming recording...')
     if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
       this.mediaRecorder.resume()
       this.isPaused = false
@@ -568,16 +568,16 @@ class ScreenRecorderService {
   }
 
   public async stopRecording(): Promise<ArrayBuffer | null> {
-    console.log('[BetterShot:Recorder] Stopping recording requested...')
+    console.log('[Velo:Recorder] Stopping recording requested...')
 
     // Signal cursor tracker to stop and finalize telemetry
     if (typeof window !== 'undefined' && (window as any).electronAPI?.stopCursorTracking) {
-      (window as any).electronAPI.stopCursorTracking().catch((err: any) => console.warn('[BetterShot:Recorder] Error stopping cursor tracking:', err))
+      (window as any).electronAPI.stopCursorTracking().catch((err: any) => console.warn('[Velo:Recorder] Error stopping cursor tracking:', err))
     }
 
     return new Promise((resolve) => {
       if (!this.mediaRecorder) {
-        console.log('[BetterShot:Recorder] No active mediaRecorder found to stop.')
+        console.log('[Velo:Recorder] No active mediaRecorder found to stop.')
         this.cleanup()
         resolve(null)
         return
@@ -585,7 +585,7 @@ class ScreenRecorderService {
 
       this.mediaRecorder.onstop = async () => {
         const blob = new Blob(this.recordedChunks, { type: this.mediaRecorder?.mimeType || 'video/webm' })
-        console.log(`[BetterShot:Recorder] MediaRecorder stopped. Created Blob of size ${blob.size} bytes across ${this.recordedChunks.length} chunks.`)
+        console.log(`[Velo:Recorder] MediaRecorder stopped. Created Blob of size ${blob.size} bytes across ${this.recordedChunks.length} chunks.`)
         const arrayBuffer = blob.size > 0 ? await blob.arrayBuffer() : null
         this.cleanup()
         resolve(arrayBuffer)
@@ -649,12 +649,12 @@ class ScreenRecorderService {
 
       updateMeter()
     } catch (e) {
-      console.warn('[BetterShot:Recorder] Audio context setup error:', e)
+      console.warn('[Velo:Recorder] Audio context setup error:', e)
     }
   }
 
   private cleanup() {
-    console.log('[BetterShot:Recorder] Cleaning up recording streams and animation loops...')
+    console.log('[Velo:Recorder] Cleaning up recording streams and animation loops...')
     if (this.timerInterval) clearInterval(this.timerInterval)
     if (this.animFrameId) cancelAnimationFrame(this.animFrameId)
     if (this.cropAnimFrameId) {
@@ -702,7 +702,7 @@ class ScreenRecorderService {
     this.recordedChunks = []
     this.elapsedTime = 0
     this.isPaused = false
-    console.log('[BetterShot:Recorder] Cleanup finished.')
+    console.log('[Velo:Recorder] Cleanup finished.')
   }
 }
 

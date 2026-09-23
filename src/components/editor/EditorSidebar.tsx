@@ -6,7 +6,6 @@ import {
   Download,
   Volume2,
   VolumeX,
-  ZoomIn,
   Trash2,
   MousePointer,
   Sparkles,
@@ -32,15 +31,12 @@ import {
   StudioProject,
   StudioRuntimeState,
   ShadowType,
-  ZoomEvent,
-  ZoomEasingType,
   ExportResolution,
   ExportFps,
   ExportBitratePreset,
   ExportFormat
 } from '../../types/editor'
 import { WALLPAPER_PRESETS } from '../../config/presets'
-import { AutoZoomOptions } from '../../utils/zoomUtils'
 import {
   calculateExportDimensions,
   calculateTargetBitrate,
@@ -59,12 +55,6 @@ interface EditorSidebarProps {
   onUpdateBackground: (updates: Partial<StudioProject['background']>) => void
   onUpdateLayout: (updates: Partial<StudioProject['layout']>) => void
   onSelectTab: (tab: StudioRuntimeState['selectedTab']) => void
-  onAddZoomEvent?: (zoomData?: Partial<ZoomEvent>) => void
-  onUpdateZoomEvent?: (zoomId: string, updates: Partial<ZoomEvent>) => void
-  onDeleteZoomEvent?: (zoomId: string) => void
-  onSelectZoomEvent?: (zoomId: string | null) => void
-  onGenerateAutoZooms?: (options?: AutoZoomOptions) => void
-  onClearAutoZooms?: () => void
   onUpdateCursorConfig?: (updates: Partial<CursorConfig>) => void
   onUpdateExportSettings?: (updates: Partial<StudioProject['exportSettings']>) => void
   onExport?: () => void
@@ -89,12 +79,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   onUpdateBackground,
   onUpdateLayout,
   onSelectTab,
-  onAddZoomEvent,
-  onUpdateZoomEvent,
-  onDeleteZoomEvent,
-  onSelectZoomEvent,
-  onGenerateAutoZooms,
-  onClearAutoZooms,
   onUpdateCursorConfig,
   onUpdateExportSettings,
   onExport,
@@ -110,18 +94,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   canUndoAI = false,
   aiMessages = []
 }) => {
-  const [zoomMode, setZoomMode] = useState<'manual' | 'auto'>('manual')
   const [aiPrompt, setAiPrompt] = useState<string>('')
   const [aiConfig, setAiConfig] = useState(getAIConfig())
   const [promptHistory, setPromptHistory] = useState<string[]>([])
   const [expandedThoughtMap, setExpandedThoughtMap] = useState<Record<string, boolean>>({})
   const [expandedDiffMap, setExpandedDiffMap] = useState<Record<string, boolean>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Auto Zoom Config Sliders state
-  const [autoDensity, setAutoDensity] = useState<'subtle' | 'balanced' | 'dynamic'>('balanced')
-  const [autoMaxScale, setAutoMaxScale] = useState<number>(1.8)
-  const [autoEaseSpeed, setAutoEaseSpeed] = useState<number>(0.4)
 
   const formatTimestamp = (sec: number) => {
     const m = Math.floor(sec / 60)
@@ -132,8 +110,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
   useEffect(() => {
     const handleConfigChange = () => setAiConfig(getAIConfig())
+    window.addEventListener('velo-ai-config-changed', handleConfigChange)
     window.addEventListener('bettershot-ai-config-changed', handleConfigChange)
-    return () => window.removeEventListener('bettershot-ai-config-changed', handleConfigChange)
+    return () => {
+      window.removeEventListener('velo-ai-config-changed', handleConfigChange)
+      window.removeEventListener('bettershot-ai-config-changed', handleConfigChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -178,7 +160,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
   const handleSelectSaveLocation = async () => {
     if (window.electronAPI?.showSaveDialog) {
-      const cleanTitle = (project.title || 'BetterShot').replace(/[<>:"/\\|?*]+/g, '_')
+      const cleanTitle = (project.title || 'Velo').replace(/[<>:"/\\|?*]+/g, '_')
       const ext = exportSettings.format || 'mp4'
       const defaultName = `${cleanTitle}_${exportSettings.resolution}.${ext}`
       const res = await window.electronAPI.showSaveDialog(defaultName, ext)
@@ -193,7 +175,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const allTabs = [
     { id: 'background', label: 'Bg', icon: Image },
     { id: 'layout', label: 'Layout', icon: Sliders },
-    { id: 'zoom', label: 'Zoom', icon: ZoomIn },
     { id: 'cursor', label: 'Cursor', icon: MousePointer },
     { id: 'audio', label: 'Audio', icon: Volume2 },
     { id: 'ai', label: 'AI', icon: Bot },
@@ -204,7 +185,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     ? allTabs.filter(t => t.id === 'background' || t.id === 'layout' || t.id === 'ai' || t.id === 'export')
     : allTabs
 
-
   const shadowOptions: { id: ShadowType; label: string }[] = [
     { id: 'none', label: 'None' },
     { id: 'soft', label: 'Soft' },
@@ -212,26 +192,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     { id: 'hard', label: 'Hard' },
     { id: 'glow', label: 'Glow' }
   ]
-
-  const easingOptions: { id: ZoomEasingType; label: string }[] = [
-    { id: 'ease-in-out', label: 'Smooth Cubic (Ease In & Out)' },
-    { id: 'ease-out', label: 'Fast Landing (Ease Out)' },
-    { id: 'ease-in', label: 'Smooth Acceleration (Ease In)' },
-    { id: 'linear', label: 'Linear Speed' },
-    { id: 'elastic', label: 'Elastic Spring Bounce' }
-  ]
-
-  const focalPresets = [
-    { label: 'Center', x: 50, y: 50 },
-    { label: 'Top-Left', x: 30, y: 30 },
-    { label: 'Top-Right', x: 70, y: 30 },
-    { label: 'Bottom-Left', x: 30, y: 70 },
-    { label: 'Bottom-Right', x: 70, y: 70 }
-  ]
-
-  const selectedZoomEvent = project.timeline.zoomEvents.find(
-    (z) => z.id === runtime.selectedZoomId
-  )
 
   return (
     <aside
@@ -417,296 +377,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
           </div>
         )}
 
-        {/* Zoom Controls Tab Content */}
-        {runtime.selectedTab === 'zoom' && (
-          <div className="flex flex-col gap-4">
-            {/* Mode Switcher: Manual vs Auto Zoom */}
-            <div className="grid grid-cols-2 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
-              <button
-                onClick={() => setZoomMode('manual')}
-                className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  zoomMode === 'manual'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Manual
-              </button>
 
-              <button
-                onClick={() => setZoomMode('auto')}
-                className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  zoomMode === 'auto'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Auto Zoom
-              </button>
-            </div>
-
-            {/* MANUAL ZOOM MODE */}
-            {zoomMode === 'manual' && (
-              <div className="flex flex-col gap-4">
-                {/* Zoom Keyframe Events List */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-gray-400 font-semibold px-1">
-                    <span>Timeline Zoom Events</span>
-                    <span className="font-mono text-[11px] text-blue-400 font-semibold">
-                      {project.timeline.zoomEvents.length} active
-                    </span>
-                  </div>
-
-                  {project.timeline.zoomEvents.length === 0 ? (
-                    <div className="p-4 bg-[#161922] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-center gap-1.5">
-                      <p className="text-xs text-gray-400">
-                        No zoom keyframes yet. Click on the timeline track below to add a zoom.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto custom-scrollbar">
-                      {project.timeline.zoomEvents.map((z) => {
-                        const isSelected = z.id === runtime.selectedZoomId
-                        return (
-                          <div
-                            key={z.id}
-                            onClick={() => onSelectZoomEvent && onSelectZoomEvent(z.id)}
-                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-[#1a1d28] border-blue-500/60 text-white shadow-sm'
-                                : 'bg-[#161922] border-white/5 hover:border-white/20 text-gray-300'
-                            }`}
-                          >
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-gray-200">{z.scale.toFixed(1)}x Zoom</span>
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-mono capitalize">
-                                  {z.type || 'manual'}
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-mono text-gray-400">
-                                {z.startTime.toFixed(2)}s - {(z.startTime + z.duration).toFixed(2)}s ({z.duration.toFixed(1)}s)
-                              </span>
-                            </div>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (onDeleteZoomEvent) onDeleteZoomEvent(z.id)
-                              }}
-                              className="p-1 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-white/5 cursor-pointer"
-                              title="Delete Keyframe"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* SELECTED ZOOM EVENT PROPERTY EDITOR */}
-                {selectedZoomEvent && (
-                  <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex flex-col gap-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                      <span className="text-xs font-bold text-gray-200">
-                        Selected Keyframe
-                      </span>
-                      <span className="text-[10px] font-mono text-gray-400">
-                        @{selectedZoomEvent.startTime.toFixed(2)}s
-                      </span>
-                    </div>
-
-                    {/* Scale Level Slider & Quick Presets */}
-                    <div className="flex flex-col gap-2">
-                      <SliderRow
-                        label="Zoom Scale"
-                        value={selectedZoomEvent.scale}
-                        min={1.1}
-                        max={4.0}
-                        step={0.05}
-                        unit="x"
-                        decimals={2}
-                        onChange={(scale) =>
-                          onUpdateZoomEvent &&
-                          onUpdateZoomEvent(selectedZoomEvent.id, { scale })
-                        }
-                      />
-                      {/* Scale Presets */}
-                      <div className="grid grid-cols-4 gap-1">
-                        {[1.25, 1.5, 2.0, 3.0].map((presetScale) => (
-                          <button
-                            key={presetScale}
-                            onClick={() =>
-                              onUpdateZoomEvent &&
-                              onUpdateZoomEvent(selectedZoomEvent.id, { scale: presetScale })
-                            }
-                            className={`py-1 rounded text-[10px] font-mono font-semibold transition-colors ${
-                              Math.abs(selectedZoomEvent.scale - presetScale) < 0.05
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-[#12141a] text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            {presetScale}x
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Focal Position X & Y + 2D Interactive Target Picker */}
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-gray-300">Focal Origin Target</span>
-                        <span className="font-mono text-blue-400 text-[11px] font-bold">
-                          X: {Math.round(selectedZoomEvent.x)}%, Y: {Math.round(selectedZoomEvent.y)}%
-                        </span>
-                      </div>
-
-                      {/* 2D Interactive Mini Target Canvas Box */}
-                      <div
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          const rawX = ((e.clientX - rect.left) / rect.width) * 100
-                          const rawY = ((e.clientY - rect.top) / rect.height) * 100
-                          const x = Math.round(Math.max(0, Math.min(100, rawX)))
-                          const y = Math.round(Math.max(0, Math.min(100, rawY)))
-                          if (onUpdateZoomEvent) {
-                            onUpdateZoomEvent(selectedZoomEvent.id, { x, y })
-                          }
-                        }}
-                        className="w-full h-24 bg-[#101216] border border-white/10 rounded-xl relative overflow-hidden cursor-crosshair group flex items-center justify-center shadow-inner"
-                        title="Click anywhere to set focus point"
-                      >
-                        {/* Rule of Thirds Grid Lines */}
-                        <div className="absolute inset-0 border-r border-white/5 w-1/3 h-full pointer-events-none" />
-                        <div className="absolute inset-0 border-r border-white/5 left-1/3 w-1/3 h-full pointer-events-none" />
-                        <div className="absolute inset-0 border-b border-white/5 h-1/3 w-full pointer-events-none" />
-                        <div className="absolute inset-0 border-b border-white/5 top-1/3 h-1/3 w-full pointer-events-none" />
-
-                        {/* Active Target Dot Pin */}
-                        <div
-                          className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-sm flex items-center justify-center pointer-events-none"
-                          style={{
-                            left: `${selectedZoomEvent.x}%`,
-                            top: `${selectedZoomEvent.y}%`
-                          }}
-                        >
-                          <div className="w-1 h-1 rounded-full bg-white" />
-                        </div>
-                      </div>
-
-                      {/* Position Presets */}
-                      <div className="flex flex-wrap gap-1">
-                        {focalPresets.map((preset) => {
-                          const isActive =
-                            Math.abs(selectedZoomEvent.x - preset.x) < 5 &&
-                            Math.abs(selectedZoomEvent.y - preset.y) < 5
-                          return (
-                            <button
-                              key={preset.label}
-                              onClick={() =>
-                                onUpdateZoomEvent &&
-                                onUpdateZoomEvent(selectedZoomEvent.id, { x: preset.x, y: preset.y })
-                              }
-                              className={`py-1 px-2 text-[10px] rounded border transition-all cursor-pointer ${
-                                isActive
-                                  ? 'bg-blue-600 text-white border-blue-500 font-semibold shadow-sm'
-                                  : 'bg-[#12141a] hover:bg-white/5 text-gray-300 border-white/5'
-                              }`}
-                            >
-                              {preset.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* AUTO ZOOM MODE */}
-            {zoomMode === 'auto' && (
-              <div className="flex flex-col gap-4">
-                <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex flex-col gap-1.5">
-                  <span className="text-xs font-bold text-gray-200">Auto-Zoom Engine</span>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    Auto-Zoom scans your video timeline and places smooth focal zoom keyframes across active regions.
-                  </p>
-                </div>
-
-                {/* Density Selector */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-gray-300">Density</span>
-                  <div className="grid grid-cols-3 gap-1 bg-[#161922] p-1 rounded-xl border border-white/5">
-                    {(['subtle', 'balanced', 'dynamic'] as const).map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setAutoDensity(d)}
-                        className={`py-1.5 text-[11px] font-semibold rounded-lg capitalize transition-all cursor-pointer ${
-                          autoDensity === d
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'text-gray-400 hover:text-white'
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Max Auto Scale Limit */}
-                <SliderRow
-                  label="Max Scale"
-                  value={autoMaxScale}
-                  min={1.2}
-                  max={2.5}
-                  step={0.05}
-                  unit="x"
-                  decimals={2}
-                  onChange={(val) => setAutoMaxScale(val)}
-                />
-
-                {/* Cursor Click Detection Banner */}
-                {project.cursorData?.clicks && project.cursorData.clicks.length > 0 && (
-                  <div className="p-2.5 bg-blue-600/10 border border-blue-500/20 rounded-xl flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span className="text-[11px] text-blue-300 leading-snug">
-                      Detected <strong>{project.cursorData.clicks.length} real clicks</strong>! Zooms will center on your action points.
-                    </span>
-                  </div>
-                )}
-
-                {/* Generate Auto Zooms Button */}
-                <button
-                  onClick={() =>
-                    onGenerateAutoZooms &&
-                    onGenerateAutoZooms({
-                      density: autoDensity,
-                      maxScale: autoMaxScale,
-                      easeSpeed: autoEaseSpeed
-                    })
-                  }
-                  className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{project.cursorData?.clicks?.length ? 'Generate Zooms from Clicks' : 'Generate Auto Zooms'}</span>
-                </button>
-
-                {/* Clear Auto Zooms Button */}
-                {project.timeline.zoomEvents.some((z) => z.type === 'auto') && (
-                  <button
-                    onClick={() => onClearAutoZooms && onClearAutoZooms()}
-                    className="w-full py-2 px-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 font-semibold text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    Clear Generated Auto Zooms
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Cursor & Click FX Tab Content */}
         {runtime.selectedTab === 'cursor' && (
@@ -1108,11 +779,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                             text: 'Apply 12% padding, rounded corners, soft shadow and modern wallpaper'
                           },
                           {
-                            title: runtime.currentTime > 0 ? `Focal Zoom at ${formatTimestamp(runtime.currentTime)}` : 'Focal Zoom at Playhead',
-                            desc: 'Add 1.8x focal keyframe',
-                            text: runtime.currentTime > 0 ? `Add 1.8x focal zoom at ${runtime.currentTime.toFixed(1)}s` : 'Add 1.8x focal zoom at 2s'
-                          },
-                          {
                             title: 'Format for 9:16 Shorts / Reels',
                             desc: 'Fit vertical mobile canvas',
                             text: 'Make 9:16 vertical for TikTok and Shorts'
@@ -1155,9 +821,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       if (act.type === 'set_shadow') return { key: 'Shadow', val: String(act.shadow) }
                       if (act.type === 'set_background') return { key: 'Wallpaper', val: act.presetId === 'none' ? 'None' : (act.presetId || 'Custom') }
                       if (act.type === 'set_aspect_ratio') return { key: 'Aspect', val: act.aspectRatio }
-                      if (act.type === 'add_zoom') return { key: 'Zoom', val: `${act.scale || 1.8}x` }
                       if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s-${act.end?.toFixed(1) || 0}s` }
-                      if (act.type === 'clear_zooms') return { key: 'Zooms', val: 'Reset' }
 
                       if (act.label) {
                         if (/^returning to/i.test(act.label)) return null
@@ -1393,7 +1057,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       ? 'Executing edits...'
                       : isImage
                       ? 'Ask to polish screenshot...'
-                      : 'Ask to zoom, trim, format layout...'
+                      : 'Ask to trim, format layout...'
                   }
                   disabled={isAIExecuting}
                   className="w-full pl-3 pr-10 py-2.5 bg-slate-100 dark:bg-[#161922] border border-slate-300 dark:border-white/10 rounded-xl text-xs outline-none focus:border-slate-400 dark:focus:border-white/20 transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-500 text-slate-800 dark:text-zinc-100"

@@ -6,7 +6,6 @@ import {
   ExportProgress,
   AspectRatioType
 } from '../types/editor'
-import { calculateActiveZoom } from '../utils/zoomUtils'
 import { WALLPAPER_PRESETS } from '../config/presets'
 import { getInterpolatedCursorPosition, renderCursorOnCanvas } from '../utils/cursorRenderUtils'
 import { DEFAULT_CURSOR_CONFIG } from '../types/cursor'
@@ -374,25 +373,10 @@ export function renderFrameToCanvas(
   // 4. Draw Shadow behind video
   drawShadow(ctx, frameX, frameY, frameW, frameH, cornerRadius, project.layout.shadow, scaleRef)
 
-  // 5. Calculate Zoom Animation
-  const activeZoom = calculateActiveZoom(project.timeline.zoomEvents, currentTime)
-  const zoomScale = activeZoom.scale
-  const focalX = activeZoom.x / 100 // 0 to 1
-  const focalY = activeZoom.y / 100 // 0 to 1
-
   // 6. Draw Clipped Video
   ctx.save()
   drawRoundedRect(ctx, frameX, frameY, frameW, frameH, cornerRadius)
   ctx.clip()
-
-  // Apply zoom transformation around focal point
-  if (zoomScale > 1.001) {
-    const originX = frameX + frameW * focalX
-    const originY = frameY + frameH * focalY
-    ctx.translate(originX, originY)
-    ctx.scale(zoomScale, zoomScale)
-    ctx.translate(-originX, -originY)
-  }
 
   // Draw video frame (with crop slicing if active)
   if (isCropped) {
@@ -847,7 +831,7 @@ export function createExportProcess(
       })
 
       const arrayBuffer = await blob.arrayBuffer()
-      const cleanTitle = (project.title || 'BetterShot').replace(/[<>:"/\\|?*]+/g, '_')
+      const cleanTitle = (project.title || 'Velo').replace(/[<>:"/\\|?*]+/g, '_')
       const defaultFileName = `${cleanTitle}_${settings.resolution}_${Date.now()}.${resolvedFormat}`
 
       let saveResult: { success: boolean; filePath?: string; error?: string }

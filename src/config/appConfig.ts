@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
-  appName: 'BetterShot',
-  outputFolder: 'BetterShot',
+  appName: 'Velo',
+  outputFolder: 'Velo',
   defaultVideoBitrate: 5000000, // 5 Mbps
   windowDimensions: {
     launcher: { width: 350, height: 275 },

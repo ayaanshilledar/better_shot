@@ -476,15 +476,15 @@ ipcMain.handle('capture-screenshot', async (_event, options?: { cropRegion?: any
       console.log('[BetterShot:Main] Screenshot copied to system clipboard')
     }
 
-    const picturesDir = path.join(os.homedir(), 'Pictures', 'BetterShot')
+    const picturesDir = path.join(os.homedir(), 'Pictures', 'Velo')
     if (!fs.existsSync(picturesDir)) {
       fs.mkdirSync(picturesDir, { recursive: true })
     }
 
-    const filename = `BetterShot_${Date.now()}.png`
+    const filename = `Velo_${Date.now()}.png`
     const filePath = path.join(picturesDir, filename)
     await fs.promises.writeFile(filePath, img.toPNG())
-    console.log(`[BetterShot:Main] Screenshot saved successfully to: ${filePath}`)
+    console.log(`[Velo:Main] Screenshot saved successfully to: ${filePath}`)
 
     if (launcherWindow && !launcherWindow.isDestroyed()) {
       launcherWindow.show()
@@ -536,49 +536,49 @@ ipcMain.handle('stop-recording-mode', () => {
 })
 
 ipcMain.handle('save-recording', async (_event, buffer: ArrayBuffer, fileName?: string) => {
-  console.log(`[BetterShot:Main] IPC handle: save-recording requested (${buffer.byteLength} bytes)`)
+  console.log(`[Velo:Main] IPC handle: save-recording requested (${buffer.byteLength} bytes)`)
   try {
-    const recordingsDir = path.join(os.homedir(), 'Videos', 'BetterShot')
+    const recordingsDir = path.join(os.homedir(), 'Videos', 'Velo')
     if (!fs.existsSync(recordingsDir)) {
       fs.mkdirSync(recordingsDir, { recursive: true })
     }
 
-    const defaultName = fileName || `BetterShot_${Date.now()}.webm`
+    const defaultName = fileName || `Velo_${Date.now()}.webm`
     const filePath = path.join(recordingsDir, defaultName)
     const uint8Array = new Uint8Array(buffer)
 
     await fs.promises.writeFile(filePath, uint8Array)
-    console.log(`[BetterShot:Main] Saved recording successfully to: ${filePath}`)
+    console.log(`[Velo:Main] Saved recording successfully to: ${filePath}`)
 
     // Auto-save cursor telemetry sidecar alongside the video file
     try {
       await cursorTracker.saveToFile(filePath)
     } catch (cursorErr) {
-      console.warn('[BetterShot:Main] Could not auto-save cursor sidecar:', cursorErr)
+      console.warn('[Velo:Main] Could not auto-save cursor sidecar:', cursorErr)
     }
 
     // Automatically trigger editor window creation upon saving recording
     try {
       createEditorWindow(filePath)
     } catch (e) {
-      console.warn('[BetterShot:Main] Could not auto-open editor window:', e)
+      console.warn('[Velo:Main] Could not auto-open editor window:', e)
     }
 
     return { success: true, filePath }
   } catch (error: any) {
-    console.error('[BetterShot:Main] Error saving recording:', error)
+    console.error('[Velo:Main] Error saving recording:', error)
     return { success: false, error: error.message }
   }
 })
 
 ipcMain.handle('start-cursor-tracking', (_event, options) => {
-  console.log('[BetterShot:Main] IPC handle: start-cursor-tracking', options)
+  console.log('[Velo:Main] IPC handle: start-cursor-tracking', options)
   cursorTracker.start(options)
   return true
 })
 
 ipcMain.handle('stop-cursor-tracking', () => {
-  console.log('[BetterShot:Main] IPC handle: stop-cursor-tracking')
+  console.log('[Velo:Main] IPC handle: stop-cursor-tracking')
   return cursorTracker.stop()
 })
 
@@ -592,21 +592,21 @@ ipcMain.handle('register-mouse-click', (_event, button: 'left' | 'right' | 'midd
 })
 
 ipcMain.handle('open-editor-window', (_event, filePath?: string) => {
-  console.log('[BetterShot:Main] IPC handle: open-editor-window requested for:', filePath)
+  console.log('[Velo:Main] IPC handle: open-editor-window requested for:', filePath)
   createEditorWindow(filePath)
   return true
 })
 
 ipcMain.handle('save-exported-video', async (_event, buffer: ArrayBuffer, fileName?: string, targetPath?: string) => {
-  console.log(`[BetterShot:Main] IPC handle: save-exported-video requested (${buffer.byteLength} bytes)`)
+  console.log(`[Velo:Main] IPC handle: save-exported-video requested (${buffer.byteLength} bytes)`)
   try {
     let filePath = targetPath
     if (!filePath) {
-      const exportsDir = path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
+      const exportsDir = path.join(os.homedir(), 'Videos', 'Velo', 'Exports')
       if (!fs.existsSync(exportsDir)) {
         fs.mkdirSync(exportsDir, { recursive: true })
       }
-      const defaultName = fileName || `BetterShot_Export_${Date.now()}.mp4`
+      const defaultName = fileName || `Velo_Export_${Date.now()}.mp4`
       filePath = path.join(exportsDir, defaultName)
     } else {
       const dir = path.dirname(filePath)
@@ -617,24 +617,24 @@ ipcMain.handle('save-exported-video', async (_event, buffer: ArrayBuffer, fileNa
 
     const uint8Array = new Uint8Array(buffer)
     await fs.promises.writeFile(filePath, uint8Array)
-    console.log(`[BetterShot:Main] Saved exported video successfully to: ${filePath}`)
+    console.log(`[Velo:Main] Saved exported video successfully to: ${filePath}`)
     return { success: true, filePath }
   } catch (error: any) {
-    console.error('[BetterShot:Main] Error saving exported video:', error)
+    console.error('[Velo:Main] Error saving exported video:', error)
     return { success: false, error: error.message }
   }
 })
 
 ipcMain.handle('save-exported-image', async (_event, buffer: ArrayBuffer, fileName?: string, targetPath?: string) => {
-  console.log(`[BetterShot:Main] IPC handle: save-exported-image requested (${buffer.byteLength} bytes)`)
+  console.log(`[Velo:Main] IPC handle: save-exported-image requested (${buffer.byteLength} bytes)`)
   try {
     let filePath = targetPath
     if (!filePath) {
-      const picturesDir = path.join(os.homedir(), 'Pictures', 'BetterShot')
+      const picturesDir = path.join(os.homedir(), 'Pictures', 'Velo')
       if (!fs.existsSync(picturesDir)) {
         fs.mkdirSync(picturesDir, { recursive: true })
       }
-      const defaultName = fileName || `BetterShot_${Date.now()}.png`
+      const defaultName = fileName || `Velo_${Date.now()}.png`
       filePath = path.join(picturesDir, defaultName)
     } else {
       const dir = path.dirname(filePath)
@@ -645,10 +645,10 @@ ipcMain.handle('save-exported-image', async (_event, buffer: ArrayBuffer, fileNa
 
     const uint8Array = new Uint8Array(buffer)
     await fs.promises.writeFile(filePath, uint8Array)
-    console.log(`[BetterShot:Main] Saved exported screenshot to: ${filePath}`)
+    console.log(`[Velo:Main] Saved exported screenshot to: ${filePath}`)
     return { success: true, filePath }
   } catch (error: any) {
-    console.error('[BetterShot:Main] Error saving exported image:', error)
+    console.error('[Velo:Main] Error saving exported image:', error)
     return { success: false, error: error.message }
   }
 })
@@ -658,10 +658,10 @@ ipcMain.handle('copy-image-to-clipboard', async (_event, buffer: ArrayBuffer) =>
     const uint8 = Buffer.from(buffer)
     const img = nativeImage.createFromBuffer(uint8)
     clipboard.writeImage(img)
-    console.log('[BetterShot:Main] Exported screenshot copied to clipboard')
+    console.log('[Velo:Main] Exported screenshot copied to clipboard')
     return true
   } catch (err) {
-    console.error('[BetterShot:Main] Error copying image to clipboard:', err)
+    console.error('[Velo:Main] Error copying image to clipboard:', err)
     return false
   }
 })
@@ -670,8 +670,8 @@ ipcMain.handle('show-save-dialog', async (event, defaultName: string, format: st
   const win = BrowserWindow.fromWebContents(event.sender) || editorWindow || launcherWindow
   const isImg = ['png', 'jpg', 'jpeg', 'webp'].includes((format || '').toLowerCase())
   const defaultDir = isImg
-    ? path.join(os.homedir(), 'Pictures', 'BetterShot')
-    : path.join(os.homedir(), 'Videos', 'BetterShot', 'Exports')
+    ? path.join(os.homedir(), 'Pictures', 'Velo')
+    : path.join(os.homedir(), 'Videos', 'Velo', 'Exports')
 
   if (!fs.existsSync(defaultDir)) {
     fs.mkdirSync(defaultDir, { recursive: true })
@@ -916,30 +916,31 @@ ipcMain.on('relay-theme-change', (_event, theme: string) => {
 // Recordings Manager IPC Handlers
 ipcMain.handle('get-recordings', async () => {
   try {
-    const recordingsDir = path.join(os.homedir(), 'Videos', 'BetterShot')
-    if (!fs.existsSync(recordingsDir)) {
-      return []
-    }
-    const files = await fs.promises.readdir(recordingsDir)
-    const recordingFiles = []
+    const veloDir = path.join(os.homedir(), 'Videos', 'Velo')
+    const legacyDir = path.join(os.homedir(), 'Videos', 'BetterShot')
+    const dirsToScan = [veloDir, legacyDir].filter((d) => fs.existsSync(d))
+    const recordingFiles: { name: string; filePath: string; size: number; createdAt: number }[] = []
 
-    for (const file of files) {
-      if (file.endsWith('.webm') || file.endsWith('.mp4')) {
-        const filePath = path.join(recordingsDir, file)
-        const stats = await fs.promises.stat(filePath)
-        recordingFiles.push({
-          name: file,
-          filePath,
-          size: stats.size,
-          createdAt: stats.birthtimeMs || stats.mtimeMs
-        })
+    for (const dir of dirsToScan) {
+      const files = await fs.promises.readdir(dir)
+      for (const file of files) {
+        if (file.endsWith('.webm') || file.endsWith('.mp4')) {
+          const filePath = path.join(dir, file)
+          const stats = await fs.promises.stat(filePath)
+          recordingFiles.push({
+            name: file,
+            filePath,
+            size: stats.size,
+            createdAt: stats.birthtimeMs || stats.mtimeMs
+          })
+        }
       }
     }
 
     recordingFiles.sort((a, b) => b.createdAt - a.createdAt)
     return recordingFiles
   } catch (err) {
-    console.error('[BetterShot:Main] Error getting recordings:', err)
+    console.error('[Velo:Main] Error getting recordings:', err)
     return []
   }
 })

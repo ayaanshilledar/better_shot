@@ -11,7 +11,7 @@ export default function Home() {
       {/* Navigation */}
       <header className="w-full px-6 sm:px-10 py-6 flex items-center justify-start">
         <span className="text-sm font-semibold tracking-tight text-white">
-          BetterShot
+          Velo
         </span>
       </header>
 

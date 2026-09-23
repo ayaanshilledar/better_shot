@@ -1,34 +1,19 @@
-import React, { useRef, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
-import { StudioProject, StudioRuntimeState, ZoomEvent } from '../../types/editor'
+import React, { useRef } from 'react'
+import { StudioProject, StudioRuntimeState } from '../../types/editor'
 
 interface EditorTimelineProps {
   project: StudioProject
   runtime: StudioRuntimeState
   onSeek: (time: number) => void
-  onSelectZoomEvent?: (zoomId: string | null) => void
-  onAddZoomEvent?: (zoomData?: Partial<ZoomEvent>) => void
-  onUpdateZoomEvent?: (zoomId: string, updates: Partial<ZoomEvent>, skipHistory?: boolean) => void
-  onDeleteZoomEvent?: (zoomId: string) => void
 }
 
 export const EditorTimeline: React.FC<EditorTimelineProps> = ({
   project,
   runtime,
-  onSeek,
-  onSelectZoomEvent,
-  onAddZoomEvent,
-  onUpdateZoomEvent,
-  onDeleteZoomEvent
+  onSeek
 }) => {
   const rulerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
-
-  const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [dragMode, setDragMode] = useState<'move' | 'resize-left' | 'resize-right' | null>(null)
-
-  const [trackHoverTime, setTrackHoverTime] = useState<number | null>(null)
-  const [trackHoverX, setTrackHoverX] = useState<number | null>(null)
 
   const rawDuration = project.media.duration
   const duration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 5.0
@@ -51,169 +36,12 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
     ticks.push(i)
   }
 
-  // Check if current playhead is inside any zoom event or too close to next block
-  const isCurrentTimeInsideZoom = project.timeline.zoomEvents.some(
-    (z) => runtime.currentTime >= z.startTime && runtime.currentTime < z.startTime + z.duration
-  )
-
-  const nextZoomAfterCurrent = project.timeline.zoomEvents
-    .filter((z) => z.startTime > runtime.currentTime)
-    .sort((a, b) => a.startTime - b.startTime)[0]
-
-  const gapAfterCurrent = nextZoomAfterCurrent
-    ? nextZoomAfterCurrent.startTime - runtime.currentTime
-    : duration - runtime.currentTime
-
-  const canAddZoomAtCurrentTime = !isCurrentTimeInsideZoom && gapAfterCurrent >= 0.3 && duration - runtime.currentTime >= 0.3
-
-  // Check if track hover time falls inside an existing zoom block or has insufficient gap (<0.3s)
-  const isHoverInsideExisting = Boolean(
-    trackHoverTime !== null &&
-    project.timeline.zoomEvents.some(
-      (z) => trackHoverTime >= z.startTime && trackHoverTime < z.startTime + z.duration
-    )
-  )
-
-  const nextZoomAfterHover = trackHoverTime !== null
-    ? project.timeline.zoomEvents
-        .filter((z) => z.startTime > trackHoverTime)
-        .sort((a, b) => a.startTime - b.startTime)[0]
-    : null
-
-  const gapAfterHover = trackHoverTime !== null
-    ? (nextZoomAfterHover ? nextZoomAfterHover.startTime - trackHoverTime : duration - trackHoverTime)
-    : 0
-
-  const isHoverValid = trackHoverTime !== null && !isHoverInsideExisting && gapAfterHover >= 0.3 && (duration - trackHoverTime >= 0.3)
-
-  // Track Mouse Movement over Zoom Track Row for Ghost Add Preview
-  const handleTrackMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const offsetX = e.clientX - rect.left
-    const percent = Math.max(0, Math.min(1, offsetX / rect.width))
-    const hoverSec = parseFloat((percent * duration).toFixed(2))
-    setTrackHoverTime(hoverSec)
-    setTrackHoverX(offsetX)
-  }
-
-  const handleTrackMouseLeave = () => {
-    setTrackHoverTime(null)
-    setTrackHoverX(null)
-  }
-
-  // Click on empty Zoom Track row area to add Zoom keyframe at mouse location
-  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (trackHoverTime !== null && onAddZoomEvent && isHoverValid && !activeDragId) {
-      onSeek(trackHoverTime)
-      onAddZoomEvent({ startTime: trackHoverTime })
-    }
-  }
-
-  // Handle Dragging Zoom Event Block (Move or Resize with strict collision boundaries)
-  const handleZoomBlockMouseDown = (
-    e: React.MouseEvent,
-    z: ZoomEvent,
-    mode: 'move' | 'resize-left' | 'resize-right'
-  ) => {
-    e.stopPropagation()
-    if (e.button !== 0) return
-
-    if (onSelectZoomEvent) onSelectZoomEvent(z.id)
-
-    setActiveDragId(z.id)
-    setDragMode(mode)
-
-    const startX = e.clientX
-    const startStartTime = z.startTime
-    const startDuration = z.duration
-
-    const trackEl = trackRef.current
-    if (!trackEl) return
-
-    const trackWidth = trackEl.getBoundingClientRect().width || 1
-
-    // Determine neighbor boundary blocks to prevent collision / overlap
-    const otherBlocks = project.timeline.zoomEvents
-      .filter((other) => other.id !== z.id)
-      .sort((a, b) => a.startTime - b.startTime)
-
-    const prevBlock = [...otherBlocks].reverse().find((other) => other.startTime + other.duration <= startStartTime + 0.001)
-    const nextBlock = otherBlocks.find((other) => other.startTime >= startStartTime + startDuration - 0.001)
-
-    const minAllowedStart = prevBlock ? prevBlock.startTime + prevBlock.duration : 0
-    const maxAllowedEnd = nextBlock ? nextBlock.startTime : duration
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX
-      const deltaTime = (deltaX / trackWidth) * duration
-
-      if (mode === 'move') {
-        const maxAllowedStart = Math.max(minAllowedStart, maxAllowedEnd - startDuration)
-        const nextStartTime = Math.max(minAllowedStart, Math.min(maxAllowedStart, startStartTime + deltaTime))
-        const roundedStart = parseFloat(nextStartTime.toFixed(2))
-
-        if (onUpdateZoomEvent) {
-          onUpdateZoomEvent(z.id, { startTime: roundedStart }, true)
-        }
-        onSeek(roundedStart)
-      } else if (mode === 'resize-left') {
-        const maxStart = startStartTime + startDuration - 0.3
-        const nextStartTime = Math.max(minAllowedStart, Math.min(maxStart, startStartTime + deltaTime))
-        const nextDuration = startStartTime + startDuration - nextStartTime
-
-        const roundedStart = parseFloat(nextStartTime.toFixed(2))
-        const roundedDur = parseFloat(nextDuration.toFixed(2))
-
-        if (onUpdateZoomEvent) {
-          onUpdateZoomEvent(z.id, { startTime: roundedStart, duration: roundedDur }, true)
-        }
-        onSeek(roundedStart)
-      } else if (mode === 'resize-right') {
-        const maxAllowedDur = Math.max(0.3, maxAllowedEnd - startStartTime)
-        const nextDuration = Math.max(0.3, Math.min(maxAllowedDur, startDuration + deltaTime))
-        const roundedDur = parseFloat(nextDuration.toFixed(2))
-
-        if (onUpdateZoomEvent) {
-          onUpdateZoomEvent(z.id, { duration: roundedDur }, true)
-        }
-      }
-    }
-
-    const handleMouseUp = () => {
-      setActiveDragId(null)
-      setDragMode(null)
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-  }
-
   return (
-    <div className="h-52 bg-white dark:bg-[#101216] border-t border-slate-200 dark:border-white/10 flex flex-col select-none z-30 text-slate-800 dark:text-gray-200">
+    <div className="h-40 bg-white dark:bg-[#101216] border-t border-slate-200 dark:border-white/10 flex flex-col select-none z-30 text-slate-800 dark:text-gray-200">
       {/* Timeline Controls & Header */}
       <div className="h-9 px-3 border-b border-slate-200/80 dark:border-white/5 bg-slate-50 dark:bg-[#14161f] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
-            disabled={!canAddZoomAtCurrentTime}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border transition-all ${
-              canAddZoomAtCurrentTime
-                ? 'bg-blue-600/10 dark:bg-blue-600/20 hover:bg-blue-600/20 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-300 font-semibold border-blue-500/30 cursor-pointer'
-                : 'bg-black/5 dark:bg-white/5 text-slate-400 dark:text-gray-500 border-black/5 dark:border-white/5 cursor-not-allowed opacity-50'
-            }`}
-            title={
-              canAddZoomAtCurrentTime
-                ? 'Add Zoom Keyframe at current playhead position'
-                : isCurrentTimeInsideZoom
-                ? 'Cannot add zoom: playhead is already inside a zoom event'
-                : 'Cannot add zoom: not enough room before next zoom or end of clip'
-            }
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Zoom</span>
-          </button>
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-gray-400">
+          <span>Timeline</span>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400 font-mono">
@@ -229,30 +57,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Track Labels Column */}
         <div className="w-28 bg-slate-50 dark:bg-[#12141a] border-r border-slate-200 dark:border-white/10 flex flex-col pt-7 z-10 text-slate-700 dark:text-gray-300">
-          <div className="h-9 px-3 flex items-center text-xs font-semibold text-slate-700 dark:text-gray-300 border-b border-slate-200/80 dark:border-white/5">
+          <div className="h-10 px-3 flex items-center text-xs font-semibold text-slate-700 dark:text-gray-300 border-b border-slate-200/80 dark:border-white/5">
             <span>Video</span>
-          </div>
-
-          <div className="h-10 px-3 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-gray-300 border-b border-slate-200/80 dark:border-white/5 group">
-            <span>Zoom</span>
-            <button
-              onClick={() => canAddZoomAtCurrentTime && onAddZoomEvent && onAddZoomEvent()}
-              disabled={!canAddZoomAtCurrentTime}
-              className={`p-1 rounded transition-colors ${
-                canAddZoomAtCurrentTime
-                  ? 'hover:bg-white/10 text-blue-400 cursor-pointer'
-                  : 'text-gray-600 cursor-not-allowed opacity-40'
-              }`}
-              title={
-                canAddZoomAtCurrentTime
-                  ? 'Add Zoom Keyframe'
-                  : isCurrentTimeInsideZoom
-                  ? 'Cannot add zoom: playhead is already inside a zoom event'
-                  : 'Cannot add zoom: not enough room before next zoom'
-              }
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
 
@@ -290,8 +96,8 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
               <div className="w-3 h-3 bg-red-500 rounded-full -ml-[5px] -mt-1 shadow-md shadow-red-500/50" />
             </div>
 
-            {/* Track 1: Video Track Layer */}
-            <div data-track="video" className="h-9 border-b border-white/5 relative flex items-center px-1">
+            {/* Track: Video Track Layer */}
+            <div data-track="video" className="h-10 border-b border-white/5 relative flex items-center px-1">
               {/* Dimmed Inactive Zone Before Trim Start */}
               {project.timeline.trimRange && project.timeline.trimRange.start > 0 && (
                 <div
@@ -344,102 +150,6 @@ export const EditorTimeline: React.FC<EditorTimelineProps> = ({
                 >
                   <span className="text-[9px] text-amber-400/80 font-mono">Trimmed</span>
                 </div>
-              )}
-            </div>
-
-            {/* Track 2: Zoom Track Layer with Interactive Hover & Add Option */}
-            <div
-              data-track="zoom"
-              onMouseMove={handleTrackMouseMove}
-              onMouseLeave={handleTrackMouseLeave}
-              onClick={handleTrackClick}
-              className="h-10 border-b border-white/5 relative flex items-center px-1 bg-[#10121a]/60 hover:bg-[#151726]/80 cursor-pointer transition-colors group"
-            >
-              {/* Interactive Ghost "+ Add Zoom" Preview Button on Hover (Only over valid empty track space) */}
-              {trackHoverX !== null && trackHoverTime !== null && !activeDragId && isHoverValid && (
-                <div
-                  className="absolute z-20 pointer-events-none -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-blue-600/90 text-white border border-blue-400 text-[10px] font-semibold rounded-lg shadow-lg backdrop-blur-sm animate-pulse"
-                  style={{ left: `${trackHoverX}px` }}
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Add Zoom @ {trackHoverTime.toFixed(2)}s</span>
-                </div>
-              )}
-
-              {project.timeline.zoomEvents.length === 0 ? (
-                <span className="text-[10px] text-gray-500 pl-3 italic group-hover:text-blue-300 transition-colors">
-                  Click anywhere on this track to add a zoom keyframe
-                </span>
-              ) : (
-                project.timeline.zoomEvents.map((z) => {
-                  const leftPercent = (z.startTime / duration) * 100
-                  const widthPercent = (z.duration / duration) * 100
-                  const isSelected = z.id === runtime.selectedZoomId
-                  const isDraggingThis = activeDragId === z.id
-
-                  return (
-                    <div
-                      key={z.id}
-                      onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'move')}
-                      className={`absolute h-8 rounded-lg border flex items-center justify-between px-2 cursor-grab active:cursor-grabbing transition-shadow group/block ${
-                        isSelected
-                          ? 'bg-blue-600/70 border-blue-400 text-white shadow-md ring-2 ring-blue-400/80 z-10'
-                          : 'bg-blue-950/60 border-blue-500/40 hover:bg-blue-900/60 text-blue-200'
-                      } ${isDraggingThis ? 'scale-[1.02] shadow-xl z-30' : ''}`}
-                      style={{
-                        left: `${leftPercent}%`,
-                        width: `${Math.max(4, widthPercent)}%`
-                      }}
-                      title={`Zoom ${z.scale.toFixed(1)}x (${z.startTime.toFixed(2)}s - ${(z.startTime + z.duration).toFixed(2)}s)`}
-                    >
-                      {/* Left Resize Handle */}
-                      <div
-                        onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'resize-left')}
-                        className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-400/50 rounded-l-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
-                        title="Drag edge to change zoom start time"
-                      >
-                        <div className="w-0.5 h-3 bg-white/70 rounded-full" />
-                      </div>
-
-                      {/* Main Zoom Info Tag */}
-                      <div className="flex items-center gap-1.5 overflow-hidden select-none pointer-events-none px-1">
-                        <span className="text-[11px] font-semibold font-mono truncate">
-                          {z.scale.toFixed(1)}x Zoom
-                        </span>
-                      </div>
-
-                      {/* Direct Delete Button on Zoom Block */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (onDeleteZoomEvent) onDeleteZoomEvent(z.id)
-                        }}
-                        className="p-1 text-gray-300 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors cursor-pointer pointer-events-auto shrink-0 z-20"
-                        title="Delete keyframe"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-
-                      {/* Right Resize Handle */}
-                      <div
-                        onMouseDown={(e) => handleZoomBlockMouseDown(e, z, 'resize-right')}
-                        className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-400/50 rounded-r-lg flex items-center justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20"
-                        title="Drag edge to change zoom duration"
-                      >
-                        <div className="w-0.5 h-3 bg-white/70 rounded-full" />
-                      </div>
-
-                      {/* Live Dragging Tooltip */}
-                      {isDraggingThis && (
-                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#12141a] text-white border border-blue-500/50 text-[10px] font-mono px-2 py-0.5 rounded shadow-xl whitespace-nowrap z-40 pointer-events-none">
-                          {dragMode === 'move' && `Start: ${z.startTime.toFixed(2)}s`}
-                          {dragMode === 'resize-left' && `Start: ${z.startTime.toFixed(2)}s | Dur: ${z.duration.toFixed(2)}s`}
-                          {dragMode === 'resize-right' && `Duration: ${z.duration.toFixed(2)}s`}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
               )}
             </div>
           </div>

@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { Play, Pause, Scissors, ZoomIn, ZoomOut, SkipBack, SkipForward, Crosshair, Target, Crop, Frame, ChevronDown, Check } from 'lucide-react'
+import { Play, Pause, Scissors, SkipBack, SkipForward, Crop, Frame, ChevronDown, Check } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, AspectRatioType } from '../../types/editor'
-import { calculateActiveZoom } from '../../utils/zoomUtils'
 import { getInterpolatedCursorPosition, renderCursorOnCanvas } from '../../utils/cursorRenderUtils'
 import { clickSoundService } from '../../services/clickSoundService'
 import { DEFAULT_CURSOR_CONFIG } from '../../types/cursor'
@@ -13,11 +12,9 @@ interface StudioCanvasProps {
   onTogglePlay: () => void
   onTimeUpdate: (time: number) => void
   onSeek: (time: number) => void
-  onZoomChange?: (zoomLevel: number) => void
   onSelectVideo?: () => void
   onDeselectVideo?: () => void
   onUpdateLayout?: (updates: Partial<StudioProject['layout']>, skipHistory?: boolean) => void
-  onUpdateZoomFocalPoint?: (zoomId: string, x: number, y: number) => void
   onToggleCrop?: () => void
   onScaleChange?: (scale: 'full' | 'half' | 'quarter') => void
 }
@@ -42,7 +39,6 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   onSelectVideo,
   onDeselectVideo,
   onUpdateLayout,
-  onUpdateZoomFocalPoint,
   onToggleCrop,
   onScaleChange
 }) => {
@@ -52,15 +48,12 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   const prevTimeRef = useRef<number>(0)
 
   const isDraggingRef = useRef<boolean>(false)
-  const isDraggingReticleRef = useRef<boolean>(false)
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
     startX: 0,
     startY: 0
   })
-  const hasMovedRef = useRef<boolean>(false)
-
   // Floating Frame Aspect Ratio menu state
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState<boolean>(false)
   const frameMenuRef = useRef<HTMLDivElement>(null)
@@ -106,24 +99,6 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         return 'none'
     }
   }
-
-  // Calculate smooth sub-frame active zoom state (scale & origin X/Y)
-  const activeZoomState = calculateActiveZoom(
-    project.timeline.zoomEvents,
-    runtime.currentTime
-  )
-
-  const selectedZoomEvent = project.timeline.zoomEvents.find(
-    (z) => z.id === runtime.selectedZoomId
-  )
-
-  // Use selected event's target focal point if in Zoom tab & event selected, else use real-time animated state
-  const reticleX = selectedZoomEvent ? selectedZoomEvent.x : activeZoomState.x
-  const reticleY = selectedZoomEvent ? selectedZoomEvent.y : activeZoomState.y
-
-  const zoomScale = activeZoomState.scale
-  const zoomOriginX = `${activeZoomState.x}%`
-  const zoomOriginY = `${activeZoomState.y}%`
 
   const stageRef = useRef<HTMLDivElement>(null)
 
@@ -319,19 +294,6 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
 
     if (onSelectVideo) onSelectVideo()
 
-    if (runtime.selectedTab === 'zoom' && selectedZoomEvent && onUpdateZoomFocalPoint) {
-      const videoWrapperEl = videoWrapperRef.current
-      if (videoWrapperEl) {
-        const rect = videoWrapperEl.getBoundingClientRect()
-        const rawX = ((e.clientX - rect.left) / rect.width) * 100
-        const rawY = ((e.clientY - rect.top) / rect.height) * 100
-        const clampedX = Math.round(Math.max(0, Math.min(100, rawX)))
-        const clampedY = Math.round(Math.max(0, Math.min(100, rawY)))
-        onUpdateZoomFocalPoint(selectedZoomEvent.id, clampedX, clampedY)
-      }
-      return
-    }
-
     isDraggingRef.current = true
     hasMovedRef.current = false
     dragStartRef.current = {
@@ -389,40 +351,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Mouse Down Drag Handler for Zoom Reticle Target Point
-  const handleReticleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
 
-    if (!selectedZoomEvent || !onUpdateZoomFocalPoint) return
-
-    isDraggingReticleRef.current = true
-
-    const videoWrapperEl = videoWrapperRef.current
-    if (!videoWrapperEl) return
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingReticleRef.current) return
-
-      const rect = videoWrapperEl.getBoundingClientRect()
-      const rawX = ((moveEvent.clientX - rect.left) / rect.width) * 100
-      const rawY = ((moveEvent.clientY - rect.top) / rect.height) * 100
-
-      const clampedX = Math.round(Math.max(0, Math.min(100, rawX)))
-      const clampedY = Math.round(Math.max(0, Math.min(100, rawY)))
-
-      onUpdateZoomFocalPoint(selectedZoomEvent.id, clampedX, clampedY)
-    }
-
-    const handleMouseUp = () => {
-      isDraggingReticleRef.current = false
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-  }
 
   // Click outside to deselect
   const handleCanvasClick = () => {
@@ -626,25 +555,6 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 </>
               )}
 
-              {/* Visual Target Reticle Overlay for Zoom Focal Point */}
-              {(runtime.selectedTab === 'zoom' || selectedZoomEvent || activeZoomState.activeEventId) && (
-                <div
-                  onMouseDown={handleReticleMouseDown}
-                  className={`absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-crosshair group transition-transform ${selectedZoomEvent ? 'pointer-events-auto hover:scale-110' : 'pointer-events-none'
-                    }`}
-                  style={{
-                    left: `${reticleX}%`,
-                    top: `${reticleY}%`
-                  }}
-                  title="Drag to position zoom focus target"
-                >
-                  {/* Minimal Target Circle Pin */}
-                  <div className="w-5 h-5 rounded-full border-2 border-white bg-blue-600/80 shadow-md flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
-                  </div>
-                </div>
-              )}
-
               {/* Outer Border Stroke Layer (Expands strictly OUTSIDE the video frame) */}
               {borderWidth > 0 && borderOpacity > 0 && (
                 <div
@@ -661,22 +571,14 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 />
               )}
 
-              {/* Framed Viewport Container (Clips inner zoomed content to rounded frame bounds) */}
+              {/* Framed Viewport Container */}
               <div
                 className="w-full h-full relative overflow-hidden"
                 style={{
                   borderRadius: `${project.layout.cornerRadius}px`
                 }}
               >
-                {/* Inner Zoom Layer (Scales video content smoothly without overflowing outer frame or affecting padding) */}
-                <div
-                  className="w-full h-full relative overflow-hidden"
-                  style={{
-                    transform: `scale(${zoomScale}) translateZ(0)`,
-                    transformOrigin: `${zoomOriginX} ${zoomOriginY}`,
-                    willChange: 'transform'
-                  }}
-                >
+                <div className="w-full h-full relative overflow-hidden">
                   {mediaUrl ? (
                     isImage ? (
                       <img

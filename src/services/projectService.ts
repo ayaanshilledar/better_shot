@@ -43,8 +43,7 @@ export const createDefaultProject = (sourcePath: string, fileName: string): Stud
       isMuted: false
     },
     timeline: {
-      clips: [],
-      zoomEvents: []
+      clips: []
     },
     cursorConfig: { ...DEFAULT_CURSOR_CONFIG },
     exportSettings: {
@@ -69,11 +68,11 @@ export const loadCursorTelemetryForVideo = async (videoPath: string): Promise<Cu
   try {
     const data = await (window as any).electronAPI.loadCursorTelemetry(videoPath)
     if (data && Array.isArray(data.samples)) {
-      console.log(`[BetterShot:ProjectService] Loaded cursor telemetry for ${videoPath} (${data.samples.length} samples, ${data.clicks?.length || 0} clicks)`)
+      console.log(`[Velo:ProjectService] Loaded cursor telemetry for ${videoPath} (${data.samples.length} samples, ${data.clicks?.length || 0} clicks)`)
       return data
     }
   } catch (err) {
-    console.warn('[BetterShot:ProjectService] Could not load cursor telemetry:', err)
+    console.warn('[Velo:ProjectService] Could not load cursor telemetry:', err)
   }
   return null
 }

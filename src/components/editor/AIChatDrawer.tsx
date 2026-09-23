@@ -44,12 +44,8 @@ function getActionReason(action?: AIAction): string {
     case 'set_corner_radius':
     case 'set_shadow':
       return 'Spacing & border radius'
-    case 'add_zoom':
-      return 'Focal zoom'
     case 'trim_video':
       return 'Trim duration'
-    case 'clear_zooms':
-      return 'Reset zooms'
     case 'undo':
       return 'Revert snapshot'
     default:
@@ -140,7 +136,6 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const suggestionChips = [
     'Add wallpaper, 12% padding & drop shadow',
     'Trim the first and last 1 second',
-    'Add 1.8x focal zoom at current time',
     'Apply Northern Lights gradient background',
     'Format with 16px rounded corners & subtle shadow'
   ]
@@ -227,7 +222,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 How can I help with this video?
               </h4>
               <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Describe adjustments to framing, timing, zoom, and background.
+                Describe adjustments to framing, timing, and background.
               </p>
             </div>
 
@@ -304,9 +299,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                           if (act.type === 'set_shadow') return { key: 'Shadow', val: String(act.shadow) }
                           if (act.type === 'set_background') return { key: 'Wallpaper', val: act.presetId === 'none' ? 'None' : (act.presetId || 'Custom') }
                           if (act.type === 'set_aspect_ratio') return { key: 'Aspect', val: act.aspectRatio }
-                          if (act.type === 'add_zoom') return { key: 'Zoom', val: `${act.scale || 1.8}x` }
                           if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s-${act.end?.toFixed(1) || 0}s` }
-                          if (act.type === 'clear_zooms') return { key: 'Zooms', val: 'Reset' }
 
                           if (act.label) {
                             if (/^returning to/i.test(act.label)) return null
@@ -443,7 +436,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isExecuting}
-            placeholder="Ask to trim, format layout, add zoom..."
+            placeholder="Ask to trim, format layout, change wallpaper..."
             className="w-full pl-3 pr-9 py-2 bg-slate-100/80 dark:bg-[#181920] border border-slate-200/80 dark:border-white/10 rounded-xl text-xs outline-none focus:border-slate-400 dark:focus:border-white/20 transition-colors disabled:opacity-50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500"
           />
           <button

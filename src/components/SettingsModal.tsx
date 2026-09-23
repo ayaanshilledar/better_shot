@@ -25,8 +25,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   useEffect(() => {
     const handleUpdate = () => setAiConfig(getAIConfig())
+    window.addEventListener('velo-ai-config-changed', handleUpdate)
     window.addEventListener('bettershot-ai-config-changed', handleUpdate)
-    return () => window.removeEventListener('bettershot-ai-config-changed', handleUpdate)
+    return () => {
+      window.removeEventListener('velo-ai-config-changed', handleUpdate)
+      window.removeEventListener('bettershot-ai-config-changed', handleUpdate)
+    }
   }, [])
 
   if (!isOpen) return null

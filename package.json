@@ -1,5 +1,5 @@
 {
-  "name": "better-shot",
+  "name": "velo",
   "version": "1.0.0",
   "description": "Clean, high-performance screen recording desktop launcher & floating toolbar",
   "type": "module",
@@ -13,8 +13,8 @@
     "preview": "vite preview"
   },
   "build": {
-    "appId": "com.bettershot.app",
-    "productName": "BetterShot",
+    "appId": "com.velo.app",
+    "productName": "Velo",
     "compression": "maximum",
     "electronLanguages": [
       "en-US"

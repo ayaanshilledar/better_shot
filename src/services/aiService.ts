@@ -3,6 +3,16 @@ import { AIAction, AIConfig, AIPlanResult, AIProvider } from '../types/ai'
 import { WALLPAPER_PRESETS } from '../config/presets'
 
 const STORAGE_KEYS = {
+  PROVIDER: 'velo_ai_provider',
+  API_KEY: 'velo_ai_api_key',
+  MODEL: 'velo_ai_model',
+  MODELS_CACHE: 'velo_ai_models_cache',
+  VERIFIED: 'velo_ai_is_verified',
+  AUTO_APPLY: 'velo_ai_auto_apply'
+}
+
+// Legacy fallback keys
+const LEGACY_STORAGE_KEYS = {
   PROVIDER: 'bettershot_ai_provider',
   API_KEY: 'bettershot_ai_api_key',
   MODEL: 'bettershot_ai_model',
@@ -120,19 +130,19 @@ export function getAIConfig(): AIConfig {
     }
   }
 
-  const rawProvider = localStorage.getItem(STORAGE_KEYS.PROVIDER) as AIProvider | null
-  const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || ''
+  const rawProvider = (localStorage.getItem(STORAGE_KEYS.PROVIDER) || localStorage.getItem(LEGACY_STORAGE_KEYS.PROVIDER)) as AIProvider | null
+  const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || localStorage.getItem(LEGACY_STORAGE_KEYS.API_KEY) || ''
   const detected = detectProviderFromKey(apiKey)
   const provider: AIProvider = detected || rawProvider || 'groq'
 
   const defaultModel = PROVIDER_MODELS[provider]?.[0] || 'llama-3.3-70b-versatile'
-  const selectedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || defaultModel
-  const isVerified = localStorage.getItem(STORAGE_KEYS.VERIFIED) === 'true'
-  const autoApplyByDefault = localStorage.getItem(STORAGE_KEYS.AUTO_APPLY) === 'true'
+  const selectedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || localStorage.getItem(LEGACY_STORAGE_KEYS.MODEL) || defaultModel
+  const isVerified = (localStorage.getItem(STORAGE_KEYS.VERIFIED) || localStorage.getItem(LEGACY_STORAGE_KEYS.VERIFIED)) === 'true'
+  const autoApplyByDefault = (localStorage.getItem(STORAGE_KEYS.AUTO_APPLY) || localStorage.getItem(LEGACY_STORAGE_KEYS.AUTO_APPLY)) === 'true'
 
   let availableModels = PROVIDER_MODELS[provider] || PROVIDER_MODELS.groq
   try {
-    const cached = localStorage.getItem(STORAGE_KEYS.MODELS_CACHE)
+    const cached = localStorage.getItem(STORAGE_KEYS.MODELS_CACHE) || localStorage.getItem(LEGACY_STORAGE_KEYS.MODELS_CACHE)
     if (cached) {
       const parsed = JSON.parse(cached)
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -177,6 +187,7 @@ export function saveAIConfig(updates: Partial<AIConfig>): AIConfig {
       localStorage.setItem(STORAGE_KEYS.MODELS_CACHE, JSON.stringify(updates.availableModels))
     }
 
+    window.dispatchEvent(new CustomEvent('velo-ai-config-changed'))
     window.dispatchEvent(new CustomEvent('bettershot-ai-config-changed'))
   }
 
@@ -470,17 +481,6 @@ export function verifyProjectChanges(
     })
   }
 
-  // 6. Zoom Keyframes Count
-  if (before.timeline.zoomEvents.length !== after.timeline.zoomEvents.length || expected?.zoomCount !== undefined) {
-    const passed = expected?.zoomCount !== undefined ? after.timeline.zoomEvents.length === expected.zoomCount : true
-    diffs.push({
-      property: 'Zoom Keyframes',
-      expected: expected?.zoomCount !== undefined ? `${expected.zoomCount} zoom(s)` : `${after.timeline.zoomEvents.length} zoom(s)`,
-      actual: `${after.timeline.zoomEvents.length} zoom(s)`,
-      passed
-    })
-  }
-
   // 7. Trim Range
   if (
     before.timeline.trimRange?.start !== after.timeline.trimRange?.start ||
@@ -588,184 +588,12 @@ export function heuristicPlanner(
     expectedChanges.aspectRatio = targetRatio
   }
 
-  // 2. Clear Zooms Intent
-  if (!isImage && (p.includes('clear zoom') || p.includes('remove zoom') || p.includes('delete all zoom') || p.includes('no zoom') || p.includes('reset zoom'))) {
-    actions.push({ type: 'switch_tab', tab: 'zoom', label: 'Switching to Zoom controls' })
-    actions.push({ type: 'clear_zooms', label: 'Clearing all zoom keyframes' })
-    changesSummary.push('cleared all zoom events from timeline')
-    expectedChanges.zoomCount = 0
-  }
-
-  // 3. Trimming Intent (Videos only)
-  if (!isImage && (p.includes('trim') || p.includes('cut') || p.includes('shorten') || p.includes('crop start') || p.includes('crop end'))) {
-    let startTrim = 0.5
-    let endTrim = Math.max(1, duration - 0.5)
-
-    const matchStart = p.match(/trim\s+(?:first\s+)?(\d+(?:\.\d+)?)\s*(?:s|sec|seconds)?/i)
-    if (matchStart && matchStart[1]) {
-      const val = parseFloat(matchStart[1])
-      if (val < duration - 1) {
-        startTrim = val
-      }
-    }
-
-    const matchEnd = p.match(/(?:and|last)\s+(\d+(?:\.\d+)?)\s*(?:s|sec|seconds)?/i)
-    if (matchEnd && matchEnd[1]) {
-      const val = parseFloat(matchEnd[1])
-      if (duration - val > startTrim + 0.5) {
-        endTrim = duration - val
-      }
-    }
-
-    actions.push({
-      type: 'trim_video',
-      start: startTrim,
-      end: endTrim,
-      label: `Trimming video from ${startTrim.toFixed(1)}s to ${endTrim.toFixed(1)}s`
-    })
-    changesSummary.push(`trimmed rough edges (${startTrim.toFixed(1)}s - ${endTrim.toFixed(1)}s)`)
-    expectedChanges.trimStart = startTrim
-    expectedChanges.trimEnd = endTrim
-  }
-
-  // 4. Background Intent
-  if (
-    p.includes('background') ||
-    p.includes('wallpaper') ||
-    p.includes('gradient') ||
-    p.includes('sunset') ||
-    p.includes('aurora') ||
-    p.includes('tahoe') ||
-    p.includes('monterey') ||
-    p.includes('ventura') ||
-    p.includes('clean') ||
-    p.includes('modern') ||
-    p.includes('polish') ||
-    p.includes('style')
-  ) {
-    const currentId = project.background?.presetId
-    const otherPresets = WALLPAPER_PRESETS.filter((w) => w.id !== currentId)
-    let selectedPreset = otherPresets[Math.floor(Math.random() * otherPresets.length)] || WALLPAPER_PRESETS[1]
-
-    if (p.includes('sunset')) {
-      selectedPreset = WALLPAPER_PRESETS.find((w) => w.id.includes('sunset')) || selectedPreset
-    } else if (p.includes('aurora') || p.includes('northern')) {
-      selectedPreset = WALLPAPER_PRESETS.find((w) => w.id.includes('aurora')) || selectedPreset
-    } else if (p.includes('dune') || p.includes('ventura')) {
-      selectedPreset = WALLPAPER_PRESETS.find((w) => w.id.includes('ventura')) || selectedPreset
-    } else if (p.includes('dark') || p.includes('chroma')) {
-      selectedPreset = WALLPAPER_PRESETS.find((w) => w.id.includes('chroma')) || selectedPreset
-    } else if (p.includes('no bg') || p.includes('none') || p.includes('remove background')) {
-      actions.push({ type: 'switch_tab', tab: 'background', label: 'Switching to Background tab' })
-      actions.push({ type: 'set_background', presetId: 'none', bgType: 'none', label: 'Removing background wallpaper' })
-      changesSummary.push('removed background')
-      expectedChanges.backgroundPresetId = 'none'
-    }
-
-    if (!p.includes('no bg') && !p.includes('none') && !p.includes('remove background')) {
-      actions.push({ type: 'switch_tab', tab: 'background', label: 'Switching to Background tab' })
-      actions.push({
-        type: 'set_background',
-        presetId: selectedPreset.id,
-        bgType: selectedPreset.type,
-        label: `Applying "${selectedPreset.name}" background`
-      })
-      changesSummary.push(`applied "${selectedPreset.name}" background`)
-      expectedChanges.backgroundPresetId = selectedPreset.id
-      alternativesConsidered.push(`Evaluated other presets but selected "${selectedPreset.name}" for balanced contrast.`)
-    }
-  }
-
-  // 5. Layout / Padding Intent
-  if (
-    p.includes('padding') ||
-    p.includes('margin') ||
-    p.includes('pad') ||
-    p.includes('border') ||
-    p.includes('round') ||
-    p.includes('corner') ||
-    p.includes('shadow') ||
-    p.includes('polish')
-  ) {
-    actions.push({ type: 'switch_tab', tab: 'layout', label: 'Opening Layout controls' })
-
-    let paddingVal = 12
-    const padMatch = p.match(/(?:padding|pad)\s*(?:to\s*)?(\d+)/i)
-    if (padMatch && padMatch[1]) {
-      paddingVal = Math.min(40, Math.max(0, parseInt(padMatch[1], 10)))
-    } else if (p.includes('small') || p.includes('tight')) {
-      paddingVal = 6
-    } else if (p.includes('large') || p.includes('spacious')) {
-      paddingVal = 20
-    }
-
-    actions.push({ type: 'set_padding', padding: paddingVal, label: `Setting canvas padding to ${paddingVal}%` })
-    expectedChanges.padding = paddingVal
-
-    let cornerVal = 16
-    if (p.includes('square') || p.includes('sharp')) {
-      cornerVal = 0
-    } else if (p.includes('extra round')) {
-      cornerVal = 24
-    }
-    actions.push({ type: 'set_corner_radius', cornerRadius: cornerVal, label: `Rounding frame corners to ${cornerVal}px` })
-    expectedChanges.cornerRadius = cornerVal
-
-    let shadowVal: 'medium' | 'soft' | 'glow' | 'hard' = 'medium'
-    if (p.includes('glow')) shadowVal = 'glow'
-    else if (p.includes('soft')) shadowVal = 'soft'
-    else if (p.includes('hard')) shadowVal = 'hard'
-
-    actions.push({ type: 'set_shadow', shadow: shadowVal, label: `Applying ${shadowVal} drop shadow` })
-    expectedChanges.shadow = shadowVal
-
-    changesSummary.push(`${paddingVal}% padding, ${cornerVal}px rounded corners & ${shadowVal} shadow`)
-  }
-
-  // 6. Zoom Intent (Videos only)
-  if (!isImage && (p.includes('zoom') || p.includes('focus') || p.includes('magnify') || p.includes('cinematic'))) {
-    if (!p.includes('clear') && !p.includes('remove') && !p.includes('no zoom')) {
-      actions.push({ type: 'switch_tab', tab: 'zoom', label: 'Switching to Zoom controls' })
-
-      let zoomTime = currentTime > 0 ? currentTime : 2.0
-      const timeMatch = p.match(/(?:at|around|timestamp)\s*(\d+(?:\.\d+)?)\s*(?:s|sec|seconds)?/i)
-      if (timeMatch && timeMatch[1]) {
-        const parsedTime = parseFloat(timeMatch[1])
-        if (parsedTime < duration - 0.5) {
-          zoomTime = parsedTime
-        }
-      } else if (p.includes('here') || p.includes('now') || p.includes('playhead')) {
-        zoomTime = currentTime
-      } else if (duration > 4 && currentTime === 0) {
-        zoomTime = parseFloat((duration * 0.25).toFixed(1))
-      }
-
-      let zoomScale = 1.8
-      const scaleMatch = p.match(/(\d+(?:\.\d+)?)\s*x/i)
-      if (scaleMatch && scaleMatch[1]) {
-        zoomScale = Math.min(3.0, Math.max(1.2, parseFloat(scaleMatch[1])))
-      }
-
-      actions.push({ type: 'seek_time', time: zoomTime, label: `Scrubbing playhead to ${zoomTime.toFixed(1)}s` })
-      actions.push({
-        type: 'add_zoom',
-        startTime: zoomTime,
-        duration: 2.5,
-        scale: zoomScale,
-        x: 50,
-        y: 50,
-        label: `Adding ${zoomScale}x focal zoom at ${zoomTime.toFixed(1)}s`
-      })
-
-      changesSummary.push(`added a ${zoomScale}x zoom keyframe at ${zoomTime.toFixed(1)}s`)
-      expectedChanges.zoomCount = project.timeline.zoomEvents.length + 1
-    }
-  } else if (isImage && (p.includes('zoom') || p.includes('trim') || p.includes('cut'))) {
+  } else if (isImage && (p.includes('trim') || p.includes('cut'))) {
     return {
       message:
-        'This is a static screenshot/image. Zoom keyframes and timeline trimming only apply to videos. I can adjust framing, shadows, background wallpaper, or aspect ratio for you!',
+        'This is a static screenshot/image. Timeline trimming only applies to videos. I can adjust framing, shadows, background wallpaper, or aspect ratio for you!',
       thoughtProcess: {
-        analysis: 'Media item is a static image. Video-specific actions (zooms/trim) are incompatible.',
+        analysis: 'Media item is a static image. Video trimming actions are incompatible.',
         reasoning: 'Guiding user to visual framing, shadow, and wallpaper operations.',
         verificationPlan: 'No state modifications planned.'
       },
@@ -797,7 +625,6 @@ export function heuristicPlanner(
 
   // Proactive suggestions
   if (!isImage) {
-    proactiveSuggestions.push(`🔍 Add focal zoom at ${currentTime > 0 ? currentTime.toFixed(1) : '2.0'}s`)
     proactiveSuggestions.push('✂️ Trim rough edges (0.5s start/end)')
   }
   proactiveSuggestions.push('🎨 Try Northern Lights gradient')
@@ -884,28 +711,18 @@ export async function planVideoEdits(
     ? 'None (No Background)'
     : project.background.presetId || 'Default'
 
-  const zoomListSummary =
-    project.timeline.zoomEvents.length > 0
-      ? project.timeline.zoomEvents
-          .map(
-            (z, idx) =>
-              `Keyframe #${idx + 1}: at ${z.startTime.toFixed(1)}s for ${z.duration.toFixed(1)}s (${z.scale}x scale, focus at x=${z.x}%, y=${z.y}%)`
-          )
-          .join('; ')
-      : 'None'
-
   const cursorStyle = project.cursorConfig?.style || 'macos'
   const cursorSize = project.cursorConfig?.size || 1
   const presetsList = WALLPAPER_PRESETS.map((p) => ({ id: p.id, name: p.name, type: p.type }))
 
-  const systemInstruction = `You are BetterShot AI, an expert video and screenshot editor agent inside a desktop screen recording studio app.
+  const systemInstruction = `You are Velo AI, an expert video and screenshot editor agent inside a desktop screen recording studio app.
 You do NOT just blindly return commands. You first THINK, REASON, EVALUATE ALTERNATIVES, and formulate a verifiable plan.
 
 You MUST output ONLY valid JSON matching this schema:
 {
   "thoughtProcess": {
     "analysis": "Breakdown of user request, media characteristics, current framing and gaps",
-    "reasoning": "Aesthetic and functional rationale for why specific wallpapers, paddings, aspect ratios, or zooms were chosen",
+    "reasoning": "Aesthetic and functional rationale for why specific wallpapers, paddings, or aspect ratios were chosen",
     "alternativesConsidered": [
       "Alternative approach 1 and why it was rejected",
       "Alternative approach 2 and why it was rejected"
@@ -914,15 +731,13 @@ You MUST output ONLY valid JSON matching this schema:
   },
   "message": "Clear, friendly explanation of your proposed improvements to the user",
   "actions": [
-    { "type": "switch_tab", "tab": "background|layout|zoom|cursor|audio|export|ai", "label": "..." },
+    { "type": "switch_tab", "tab": "background|layout|cursor|audio|export|ai", "label": "..." },
     { "type": "set_background", "presetId": "preset_id_or_none", "label": "..." },
     { "type": "set_padding", "padding": 0-40, "label": "..." },
     { "type": "set_corner_radius", "cornerRadius": 0-32, "label": "..." },
     { "type": "set_shadow", "shadow": "none|soft|medium|hard|glow", "label": "..." },
     { "type": "set_aspect_ratio", "aspectRatio": "16:9|9:16|1:1|4:3|auto", "label": "..." },
     { "type": "seek_time", "time": 0-duration, "label": "..." },
-    { "type": "add_zoom", "startTime": number, "duration": number, "scale": 1.1-3.0, "x": 0-100, "y": 0-100, "label": "..." },
-    { "type": "clear_zooms", "label": "..." },
     { "type": "trim_video", "start": number, "end": number, "label": "..." },
     { "type": "undo", "label": "..." }
   ],
@@ -931,8 +746,7 @@ You MUST output ONLY valid JSON matching this schema:
     "padding": "number or undefined",
     "cornerRadius": "number or undefined",
     "shadow": "string or undefined",
-    "aspectRatio": "string or undefined",
-    "zoomCount": "number or undefined"
+    "aspectRatio": "string or undefined"
   },
   "proactiveSuggestions": [
     "Contextual follow-up quick prompt 1",
@@ -942,11 +756,10 @@ You MUST output ONLY valid JSON matching this schema:
 }
 
 === CURRENT PROJECT STATE (USE THIS FOR COMPLETE CONTEXT) ===
-Media Type: ${isImage ? 'Static Screenshot / Image (Do NOT generate zoom or trim actions)' : 'Screen Recording Video'}
+Media Type: ${isImage ? 'Static Screenshot / Image (Do NOT generate trim actions)' : 'Screen Recording Video'}
 ${
   !isImage
-    ? `Duration: ${duration.toFixed(2)}s | Current Playhead Position: ${currentTime.toFixed(2)}s
-Existing Zooms (${project.timeline.zoomEvents.length}): ${zoomListSummary}`
+    ? `Duration: ${duration.toFixed(2)}s | Current Playhead Position: ${currentTime.toFixed(2)}s`
     : ''
 }
 Current Background: "${currentBgName}" (presetId: "${project.background.presetId}", type: "${project.background.type}")
@@ -963,12 +776,10 @@ Rules:
 1. Demonstrate genuine reasoning in "thoughtProcess". Explain WHY your styling choices look best for this media.
 2. If user mentions "do your best", "auto apply", "just do it", or "make it look great", set "autoApply": true. Otherwise set "autoApply": ${userAutoApply}.
 3. If user asks to undo or revert, emit { "type": "undo", "label": "Undoing previous edit" }.
-4. For videos, keep zoom events within video duration. Minimum zoom duration 0.5s.
-5. If user asks to change background/wallpaper, choose a fresh preset from Available Wallpapers (current is "${currentBgName}").
-6. If user asks to zoom "here" or doesn't specify time, place zoom keyframe at current playhead (${currentTime.toFixed(2)}s).
-7. Switch tab before adjusting parameters in that tab (e.g. switch_tab 'layout' before set_aspect_ratio).
-8. ALWAYS conclude your action sequence by returning to the AI tab: { "type": "switch_tab", "tab": "ai", "label": "Returning to AI Assistant" }.
-9. Provide 2-3 inspiring "proactiveSuggestions" for what the user could do next.
+4. If user asks to change background/wallpaper, choose a fresh preset from Available Wallpapers (current is "${currentBgName}").
+5. Switch tab before adjusting parameters in that tab (e.g. switch_tab 'layout' before set_aspect_ratio).
+6. ALWAYS conclude your action sequence by returning to the AI tab: { "type": "switch_tab", "tab": "ai", "label": "Returning to AI Assistant" }.
+7. Provide 2-3 inspiring "proactiveSuggestions" for what the user could do next.
 `
 
   // Format conversation history for context
@@ -983,8 +794,7 @@ Rules:
 - Current Background: "${currentBgName}" (${project.background.presetId})
 - Current Aspect Ratio: ${project.layout.aspectRatio}
 - Current Padding: ${project.layout.padding}%, Corners: ${project.layout.cornerRadius}px, Shadow: ${project.layout.shadow}
-- Playhead Time: ${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s
-- Existing Zooms: ${project.timeline.zoomEvents.length}`
+- Playhead Time: ${currentTime.toFixed(2)}s / ${duration.toFixed(2)}s`
 
   try {
     let rawText = ''

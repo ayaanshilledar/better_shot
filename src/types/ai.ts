@@ -7,15 +7,13 @@ export type AIActionType =
   | 'set_corner_radius'
   | 'set_shadow'
   | 'set_aspect_ratio'
-  | 'add_zoom'
-  | 'clear_zooms'
   | 'trim_video'
   | 'seek_time'
   | 'undo'
 
 export interface SwitchTabAction {
   type: 'switch_tab'
-  tab: 'background' | 'layout' | 'zoom' | 'cursor' | 'audio' | 'ai' | 'export'
+  tab: 'background' | 'layout' | 'cursor' | 'audio' | 'ai' | 'export'
   label: string
 }
 
@@ -50,21 +48,6 @@ export interface SetAspectRatioAction {
   label: string
 }
 
-export interface AddZoomAction {
-  type: 'add_zoom'
-  startTime: number
-  duration: number
-  scale: number
-  x?: number
-  y?: number
-  label: string
-}
-
-export interface ClearZoomsAction {
-  type: 'clear_zooms'
-  label: string
-}
-
 export interface TrimVideoAction {
   type: 'trim_video'
   start: number
@@ -90,8 +73,6 @@ export type AIAction =
   | SetCornerRadiusAction
   | SetShadowAction
   | SetAspectRatioAction
-  | AddZoomAction
-  | ClearZoomsAction
   | TrimVideoAction
   | SeekTimeAction
   | UndoAction

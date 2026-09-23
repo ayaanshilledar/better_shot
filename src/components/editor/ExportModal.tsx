@@ -227,7 +227,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div>
                 <h4 className="text-base font-bold text-white">Video Rendered Successfully!</h4>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Your styled recording is ready with all zoom effects, frames, and audio.
+                  Your styled recording is ready with all custom frames, layout, and audio.
                 </p>
               </div>
 

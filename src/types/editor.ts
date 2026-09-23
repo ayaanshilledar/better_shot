@@ -1,20 +1,3 @@
-export type ZoomEasingType = 'ease-in-out' | 'ease-in' | 'ease-out' | 'linear' | 'elastic'
-export type ZoomType = 'manual' | 'auto'
-
-export interface ZoomEvent {
-  id: string
-  startTime: number
-  duration: number
-  easeInDuration?: number // duration in sec to ease in (default 0.4s)
-  easeOutDuration?: number // duration in sec to ease out (default 0.4s)
-  x: number // percentage 0-100
-  y: number // percentage 0-100
-  scale: number // e.g. 1.25, 2.0, 3.0
-  easing: ZoomEasingType
-  type?: ZoomType
-  label?: string
-}
-
 export interface ClipSegment {
   id: string
   startTime: number
@@ -129,7 +112,6 @@ export interface StudioProject {
   layout: LayoutConfig
   timeline: {
     clips: ClipSegment[]
-    zoomEvents: ZoomEvent[]
     trimRange?: {
       start: number
       end: number
@@ -147,10 +129,8 @@ export interface StudioRuntimeState {
   errorMessage?: string
   currentTime: number
   isPlaying: boolean
-  selectedTab: 'background' | 'layout' | 'zoom' | 'cursor' | 'audio' | 'ai' | 'export'
+  selectedTab: 'background' | 'layout' | 'cursor' | 'audio' | 'ai' | 'export'
   selectedClipId: string | null
-  selectedZoomId?: string | null
-  activeZoomMode?: 'manual' | 'auto'
   previewScale: 'full' | 'half' | 'quarter'
   timelineZoom?: number
   hoverState: { element: string | null }

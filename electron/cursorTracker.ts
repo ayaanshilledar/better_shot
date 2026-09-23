@@ -29,6 +29,8 @@ export class CursorTracker {
   private lastX = -1
   private lastY = -1
 
+  private lastTelemetry: CursorTelemetryData | null = null
+
   /**
    * Starts tracking mouse position and click events.
    */
@@ -41,6 +43,7 @@ export class CursorTracker {
     this.startTime = Date.now()
     this.samples = []
     this.clicks = []
+    this.lastTelemetry = null
     this.lastLeftDown = false
     this.lastRightDown = false
     this.lastX = -1
@@ -57,13 +60,17 @@ export class CursorTracker {
     // Start global click listener for Windows
     this.startWindowsClickMonitor()
 
-    console.log(`[BetterShot:CursorTracker] Tracking started for bounds:`, this.targetBounds)
+    console.log(`[Velo:CursorTracker] Tracking started for bounds:`, this.targetBounds)
   }
 
   /**
    * Stops tracking and returns the collected telemetry data.
    */
   public stop(): CursorTelemetryData {
+    if (!this.isTracking && this.lastTelemetry) {
+      return this.lastTelemetry
+    }
+
     this.isTracking = false
 
     if (this.timer) {
@@ -91,6 +98,7 @@ export class CursorTracker {
       clicks: this.clicks
     }
 
+    this.lastTelemetry = telemetry
     console.log(`[BetterShot:CursorTracker] Tracking stopped. Collected ${this.samples.length} samples and ${this.clicks.length} clicks over ${duration}ms.`)
     return telemetry
   }
@@ -99,7 +107,7 @@ export class CursorTracker {
    * Writes the telemetry sidecar file next to the saved video file.
    */
   public async saveToFile(videoFilePath: string, telemetry?: CursorTelemetryData): Promise<string | null> {
-    const data = telemetry || this.stop()
+    const data = telemetry || this.lastTelemetry || this.stop()
     try {
       const ext = path.extname(videoFilePath)
       const baseName = videoFilePath.slice(0, -ext.length)

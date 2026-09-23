@@ -10,7 +10,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "BetterShot — macOS-Inspired Screen Recorder for Windows",
+  title: "Velo — macOS-Inspired Screen Recorder for Windows",
   description:
     "A precision, high-performance screenshot and screen recording application with macOS-inspired aesthetics for Windows.",
 };
