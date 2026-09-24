@@ -63,16 +63,16 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   return (
     <header
       onDoubleClick={handleToggleMaximize}
-      className="h-12 bg-white/95 dark:bg-[#12141a]/95 px-3 flex items-center justify-between select-none z-30 drag-region cursor-default border-b border-black/5 dark:border-white/5 text-slate-900 dark:text-white"
+      className="h-12 bg-white/95 dark:bg-[#1a1a1a]/95 px-3 flex items-center justify-between select-none z-30 drag-region cursor-default border-b border-black/5 dark:border-white/[0.06] text-slate-900 dark:text-white"
     >
       {/* Left section: Home Navigation + Title */}
       <div className="flex items-center gap-3 no-drag">
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#1a1d26] dark:hover:bg-[#222735] text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white text-xs font-medium rounded-lg border border-slate-200 dark:border-white/5 transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#252525] dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-white/80 dark:hover:text-white text-xs font-medium rounded-lg border border-slate-200 dark:border-white/[0.06] transition-all cursor-pointer"
           title="Return to Launcher Home"
         >
-          <Home className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <Home className="w-3.5 h-3.5 text-[#2373F4]" />
           <span>Home</span>
         </button>
 
@@ -85,8 +85,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             disabled={!canUndo}
             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
               canUndo
-                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#1a1d26] dark:hover:bg-[#222735] text-slate-700 dark:text-gray-200 border-slate-200 dark:border-white/5'
-                : 'bg-transparent text-slate-300 dark:text-gray-600 border-transparent cursor-not-allowed opacity-50'
+                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#252525] dark:hover:bg-white/10 text-slate-700 dark:text-white/80 border-slate-200 dark:border-white/[0.06]'
+                : 'bg-transparent text-slate-300 dark:text-white/20 border-transparent cursor-not-allowed opacity-50'
             }`}
             title="Undo (Ctrl+Z)"
           >
@@ -97,8 +97,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             disabled={!canRedo}
             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
               canRedo
-                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#1a1d26] dark:hover:bg-[#222735] text-slate-700 dark:text-gray-200 border-slate-200 dark:border-white/5'
-                : 'bg-transparent text-slate-300 dark:text-gray-600 border-transparent cursor-not-allowed opacity-50'
+                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#252525] dark:hover:bg-white/10 text-slate-700 dark:text-white/80 border-slate-200 dark:border-white/[0.06]'
+                : 'bg-transparent text-slate-300 dark:text-white/20 border-transparent cursor-not-allowed opacity-50'
             }`}
             title="Redo (Ctrl+Y)"
           >
@@ -112,7 +112,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
             type="text"
             value={project.title}
             onChange={(e) => onUpdateTitle && onUpdateTitle(e.target.value)}
-            className="bg-transparent hover:bg-black/5 focus:bg-slate-100 dark:hover:bg-white/5 dark:focus:bg-[#1a1d26] text-xs font-semibold text-slate-800 focus:text-slate-950 dark:text-gray-200 dark:focus:text-white px-2 py-1 rounded-md border border-transparent focus:border-slate-300 dark:focus:border-white/10 outline-none transition-all max-w-[180px] truncate"
+            className="bg-transparent hover:bg-black/5 focus:bg-slate-100 dark:hover:bg-white/5 dark:focus:bg-[#252525] text-xs font-semibold text-slate-800 focus:text-slate-950 dark:text-white/90 dark:focus:text-white px-2 py-1 rounded-md border border-transparent focus:border-slate-300 dark:focus:border-white/10 outline-none transition-all max-w-[180px] truncate"
             title="Rename Project"
           />
         )}
@@ -120,8 +120,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
       {/* Right Section: Preview Scale Selector + Theme Toggle + Window Controls */}
       <div className="flex items-center gap-3 no-drag">
-        {/* Preview Scale Selector (Right Aligned) */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#161922] p-0.5 rounded-lg border border-slate-200 dark:border-white/5">
+        {/* Preview Scale Selector (Right Aligned - Segmented tab style matching Launcher) */}
+        <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-slate-200 dark:border-white/[0.06]">
           {(['full', 'half', 'quarter'] as const).map((scale) => {
             const labels = { full: '100% Full', half: '50% Half', quarter: '25% Quarter' }
             const isActive = currentScale === scale
@@ -129,10 +129,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
               <button
                 key={scale}
                 onClick={() => onScaleChange && onScaleChange(scale)}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-[8px] transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
+                    ? 'bg-[#2373F4] text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 dark:text-white/40 dark:hover:text-white/70'
                 }`}
               >
                 {labels[scale]}
@@ -144,13 +144,13 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         {/* Quick Theme Toggle Button */}
         <button
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-black/5 dark:hover:border-white/5"
+          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-white/40 dark:hover:text-white/80 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-black/5 dark:hover:border-white/[0.06]"
           title={resolvedTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {resolvedTheme === 'dark' ? (
             <Sun className="w-3.5 h-3.5 text-amber-400" />
           ) : (
-            <Moon className="w-3.5 h-3.5 text-blue-600" />
+            <Moon className="w-3.5 h-3.5 text-[#2373F4]" />
           )}
         </button>
 
@@ -160,21 +160,21 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={onMinimize}
-            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-white/40 dark:hover:text-white/80 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
             title="Minimize"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleToggleMaximize}
-            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-black/5 dark:text-white/40 dark:hover:text-white/80 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
             title="Maximize / Restore"
           >
             <Square className="w-3 h-3" />
           </button>
           <button
             onClick={onClose}
-            className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-500/20 rounded-md transition-colors cursor-pointer"
+            className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:text-white/40 dark:hover:text-red-400 dark:hover:bg-red-500/20 rounded-md transition-colors cursor-pointer"
             title="Close Editor"
           >
             <X className="w-3.5 h-3.5" />

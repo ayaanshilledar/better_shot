@@ -146,9 +146,25 @@ function createEditorWindow(filePath?: string) {
 }
 
 function createLauncherWindow() {
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    if (launcherWindow.isMinimized()) launcherWindow.restore()
+    launcherWindow.show()
+    launcherWindow.focus()
+    return
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
+  const launcherWidth = 340
+  const launcherHeight = 420
+  const launcherX = displayX + Math.round((screenW - launcherWidth) / 2)
+  const launcherY = displayY + Math.round((screenH - launcherHeight) / 2)
+
   launcherWindow = new BrowserWindow({
-    width: 320,
-    height: 345,
+    width: launcherWidth,
+    height: launcherHeight,
+    x: launcherX,
+    y: launcherY,
     resizable: false,
     frame: false,
     transparent: true,
@@ -172,9 +188,22 @@ function createLauncherWindow() {
     launcherWindow.loadFile(rendererIndexPath, { hash: 'launcher' })
   }
 
-  launcherWindow.once('ready-to-show', () => {
-    if (!isSmokeTest) launcherWindow?.show()
+  const showLauncher = () => {
+    if (isSmokeTest) return
+    if (launcherWindow && !launcherWindow.isDestroyed()) {
+      if (launcherWindow.isMinimized()) launcherWindow.restore()
+      launcherWindow.show()
+      launcherWindow.focus()
+    }
+  }
+
+  launcherWindow.once('ready-to-show', showLauncher)
+
+  launcherWindow.webContents.on('did-finish-load', () => {
+    showLauncher()
   })
+
+  setTimeout(showLauncher, 300)
 
   launcherWindow.on('closed', () => {
     launcherWindow = null
@@ -730,19 +759,21 @@ ipcMain.on('close-launcher', (event) => {
 
 ipcMain.on('set-launcher-height', (_event, height: number) => {
   if (launcherWindow && !launcherWindow.isDestroyed()) {
+    if (!height || typeof height !== 'number' || isNaN(height) || height < 200) return
+    const safeHeight = Math.max(300, Math.min(700, Math.round(height)))
     const [w, currentH] = launcherWindow.getSize()
-    if (currentH === height) return
+    if (currentH === safeHeight) return
     const [x, y] = launcherWindow.getPosition()
     const display = screen.getDisplayNearestPoint({ x, y })
     const workArea = display.workArea
     let newY = y
-    if (newY + height > workArea.y + workArea.height) {
-      newY = Math.max(workArea.y + 10, workArea.y + workArea.height - height - 10)
+    if (newY + safeHeight > workArea.y + workArea.height) {
+      newY = Math.max(workArea.y + 10, workArea.y + workArea.height - safeHeight - 10)
     }
     if (newY !== y) {
       launcherWindow.setPosition(x, newY, false)
     }
-    launcherWindow.setSize(w, height, false)
+    launcherWindow.setSize(w, safeHeight, false)
   }
 })
 

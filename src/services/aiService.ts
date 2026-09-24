@@ -588,7 +588,7 @@ export function heuristicPlanner(
     expectedChanges.aspectRatio = targetRatio
   }
 
-  } else if (isImage && (p.includes('trim') || p.includes('cut'))) {
+  if (isImage && (p.includes('trim') || p.includes('cut'))) {
     return {
       message:
         'This is a static screenshot/image. Timeline trimming only applies to videos. I can adjust framing, shadows, background wallpaper, or aspect ratio for you!',

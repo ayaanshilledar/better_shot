@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { Play, Pause, Scissors, SkipBack, SkipForward, Crop, Frame, ChevronDown, Check } from 'lucide-react'
+import { Play, Pause, Scissors, SkipBack, SkipForward, Crop, Frame, ChevronDown, Check, ZoomIn, ZoomOut } from 'lucide-react'
 import { StudioProject, StudioRuntimeState, AspectRatioType } from '../../types/editor'
 import { getInterpolatedCursorPosition, renderCursorOnCanvas } from '../../utils/cursorRenderUtils'
 import { clickSoundService } from '../../services/clickSoundService'
@@ -12,6 +12,7 @@ interface StudioCanvasProps {
   onTogglePlay: () => void
   onTimeUpdate: (time: number) => void
   onSeek: (time: number) => void
+  onZoomChange?: (zoom: number) => void
   onSelectVideo?: () => void
   onDeselectVideo?: () => void
   onUpdateLayout?: (updates: Partial<StudioProject['layout']>, skipHistory?: boolean) => void
@@ -48,6 +49,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   const prevTimeRef = useRef<number>(0)
 
   const isDraggingRef = useRef<boolean>(false)
+  const hasMovedRef = useRef<boolean>(false)
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -57,6 +59,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   // Floating Frame Aspect Ratio menu state
   const [isFrameMenuOpen, setIsFrameMenuOpen] = useState<boolean>(false)
   const frameMenuRef = useRef<HTMLDivElement>(null)
+  const [isMediaLoading, setIsMediaLoading] = useState<boolean>(true)
 
   useEffect(() => {
     if (!isFrameMenuOpen) return
@@ -146,6 +149,14 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
   // Streamable local media source URL
   const mediaUrl = project.media.sourcePath ? `file:///${project.media.sourcePath.replace(/\\/g, '/')}` : ''
   const isImage = Boolean(project.media.mediaType === 'image' || /\.(png|jpe?g|webp|bmp|gif)$/i.test(project.media.sourcePath))
+
+  useEffect(() => {
+    if (mediaUrl) {
+      setIsMediaLoading(true)
+    } else {
+      setIsMediaLoading(false)
+    }
+  }, [mediaUrl])
 
   const videoW = actualVideoDims.width || project.media.width || 1920
   const videoH = actualVideoDims.height || project.media.height || 1080
@@ -386,15 +397,15 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               if (onToggleCrop) onToggleCrop()
             }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${isCropped
-                ? 'bg-blue-600/15 dark:bg-blue-600/20 border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-blue-600/25 dark:hover:bg-blue-600/30 shadow-blue-500/10'
-                : 'bg-white dark:bg-[#14161f] hover:bg-slate-50 dark:hover:bg-[#1a1d28] text-slate-700 hover:text-slate-950 dark:text-gray-300 dark:hover:text-white border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                ? 'bg-[#2373F4]/15 dark:bg-[#2373F4]/20 border-[#2373F4]/40 text-[#2373F4] dark:text-[#2373F4] hover:bg-[#2373F4]/25 shadow-[#2373F4]/10'
+                : 'bg-white dark:bg-[#252525] hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 hover:text-slate-950 dark:text-white/80 dark:hover:text-white border-slate-200 dark:border-white/[0.06] hover:border-slate-300 dark:hover:border-white/20'
               }`}
             title={isCropped ? `Cropped (${cropW}x${cropH}) - Click to adjust crop` : (isImage ? 'Crop Image' : 'Crop Video')}
           >
-            <Crop className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <Crop className="w-3.5 h-3.5 text-[#2373F4]" />
             <span>{isImage ? 'Crop Image' : 'Crop Video'}</span>
             {isCropped && (
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2373F4] animate-pulse" />
             )}
           </button>
 
@@ -406,12 +417,12 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                 setIsFrameMenuOpen((prev) => !prev)
               }}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm ${isFrameMenuOpen || activeAspectRatio !== 'auto'
-                  ? 'bg-blue-600/15 dark:bg-blue-600/20 border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-blue-600/25 dark:hover:bg-blue-600/30 shadow-blue-500/10'
-                  : 'bg-white dark:bg-[#14161f] hover:bg-slate-50 dark:hover:bg-[#1a1d28] text-slate-700 hover:text-slate-950 dark:text-gray-300 dark:hover:text-white border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                  ? 'bg-[#2373F4]/15 dark:bg-[#2373F4]/20 border-[#2373F4]/40 text-[#2373F4] dark:text-[#2373F4] hover:bg-[#2373F4]/25 shadow-[#2373F4]/10'
+                  : 'bg-white dark:bg-[#252525] hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 hover:text-slate-950 dark:text-white/80 dark:hover:text-white border-slate-200 dark:border-white/[0.06] hover:border-slate-300 dark:hover:border-white/20'
                 }`}
               title="Change canvas aspect ratio frame"
             >
-              <Frame className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <Frame className="w-3.5 h-3.5 text-[#2373F4]" />
               <span>Frame: <span className="font-mono text-slate-900 dark:text-white">{activeAspectRatio.toUpperCase()}</span></span>
               <ChevronDown className={`w-3 h-3 text-slate-500 dark:text-gray-400 transition-transform ${isFrameMenuOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -420,9 +431,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
             {isFrameMenuOpen && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute left-0 top-full mt-1.5 w-52 bg-white dark:bg-[#12141a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150"
+                className="absolute left-0 top-full mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/[0.06] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150"
               >
-                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-gray-400 border-b border-slate-100 dark:border-white/5 mb-0.5">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-gray-400 border-b border-slate-100 dark:border-white/[0.06] mb-0.5">
                   Canvas Aspect Ratio
                 </div>
                 {FRAME_PRESETS.map((preset) => {
@@ -437,7 +448,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                         setIsFrameMenuOpen(false)
                       }}
                       className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                          ? 'bg-[#2373F4] text-white font-medium shadow-sm'
                           : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5'
                         }`}
                     >
@@ -462,7 +473,7 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
         {/* Right End: Preview Scale Segmented Pill Switcher (Matching Provided Screenshot) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center bg-white/90 dark:bg-[#14161f] p-1 rounded-xl border border-slate-200/80 dark:border-white/5 shadow-sm gap-0.5"
+          className="flex items-center bg-white/90 dark:bg-[#252525] p-[3px] rounded-xl border border-slate-200/80 dark:border-white/[0.06] shadow-sm gap-0.5"
         >
           {(['full', 'half', 'quarter'] as const).map((scale) => {
             const labels = {
@@ -475,9 +486,9 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
               <button
                 key={scale}
                 onClick={() => onScaleChange && onScaleChange(scale)}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
+                className={`px-3 py-1 text-xs font-medium rounded-[8px] transition-all cursor-pointer ${isActive
+                    ? 'bg-[#2373F4] text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100 dark:text-white/40 dark:hover:text-white/70'
                   }`}
               >
                 {labels[scale]}
@@ -597,11 +608,13 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                           backfaceVisibility: 'hidden'
                         }}
                         onLoad={(e) => {
+                          setIsMediaLoading(false)
                           const el = e.currentTarget
                           if (el.naturalWidth && el.naturalHeight) {
                             setActualVideoDims({ width: el.naturalWidth, height: el.naturalHeight })
                           }
                         }}
+                        onError={() => setIsMediaLoading(false)}
                       />
                     ) : (
                       <video
@@ -621,11 +634,15 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                           backfaceVisibility: 'hidden'
                         }}
                         onLoadedMetadata={(e) => {
+                          setIsMediaLoading(false)
                           const el = e.currentTarget
                           if (el.videoWidth && el.videoHeight) {
                             setActualVideoDims({ width: el.videoWidth, height: el.videoHeight })
                           }
                         }}
+                        onLoadedData={() => setIsMediaLoading(false)}
+                        onCanPlay={() => setIsMediaLoading(false)}
+                        onError={() => setIsMediaLoading(false)}
                         onTimeUpdate={() => {
                           if (videoRef.current) {
                             onTimeUpdate(videoRef.current.currentTime)
@@ -634,8 +651,18 @@ export const StudioCanvas: React.FC<StudioCanvasProps> = ({
                       />
                     )
                   ) : (
-                    <div className="w-[640px] h-[360px] bg-slate-800 flex items-center justify-center text-gray-400 text-sm">
-                      No Media Loaded
+                    <div className="w-[640px] h-[360px] bg-[#1a1a1a] border border-white/[0.06] rounded-xl flex flex-col items-center justify-center gap-2 text-white/40 text-xs font-medium">
+                      <span>No Media Loaded</span>
+                    </div>
+                  )}
+
+                  {/* Clean Minimal Canvas Media Loader */}
+                  {isMediaLoading && mediaUrl && (
+                    <div className="absolute inset-0 z-30 bg-[#1a1a1a]/70 backdrop-blur-sm flex flex-col items-center justify-center gap-2.5 transition-all duration-200 pointer-events-none">
+                      <div className="w-6 h-6 border-2 border-white/10 border-t-[#2373F4] rounded-full animate-spin" />
+                      <span className="text-[11px] font-medium text-white/60 tracking-tight">
+                        Loading media...
+                      </span>
                     </div>
                   )}
 

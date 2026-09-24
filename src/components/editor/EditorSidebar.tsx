@@ -196,12 +196,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="bg-white dark:bg-[#12141a] border-l border-slate-200 dark:border-white/10 flex flex-col select-none z-20 text-slate-800 dark:text-gray-100 shrink-0 overflow-hidden"
+      className="bg-white dark:bg-[#1a1a1a] border-l border-slate-200 dark:border-white/[0.06] flex flex-col select-none z-20 text-slate-800 dark:text-gray-100 shrink-0 overflow-hidden"
     >
       {/* Smooth Segmented Tab Switcher Bar */}
-      <div className="p-3 bg-slate-50 dark:bg-[#161922] border-b border-slate-200/80 dark:border-transparent">
+      <div className="p-3 bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200/80 dark:border-white/[0.06]">
         <div
-          className="grid gap-1 bg-slate-200/70 dark:bg-[#12141a] p-1 rounded-xl border border-black/5 dark:border-white/5 shadow-inner"
+          className="grid gap-1 bg-slate-200/70 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]"
           style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
         >
           {tabs.map((tab) => {
@@ -212,10 +212,10 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 key={tab.id}
                 data-tab={tab.id}
                 onClick={() => onSelectTab(tab.id as any)}
-                className={`py-1.5 px-0.5 rounded-lg flex flex-col items-center justify-center gap-1 text-[9.5px] font-semibold transition-all duration-200 cursor-pointer ${
+                className={`py-1.5 px-0.5 rounded-[8px] flex flex-col items-center justify-center gap-1 text-[9.5px] font-medium transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
+                    ? 'bg-[#2373F4] text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/60 dark:text-white/40 dark:hover:text-white/70'
                 }`}
                 title={tab.label}
               >
@@ -356,17 +356,17 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             {/* Drop Shadow Preset Buttons */}
             <div className="flex flex-col gap-2 pt-2 border-t border-black/5 dark:border-white/5">
               <span className="text-xs font-semibold text-slate-800 dark:text-gray-300">Drop Shadow</span>
-              <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-[#161922] p-1 rounded-xl border border-black/5 dark:border-white/5">
+              <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                 {shadowOptions.map((opt) => (
                   <button
                     key={opt.id}
                     data-control="shadow"
                     data-shadow-id={opt.id}
                     onClick={() => onUpdateLayout({ shadow: opt.id })}
-                    className={`py-1 text-[11px] font-semibold rounded-lg capitalize transition-all cursor-pointer ${
+                    className={`py-1 text-[11px] font-medium rounded-[8px] capitalize transition-all cursor-pointer ${
                       project.layout.shadow === opt.id
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'
+                        ? 'bg-[#2373F4] text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-white/40 dark:hover:text-white/70'
                     }`}
                   >
                     {opt.label}
@@ -383,9 +383,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         {runtime.selectedTab === 'cursor' && (
           <div className="flex flex-col gap-5">
             {/* Header with Enable Switch */}
-            <div className="p-3 bg-[#161922] border border-white/10 rounded-xl flex items-center justify-between">
+            <div className="p-3 bg-[#252525] border border-white/[0.06] rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#2373F4]/20 text-[#2373F4] flex items-center justify-center">
                   <MousePointer className="w-4 h-4" />
                 </div>
                 <div>
@@ -399,7 +399,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   onUpdateCursorConfig({ enabled: !cursorConfig.enabled })
                 }
                 className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
-                  cursorConfig.enabled ? 'bg-blue-600' : 'bg-gray-700'
+                  cursorConfig.enabled ? 'bg-[#2373F4]' : 'bg-gray-700'
                 }`}
               >
                 <div
@@ -433,13 +433,13 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           }
                           className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
                             isSelected
-                              ? 'bg-blue-600/20 border-blue-500/50 shadow-sm'
-                              : 'bg-[#161922] border-white/5 hover:border-white/20'
+                              ? 'bg-[#2373F4]/20 border-[#2373F4]/50 shadow-sm'
+                              : 'bg-[#252525] border-white/[0.06] hover:border-white/20'
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-gray-200">{styleOpt.label}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#2373F4]" />}
                           </div>
                           <span className="text-[10px] text-gray-400">{styleOpt.desc}</span>
                         </button>
@@ -1118,7 +1118,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     {currentDimensions.width} × {currentDimensions.height}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                   {(['original', '2k', '4k'] as const).map((res) => {
                     const isActive = (exportSettings.resolution || 'original') === res
                     const label = res === 'original' ? '1x Native' : res === '2k' ? '2x Retina' : '4K Ultra'
@@ -1126,9 +1126,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       <button
                         key={res}
                         onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res as any })}
-                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        className={`py-1.5 px-1 rounded-[8px] text-xs font-medium transition-all cursor-pointer text-center ${
                           isActive
-                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1143,15 +1143,15 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               <div className="flex flex-col gap-2 pt-2">
                 <button
                   onClick={() => onExportImage && onExportImage('copy')}
-                  className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold text-xs rounded-xl shadow-md active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 border border-white/10 text-white font-medium text-xs rounded-xl shadow-sm active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Clipboard className="w-3.5 h-3.5 text-blue-400" />
+                  <Clipboard className="w-3.5 h-3.5 text-[#2373F4]" />
                   <span>Copy Image to Clipboard</span>
                 </button>
 
                 <button
                   onClick={() => onExportImage && onExportImage('save')}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-[#2373F4] hover:bg-[#2373F4]/90 text-white font-semibold text-[13px] rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Save Framed Screenshot</span>
@@ -1165,16 +1165,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                   Format
                 </span>
-                <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                   {(['mp4', 'webm'] as const).map((fmt) => {
                     const isActive = exportSettings.format === fmt
                     return (
                       <button
                         key={fmt}
                         onClick={() => onUpdateExportSettings && onUpdateExportSettings({ format: fmt })}
-                        className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center uppercase ${
+                        className={`py-1.5 px-3 rounded-[8px] text-xs font-medium transition-all cursor-pointer text-center uppercase ${
                           isActive
-                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1191,11 +1191,11 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                     Resolution
                   </span>
-                  <span className="text-[10px] font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                  <span className="text-[10px] font-mono text-[#2373F4] font-semibold bg-[#2373F4]/10 px-2 py-0.5 rounded border border-[#2373F4]/20">
                     {currentDimensions.width} × {currentDimensions.height}
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                   {(['4k', '1080p', '720p', 'original'] as const).map((res) => {
                     const isActive = exportSettings.resolution === res
                     const label = res === 'original' ? 'Native' : res.toUpperCase()
@@ -1203,9 +1203,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       <button
                         key={res}
                         onClick={() => onUpdateExportSettings && onUpdateExportSettings({ resolution: res })}
-                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        className={`py-1.5 px-1 rounded-[8px] text-xs font-medium transition-all cursor-pointer text-center ${
                           isActive
-                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1221,16 +1221,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                   Frame Rate
                 </span>
-                <div className="grid grid-cols-2 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                   {([60, 30] as const).map((f) => {
                     const isActive = exportSettings.fps === f
                     return (
                       <button
                         key={f}
                         onClick={() => onUpdateExportSettings && onUpdateExportSettings({ fps: f })}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        className={`py-1.5 px-2 rounded-[8px] text-xs font-medium transition-all cursor-pointer text-center ${
                           isActive
-                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1251,7 +1251,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     {formatBitrate(currentBitrate)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-1 bg-[#161924] p-1 rounded-xl border border-white/5">
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-black/5 dark:border-white/[0.06]">
                   {(['ultra', 'high', 'standard'] as const).map((preset) => {
                     const isActive = exportSettings.bitratePreset === preset
                     const labels = { ultra: 'Ultra', high: 'High', standard: 'Standard' }
@@ -1259,9 +1259,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       <button
                         key={preset}
                         onClick={() => onUpdateExportSettings && onUpdateExportSettings({ bitratePreset: preset })}
-                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                        className={`py-1.5 px-1 rounded-[8px] text-xs font-medium transition-all cursor-pointer text-center ${
                           isActive
-                            ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1273,7 +1273,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               </div>
 
               {/* Audio Toggle (Simple Single Row) */}
-              <div className="flex items-center justify-between p-3 bg-[#161924] rounded-xl border border-white/5">
+              <div className="flex items-center justify-between p-3 bg-[#252525] rounded-xl border border-white/[0.06]">
                 <span className="text-xs font-medium text-gray-200">Audio Track</span>
                 <button
                   onClick={() =>
@@ -1281,7 +1281,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     onUpdateExportSettings({ includeAudio: !exportSettings.includeAudio })
                   }
                   className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
-                    exportSettings.includeAudio ? 'bg-blue-600' : 'bg-gray-700'
+                    exportSettings.includeAudio ? 'bg-[#2373F4]' : 'bg-gray-700'
                   }`}
                 >
                   <div
@@ -1293,7 +1293,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               </div>
 
               {/* Quick Summary Strip & Save As */}
-              <div className="flex items-center justify-between px-3 py-2 bg-[#141720] rounded-xl border border-white/5 text-[11px]">
+              <div className="flex items-center justify-between px-3 py-2 bg-[#252525] rounded-xl border border-white/[0.06] text-[11px]">
                 <div className="flex items-center gap-1.5 text-gray-400">
                   <span>Est. Size:</span>
                   <span className="font-mono font-bold text-emerald-400">
@@ -1312,7 +1312,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               {/* Primary Action Export Button */}
               <button
                 onClick={() => onExport && onExport()}
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer text-center mt-1"
+                className="w-full py-3 px-4 bg-[#2373F4] hover:bg-[#2373F4]/90 text-white font-semibold text-[13px] rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer text-center mt-1"
               >
                 Export Video
               </button>

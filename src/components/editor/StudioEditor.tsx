@@ -828,7 +828,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
   }
 
   return (
-    <div className={`w-screen h-screen bg-slate-100 dark:bg-[#0d0d11] text-slate-900 dark:text-white flex flex-col overflow-hidden font-sans select-none relative ${isResizingSidebar ? 'cursor-col-resize select-none' : ''}`}>
+    <div className={`w-screen h-screen bg-slate-100 dark:bg-[#111111] text-slate-900 dark:text-white flex flex-col overflow-hidden font-sans select-none relative ${isResizingSidebar ? 'cursor-col-resize select-none' : ''}`}>
       {/* Top Navigation & Action Header */}
       <EditorTopBar
         project={project}
@@ -884,14 +884,14 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         <div
           onPointerDown={handleSidebarResizeStart}
           onDoubleClick={handleResetSidebarWidth}
-          className="relative group w-2 bg-transparent hover:bg-blue-500/10 active:bg-blue-500/20 cursor-col-resize z-30 flex items-center justify-center transition-colors shrink-0 -ml-1 -mr-1"
+          className="relative group w-2 bg-transparent hover:bg-[#2373F4]/10 active:bg-[#2373F4]/20 cursor-col-resize z-30 flex items-center justify-center transition-colors shrink-0 -ml-1 -mr-1"
           title="Drag to resize panel (Double-click to reset)"
         >
           {/* Visual indicator bar */}
           <div
             className={`w-[2px] h-8 rounded-full transition-all ${
               isResizingSidebar
-                ? 'bg-blue-500 shadow-sm shadow-blue-500/50 scale-y-125'
+                ? 'bg-[#2373F4] shadow-sm shadow-[#2373F4]/50 scale-y-125'
                 : 'bg-transparent group-hover:bg-slate-400/60 dark:group-hover:bg-zinc-500/60'
             }`}
           />

@@ -18,6 +18,7 @@ import {
   Circle as CircleIcon,
   Square as SquareIcon
 } from 'lucide-react'
+import logoImg from '../../public/Logo.png'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
 import { SettingsModal } from './SettingsModal'
@@ -255,9 +256,16 @@ export const Launcher: React.FC<LauncherProps> = ({
         <div className="w-full h-fit bg-[#1a1a1a] z-30 flex flex-col overflow-hidden animate-in fade-in duration-150 rounded-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] shrink-0">
-            <h3 className="text-[13px] font-semibold text-white/90">
-              Recordings
-            </h3>
+            <div className="flex items-center gap-2">
+              <img
+                src={logoImg}
+                alt={APP_CONFIG.appName}
+                className="w-5 h-5 object-contain"
+              />
+              <h3 className="text-[13px] font-semibold text-white/90">
+                Recordings
+              </h3>
+            </div>
             <button
               onClick={() => setIsHistoryOpen(false)}
               className="p-1.5 text-white/40 hover:text-white/70 rounded-md transition-colors cursor-pointer"
@@ -324,9 +332,14 @@ export const Launcher: React.FC<LauncherProps> = ({
       ) : (
         <>
           {/* Window Drag Header */}
-          <header className="h-10 bg-[#1a1a1a] px-3.5 flex items-center justify-between select-none z-10 drag-region cursor-default shrink-0">
-            <div className="flex items-center gap-2 no-drag">
-              <span className="text-[13px] font-semibold tracking-tight text-white/90">
+          <header className="h-11 bg-[#1a1a1a] px-3.5 flex items-center justify-between select-none z-10 drag-region cursor-default shrink-0 border-b border-white/[0.04]">
+            <div className="flex items-center gap-1.5 no-drag">
+              <img
+                src={logoImg}
+                alt={APP_CONFIG.appName}
+                className="w-6.5 h-6.5 object-contain shrink-0"
+              />
+              <span className="text-sm font-bold tracking-tight text-white">
                 {APP_CONFIG.appName}
               </span>
             </div>
@@ -397,7 +410,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                   setActiveTab('recording')
                 }}
                 className={`flex items-center justify-center gap-1.5 py-1.5 text-[13px] font-medium rounded-[10px] transition-all cursor-pointer ${activeTab === 'recording'
-                    ? 'bg-[#333] text-white shadow-sm'
+                    ? 'bg-[#2373F4] text-white shadow-sm'
                     : 'text-white/40 hover:text-white/60'
                   }`}
               >
@@ -411,7 +424,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                   setActiveTab('screenshot')
                 }}
                 className={`flex items-center justify-center gap-1.5 py-1.5 text-[13px] font-medium rounded-[10px] transition-all cursor-pointer ${activeTab === 'screenshot'
-                    ? 'bg-[#333] text-white shadow-sm'
+                    ? 'bg-[#2373F4] text-white shadow-sm'
                     : 'text-white/40 hover:text-white/60'
                   }`}
               >
@@ -676,7 +689,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                     console.log(`[BetterShot:Launcher] Start Recording clicked with mode: ${activeCaptureMode}, sourceId: ${selectedSource?.id}`)
                     onStartRecording(activeCaptureMode, selectedSource?.id || null)
                   }}
-                  className="w-full py-3 px-4 rounded-xl bg-white text-[#1a1a1a] font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-white/90 active:scale-[0.98] transition-all cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-[#2373F4] text-white font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-[#2373F4]/90 active:scale-[0.98] transition-all cursor-pointer shadow-md"
                 >
                   <span>Start Recording</span>
                 </button>
@@ -688,7 +701,7 @@ export const Launcher: React.FC<LauncherProps> = ({
                       onTakeScreenshot(activeCaptureMode, selectedSource?.id || null, { copyToClipboard, saveToFile })
                     }
                   }}
-                  className="w-full py-3 px-4 rounded-xl bg-white text-[#1a1a1a] font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-white/90 active:scale-[0.98] transition-all cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-[#2373F4] text-white font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-[#2373F4]/90 active:scale-[0.98] transition-all cursor-pointer shadow-md"
                 >
                   <span>Capture Screenshot</span>
                 </button>
