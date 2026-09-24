@@ -333,11 +333,11 @@ export const Launcher: React.FC<LauncherProps> = ({
         <>
           {/* Window Drag Header */}
           <header className="h-11 bg-[#1a1a1a] px-3.5 flex items-center justify-between select-none z-10 drag-region cursor-default shrink-0 border-b border-white/[0.04]">
-            <div className="flex items-center gap-1.5 no-drag">
+            <div className="flex items-center gap-2 no-drag">
               <img
                 src={logoImg}
                 alt={APP_CONFIG.appName}
-                className="w-6.5 h-6.5 object-contain shrink-0"
+                className="w-6 h-6 object-contain shrink-0"
               />
               <span className="text-sm font-bold tracking-tight text-white">
                 {APP_CONFIG.appName}
