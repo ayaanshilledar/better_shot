@@ -286,38 +286,45 @@ function createSelectionWindow() {
   })
 }
 
-function getCameraBubbleBounds(size: 'small' | 'medium' | 'large' = 'medium', position: string = 'bottom-right') {
+function getCameraBubbleBounds(size: 'small' | 'medium' | 'large' = 'medium', position: string = 'bottom-right', shape: string = 'circle') {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
 
-  const dim = size === 'small' ? 180 : size === 'large' ? 260 : 210
+  let width = size === 'small' ? 180 : size === 'large' ? 260 : 210
+  let height = width
+
+  if (shape === '16:9') {
+    width = size === 'small' ? 240 : size === 'large' ? 360 : 300
+    height = Math.round(width * 9 / 16)
+  }
+
   const margin = 28
 
-  let x = displayX + screenW - dim - margin
-  let y = displayY + screenH - dim - margin
+  let x = displayX + screenW - width - margin
+  let y = displayY + screenH - height - margin
 
   if (position === 'bottom-left') {
     x = displayX + margin
-    y = displayY + screenH - dim - margin
+    y = displayY + screenH - height - margin
   } else if (position === 'top-right') {
-    x = displayX + screenW - dim - margin
+    x = displayX + screenW - width - margin
     y = displayY + margin
   } else if (position === 'top-left') {
     x = displayX + margin
     y = displayY + margin
   }
 
-  return { x, y, width: dim, height: dim }
+  return { x, y, width, height }
 }
 
 function createCameraBubbleWindow(config?: any) {
   if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
-    const bounds = getCameraBubbleBounds(config?.size, config?.position)
+    const bounds = getCameraBubbleBounds(config?.size, config?.position, config?.shape)
     cameraBubbleWindow.setBounds(bounds)
     return cameraBubbleWindow
   }
 
-  const bounds = getCameraBubbleBounds(config?.size, config?.position)
+  const bounds = getCameraBubbleBounds(config?.size, config?.position, config?.shape)
 
   cameraBubbleWindow = new BrowserWindow({
     width: bounds.width,
@@ -889,7 +896,9 @@ ipcMain.handle('set-camera-bubble-position', (_event, position: string) => {
   if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
     const currentBounds = cameraBubbleWindow.getBounds()
     const size: 'small' | 'medium' | 'large' = currentBounds.width < 190 ? 'small' : currentBounds.width > 240 ? 'large' : 'medium'
-    const newBounds = getCameraBubbleBounds(size, position)
+    // Infer shape if it's 16:9
+    const shape = currentBounds.width !== currentBounds.height ? '16:9' : 'circle'
+    const newBounds = getCameraBubbleBounds(size, position, shape)
     cameraBubbleWindow.setBounds(newBounds)
   }
   return true
@@ -913,16 +922,19 @@ ipcMain.on('relay-camera-toggle', (_event, enabled: boolean) => {
   }
 })
 
-ipcMain.on('relay-camera-config', (_event, config: any) => {
+ipcMain.on('relay-camera-config', (event, config: any) => {
   console.log('[BetterShot:Main] relay-camera-config:', config)
   if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
-    if (config.size || config.position) {
-      const bounds = getCameraBubbleBounds(config.size, config.position)
+    if (config.size || config.position || config.shape) {
+      const bounds = getCameraBubbleBounds(config.size, config.position, config.shape)
+      console.log('[BetterShot:Main] Setting camera bubble bounds:', bounds)
       cameraBubbleWindow.setBounds(bounds)
     }
     cameraBubbleWindow.webContents.send('recording-camera-config-update', config)
   }
-  if (launcherWindow && !launcherWindow.isDestroyed()) {
+  // Don't echo config back to the sender window to prevent infinite loop
+  const senderWebContentsId = event.sender.id
+  if (launcherWindow && !launcherWindow.isDestroyed() && launcherWindow.webContents.id !== senderWebContentsId) {
     launcherWindow.webContents.send('recording-camera-config-update', config)
   }
 })

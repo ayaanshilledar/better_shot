@@ -191,6 +191,29 @@ export const App: React.FC = () => {
     }
   }, [])
 
+  useEffect(() => {
+    // Only manage window lifecycle from the primary Launcher window
+    // Check hash to avoid secondary windows hiding themselves before their route updates
+    const isActuallyLauncher = window.location.hash === '' || window.location.hash === '#launcher' || window.location.hash.includes('launcher')
+    if (route === 'launcher' && isActuallyLauncher) {
+      if (enableCamera) {
+        console.log('[BetterShot:App] Camera ON -> Showing real floating camera bubble on desktop:', cameraConfig)
+        window.electronAPI?.startCameraBubble?.(cameraConfig)
+      } else {
+        console.log('[BetterShot:App] Camera OFF -> Hiding floating camera bubble')
+        window.electronAPI?.stopCameraBubble?.()
+      }
+    }
+  }, [enableCamera, route])
+
+  useEffect(() => {
+    if (route === 'launcher' && enableCamera) {
+      console.log('[BetterShot:App] Relaying live camera config to real desktop bubble:', cameraConfig)
+      window.electronAPI?.sendCameraConfig?.(cameraConfig)
+      recorderService.updateCameraConfig(cameraConfig)
+    }
+  }, [cameraConfig, enableCamera, route])
+
   const runCountdownSequence = async (): Promise<boolean> => {
     if (window.electronAPI?.startRecordingMode) {
       await window.electronAPI.startRecordingMode()

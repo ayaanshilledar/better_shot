@@ -139,7 +139,7 @@ class ScreenRecorderService {
         try {
           console.log('[Velo:Recorder] Capturing Webcam Stream...')
           const camStream = await navigator.mediaDevices.getUserMedia({
-            video: config.cameraId ? { deviceId: { exact: config.cameraId } } : true,
+            video: config.cameraId ? { deviceId: { ideal: config.cameraId } } : true,
             audio: false
           })
           this.cameraStream = camStream

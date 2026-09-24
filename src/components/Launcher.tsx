@@ -16,13 +16,16 @@ import {
   Clipboard,
   FlipHorizontal,
   Circle as CircleIcon,
-  Square as SquareIcon
+  Square as SquareIcon,
+  RectangleHorizontal,
+  Trash2,
+  ChevronDown
 } from 'lucide-react'
 import logoImg from '../../public/Logo.png'
 import { APP_CONFIG } from '../config/appConfig'
 import { DesktopSource, RecordedFile } from '../../electron/preload'
 import { SettingsModal } from './SettingsModal'
-import { CameraOverlayConfig } from '../types/editor'
+import { CameraOverlayConfig, CameraOverlayPosition } from '../types/editor'
 
 export type CaptureMode = 'display' | 'area'
 export type LauncherTab = 'recording' | 'screenshot'
@@ -63,6 +66,7 @@ export const Launcher: React.FC<LauncherProps> = ({
   const [copyToClipboard, setCopyToClipboard] = useState<boolean>(true)
   const [saveToFile, setSaveToFile] = useState<boolean>(true)
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false)
+  const [showAllRecordings, setShowAllRecordings] = useState<boolean>(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false)
   const [recordings, setRecordings] = useState<RecordedFile[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
@@ -74,15 +78,27 @@ export const Launcher: React.FC<LauncherProps> = ({
   // Enumerate cameras when camera is enabled
   useEffect(() => {
     if (enableCamera) {
-      navigator.mediaDevices.enumerateDevices().then((devices) => {
-        const cams = devices.filter((d) => d.kind === 'videoinput')
-        setAvailableCameras(cams)
-        if (cams.length > 0 && !cameraConfig.deviceId) {
-          setCameraConfig((prev) => ({ ...prev, deviceId: cams[0].deviceId }))
+      const refreshCameras = async () => {
+        try {
+
+          const initStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          initStream.getTracks().forEach((t) => t.stop())
+        } catch (e) {
+          console.warn('[BetterShot:Launcher] Initial camera permission request warning:', e)
         }
-      }).catch((err) => {
-        console.warn('[BetterShot:Launcher] Camera enumeration error:', err)
-      })
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices()
+          const cams = devices.filter((d) => d.kind === 'videoinput')
+          console.log('[BetterShot:Launcher] Enumerated camera devices:', cams)
+          setAvailableCameras(cams)
+          if (cams.length > 0 && !cameraConfig.deviceId) {
+            setCameraConfig((prev) => ({ ...prev, deviceId: cams[0].deviceId }))
+          }
+        } catch (err) {
+          console.warn('[BetterShot:Launcher] Camera enumeration error:', err)
+        }
+      }
+      refreshCameras()
     }
   }, [enableCamera])
 
@@ -91,7 +107,7 @@ export const Launcher: React.FC<LauncherProps> = ({
     let active = true
     if (enableCamera && isCameraOptionsOpen) {
       navigator.mediaDevices.getUserMedia({
-        video: cameraConfig.deviceId ? { deviceId: { exact: cameraConfig.deviceId } } : true,
+        video: cameraConfig.deviceId ? { deviceId: { ideal: cameraConfig.deviceId } } : true,
         audio: false
       }).then((stream) => {
         if (!active) {
@@ -156,7 +172,7 @@ export const Launcher: React.FC<LauncherProps> = ({
       observer.disconnect()
       clearTimeout(timer)
     }
-  }, [isSettingsOpen, isHistoryOpen, activeTab, enableCamera, isCameraOptionsOpen, availableCameras.length, recordings.length])
+  }, [isSettingsOpen, isHistoryOpen, activeTab, enableCamera, isCameraOptionsOpen, availableCameras.length, recordings.length, showAllRecordings])
 
   useEffect(() => {
     if (autoOpenHistory) {
@@ -275,59 +291,161 @@ export const Launcher: React.FC<LauncherProps> = ({
             </button>
           </div>
 
-          <div className="max-h-[380px] overflow-y-auto px-4 py-2 shrink-0">
+          {/* Content Container */}
+          <div className="max-h-[480px] overflow-y-auto px-4 py-3 shrink-0 flex flex-col gap-2.5 custom-scrollbar">
             {recordings.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-white/30 text-[13px] py-8">
                 No recorded videos yet
               </div>
+            ) : showAllRecordings ? (
+              // Expanded 2-Column Card Container View for all recordings
+              <div className="grid grid-cols-2 gap-2.5">
+                {recordings.map((rec) => {
+                  const videoUri = `file:///${rec.filePath.replace(/\\/g, '/')}#t=0.5`
+                  return (
+                    <div
+                      key={rec.filePath}
+                      onClick={() => handleEditRecording(rec.filePath)}
+                      className="bg-[#252525] border border-white/[0.06] hover:border-white/20 rounded-xl p-2 flex flex-col gap-1.5 cursor-pointer group transition-all shadow-sm"
+                      title="Open in Studio Editor"
+                    >
+                      {/* Top Thumbnail (16:9 Aspect Video) */}
+                      <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-white/20 transition-colors">
+                        <video
+                          src={videoUri}
+                          className="w-full h-full object-cover pointer-events-none"
+                          preload="metadata"
+                          muted
+                        />
+                        {/* Center Hover Play Button */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePlayRecording(rec.filePath)
+                            }}
+                            className="w-8 h-8 rounded-full bg-[#2373F4] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            title="Play Raw Video"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Card Details Below Thumbnail */}
+                      <div className="flex flex-col gap-1 min-w-0 px-0.5">
+                        <span className="text-[11px] font-semibold text-white/90 truncate group-hover:text-white transition-colors" title={rec.name}>
+                          {rec.name}
+                        </span>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1 text-[10px] text-white/40 truncate">
+                            <span>{formatDate(rec.createdAt)}</span>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => handleEditRecording(rec.filePath, e)}
+                              className="px-2 py-0.5 rounded-md bg-[#2373F4]/20 hover:bg-[#2373F4]/30 text-[#2373F4] text-[10px] font-semibold transition-colors cursor-pointer"
+                              title="Open in Studio Editor"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteRecording(e, rec.filePath)}
+                              className="p-1 rounded-md text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete Recording"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
-              recordings.map((rec, idx) => {
+              // Default Compact Horizontal Rows (up to 4 items)
+              recordings.slice(0, 4).map((rec) => {
                 const videoUri = `file:///${rec.filePath.replace(/\\/g, '/')}#t=0.5`
                 return (
                   <div
                     key={rec.filePath}
                     onClick={() => handleEditRecording(rec.filePath)}
-                    className={`flex items-center gap-3 py-2.5 px-1 cursor-pointer group ${idx < recordings.length - 1 ? 'border-b border-white/[0.06]' : ''}`}
+                    className="p-2.5 rounded-xl bg-[#252525] border border-white/[0.06] hover:border-white/20 hover:bg-[#2a2a2a] transition-all flex items-center gap-3 cursor-pointer group shadow-sm"
                     title="Open in Studio Editor"
                   >
-                    {/* Thumbnail */}
-                    <div className="relative w-14 h-10 rounded-lg overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-white/20 transition-colors">
+                    {/* Video Thumbnail Preview */}
+                    <div className="relative w-14 h-10 rounded-lg overflow-hidden bg-black border border-white/10 shrink-0 flex items-center justify-center group-hover:border-white/30 transition-colors">
                       <video
                         src={videoUri}
                         className="w-full h-full object-cover pointer-events-none"
                         preload="metadata"
                         muted
                       />
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-[13px] font-medium text-white/80 truncate group-hover:text-white transition-colors">
-                        {rec.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[11px] text-white/35 mt-0.5">
-                        <span>{formatDate(rec.createdAt)}</span>
-                        <span className="text-white/15">·</span>
-                        <span>{formatFileSize(rec.size)}</span>
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Play className="w-3.5 h-3.5 text-white fill-current" />
                       </div>
                     </div>
 
-                    {/* Play button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handlePlayRecording(rec.filePath)
-                      }}
-                      className="w-7 h-7 rounded-lg bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70 flex items-center justify-center transition-all cursor-pointer shrink-0"
-                      title="Play Video"
-                    >
-                      <Play className="w-3 h-3 fill-current ml-0.5" />
-                    </button>
+                    {/* Metadata details */}
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-[12px] font-semibold text-white/90 truncate group-hover:text-white transition-colors" title={rec.name}>
+                        {rec.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-white/40 mt-0.5 truncate">
+                        <span className="truncate">{formatDate(rec.createdAt)}</span>
+                        <span className="text-white/20 shrink-0">•</span>
+                        <span className="shrink-0">{formatFileSize(rec.size)}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditRecording(rec.filePath, e)
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-[#2373F4]/20 hover:bg-[#2373F4]/30 text-[#2373F4] text-[11px] font-semibold transition-colors cursor-pointer"
+                        title="Open in Studio Editor"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteRecording(e, rec.filePath)}
+                        className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Delete Recording"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 )
               })
             )}
           </div>
+
+          {/* Show More / Show Less Footer */}
+          {recordings.length > 4 && (
+            <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-center shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAllRecordings((prev) => !prev)}
+                className="w-full py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/10 text-white/80 font-medium text-[12px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>{showAllRecordings ? 'Show Less' : `Show More (${recordings.length - 4} more)`}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAllRecordings ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -410,8 +528,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                   setActiveTab('recording')
                 }}
                 className={`flex items-center justify-center gap-1.5 py-1.5 text-[13px] font-medium rounded-[10px] transition-all cursor-pointer ${activeTab === 'recording'
-                    ? 'bg-[#2373F4] text-white shadow-sm'
-                    : 'text-white/40 hover:text-white/60'
+                  ? 'bg-[#2373F4] text-white shadow-sm'
+                  : 'text-white/40 hover:text-white/60'
                   }`}
               >
                 <span>Recording</span>
@@ -424,8 +542,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                   setActiveTab('screenshot')
                 }}
                 className={`flex items-center justify-center gap-1.5 py-1.5 text-[13px] font-medium rounded-[10px] transition-all cursor-pointer ${activeTab === 'screenshot'
-                    ? 'bg-[#2373F4] text-white shadow-sm'
-                    : 'text-white/40 hover:text-white/60'
+                  ? 'bg-[#2373F4] text-white shadow-sm'
+                  : 'text-white/40 hover:text-white/60'
                   }`}
               >
                 <span>Screenshot</span>
@@ -438,8 +556,8 @@ export const Launcher: React.FC<LauncherProps> = ({
               <button
                 onClick={() => handleModeClick('display')}
                 className={`flex flex-col items-center justify-center gap-1.5 py-3 px-3 rounded-xl border transition-all cursor-pointer ${activeCaptureMode === 'display'
-                    ? 'bg-white/[0.06] border-white/20 text-white'
-                    : 'bg-transparent border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/15'
+                  ? 'bg-white/[0.06] border-white/20 text-white'
+                  : 'bg-transparent border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/15'
                   }`}
               >
                 <Monitor className="w-5 h-5" />
@@ -450,8 +568,8 @@ export const Launcher: React.FC<LauncherProps> = ({
               <button
                 onClick={() => handleModeClick('area')}
                 className={`flex flex-col items-center justify-center gap-1.5 py-3 px-3 rounded-xl border transition-all cursor-pointer ${activeCaptureMode === 'area'
-                    ? 'bg-white/[0.06] border-white/20 text-white'
-                    : 'bg-transparent border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/15'
+                  ? 'bg-white/[0.06] border-white/20 text-white'
+                  : 'bg-transparent border-white/[0.08] text-white/50 hover:text-white/70 hover:border-white/15'
                   }`}
               >
                 <Crop className="w-5 h-5" />
@@ -486,8 +604,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </span>
                   </div>
                   <span className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md ${enableCamera
-                      ? 'bg-white/10 text-white/70'
-                      : 'bg-white/[0.04] text-white/30'
+                    ? 'bg-white/10 text-white/70'
+                    : 'bg-white/[0.04] text-white/30'
                     }`}>
                     {enableCamera ? 'On' : 'Off'}
                   </span>
@@ -495,14 +613,15 @@ export const Launcher: React.FC<LauncherProps> = ({
 
                 {/* Camera Options Drawer */}
                 {enableCamera && isCameraOptionsOpen && (
-                  <div className="py-2 px-1 border-b border-white/[0.06] flex flex-col gap-2">
+                  <div className="py-2.5 px-1 border-b border-white/[0.06] flex flex-col gap-2.5">
+                    {/* Multi-camera device selector */}
                     {availableCameras.length > 1 && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-white/40 font-medium">Device</span>
+                        <span className="text-[11px] text-white/40 font-medium">Camera Device</span>
                         <select
                           value={cameraConfig.deviceId || ''}
                           onChange={(e) => setCameraConfig(prev => ({ ...prev, deviceId: e.target.value }))}
-                          className="text-[11px] bg-[#252525] border border-white/10 rounded-lg px-2 py-1 text-white/80 truncate max-w-[170px] outline-none"
+                          className="text-[11px] bg-[#252525] border border-white/10 rounded-lg px-2 py-1 text-white/80 truncate max-w-[180px] outline-none"
                         >
                           {availableCameras.map((cam, idx) => (
                             <option key={cam.deviceId || idx} value={cam.deviceId}>
@@ -512,7 +631,9 @@ export const Launcher: React.FC<LauncherProps> = ({
                         </select>
                       </div>
                     )}
-                    <div className="flex items-center justify-between gap-1.5">
+
+                    {/* Camera Control Toolbar */}
+                    <div className="flex items-center justify-between gap-1">
                       {/* Shape Selector */}
                       <div className="flex items-center gap-0.5 bg-[#252525] p-0.5 rounded-lg">
                         <button
@@ -520,8 +641,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                           onClick={() => setCameraConfig(prev => ({ ...prev, shape: 'circle' }))}
                           title="Circle Bubble"
                           className={`p-1.5 rounded-md transition-colors cursor-pointer ${cameraConfig.shape === 'circle'
-                              ? 'bg-white/15 text-white'
-                              : 'text-white/30 hover:text-white/60'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
+                            : 'text-white/30 hover:text-white/60'
                             }`}
                         >
                           <CircleIcon className="w-3 h-3" />
@@ -529,19 +650,30 @@ export const Launcher: React.FC<LauncherProps> = ({
                         <button
                           type="button"
                           onClick={() => setCameraConfig(prev => ({ ...prev, shape: 'rect' }))}
-                          title="Rounded Rectangle"
+                          title="Square"
                           className={`p-1.5 rounded-md transition-colors cursor-pointer ${cameraConfig.shape === 'rect'
-                              ? 'bg-white/15 text-white'
-                              : 'text-white/30 hover:text-white/60'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
+                            : 'text-white/30 hover:text-white/60'
                             }`}
                         >
                           <SquareIcon className="w-3 h-3" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setCameraConfig(prev => ({ ...prev, shape: '16:9' }))}
+                          title="16:9 Wide"
+                          className={`p-1.5 rounded-md transition-colors cursor-pointer ${cameraConfig.shape === '16:9'
+                            ? 'bg-[#2373F4] text-white shadow-sm'
+                            : 'text-white/30 hover:text-white/60'
+                            }`}
+                        >
+                          <RectangleHorizontal className="w-3 h-3" />
+                        </button>
                       </div>
 
-                      {/* Corner Position Selector */}
+                      {/* Position Corner Selector */}
                       <div className="flex items-center gap-0.5 bg-[#252525] p-0.5 rounded-lg text-[10px] font-medium">
-                        {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const).map((pos) => {
+                        {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((pos) => {
                           const label = pos === 'bottom-right' ? 'BR' : pos === 'bottom-left' ? 'BL' : pos === 'top-right' ? 'TR' : 'TL'
                           const isSelected = cameraConfig.position === pos
                           return (
@@ -551,8 +683,30 @@ export const Launcher: React.FC<LauncherProps> = ({
                               onClick={() => setCameraConfig(prev => ({ ...prev, position: pos }))}
                               title={`Corner: ${pos}`}
                               className={`px-1.5 py-1 rounded-md transition-all cursor-pointer ${isSelected
-                                  ? 'bg-white/15 text-white'
-                                  : 'text-white/30 hover:text-white/60'
+                                ? 'bg-[#2373F4] text-white font-semibold shadow-sm'
+                                : 'text-white/30 hover:text-white/60'
+                                }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Size Selector */}
+                      <div className="flex items-center gap-0.5 bg-[#252525] p-0.5 rounded-lg text-[10px] font-medium">
+                        {(['small', 'medium', 'large'] as const).map((sz) => {
+                          const label = sz === 'small' ? 'S' : sz === 'medium' ? 'M' : 'L'
+                          const isSelected = cameraConfig.size === sz
+                          return (
+                            <button
+                              key={sz}
+                              type="button"
+                              onClick={() => setCameraConfig(prev => ({ ...prev, size: sz }))}
+                              title={`Size: ${sz}`}
+                              className={`px-1.5 py-1 rounded-md transition-all cursor-pointer ${isSelected
+                                ? 'bg-[#2373F4] text-white font-semibold shadow-sm'
+                                : 'text-white/30 hover:text-white/60'
                                 }`}
                             >
                               {label}
@@ -567,26 +721,12 @@ export const Launcher: React.FC<LauncherProps> = ({
                         onClick={() => setCameraConfig(prev => ({ ...prev, mirror: !prev.mirror }))}
                         title={cameraConfig.mirror ? 'Mirror Mode (On)' : 'Mirror Mode (Off)'}
                         className={`p-1.5 rounded-lg transition-colors cursor-pointer ${cameraConfig.mirror
-                            ? 'bg-white/15 text-white'
-                            : 'bg-[#252525] text-white/30 hover:text-white/60'
+                          ? 'bg-[#2373F4] text-white shadow-sm'
+                          : 'bg-[#252525] text-white/30 hover:text-white/60'
                           }`}
                       >
                         <FlipHorizontal className="w-3.5 h-3.5" />
                       </button>
-
-                      {/* Mini live preview */}
-                      <div
-                        className={`w-6 h-6 shrink-0 overflow-hidden border border-white/15 bg-black ${cameraConfig.shape === 'circle' ? 'rounded-full' : 'rounded-md'}`}
-                        title="Camera Live Preview"
-                      >
-                        <video
-                          ref={previewVideoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className={`w-full h-full object-cover pointer-events-none ${cameraConfig.mirror ? 'scale-x-[-1]' : ''}`}
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
@@ -614,8 +754,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </span>
                   </div>
                   <span className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md ${enableMic
-                      ? 'bg-white/10 text-white/70'
-                      : 'bg-white/[0.04] text-white/30'
+                    ? 'bg-white/10 text-white/70'
+                    : 'bg-white/[0.04] text-white/30'
                     }`}>
                     {enableMic ? 'On' : 'Off'}
                   </span>
@@ -644,8 +784,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </span>
                   </div>
                   <span className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md ${enableSystemAudio
-                      ? 'bg-white/10 text-white/70'
-                      : 'bg-white/[0.04] text-white/30'
+                    ? 'bg-white/10 text-white/70'
+                    : 'bg-white/[0.04] text-white/30'
                     }`}>
                     {enableSystemAudio ? 'On' : 'Off'}
                   </span>
@@ -672,8 +812,8 @@ export const Launcher: React.FC<LauncherProps> = ({
                     </span>
                   </div>
                   <span className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md ${copyToClipboard
-                      ? 'bg-white/10 text-white/70'
-                      : 'bg-white/[0.04] text-white/30'
+                    ? 'bg-white/10 text-white/70'
+                    : 'bg-white/[0.04] text-white/30'
                     }`}>
                     {copyToClipboard ? 'On' : 'Off'}
                   </span>

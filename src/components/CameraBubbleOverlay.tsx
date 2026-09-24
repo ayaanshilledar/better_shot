@@ -3,6 +3,7 @@ import {
   FlipHorizontal,
   Circle,
   Square,
+  RectangleHorizontal,
   EyeOff,
   Maximize2,
   Minimize2,
@@ -49,7 +50,7 @@ export const CameraBubbleOverlay: React.FC = () => {
         }
 
         const constraints: MediaStreamConstraints = {
-          video: config.deviceId ? { deviceId: { exact: config.deviceId } } : true,
+          video: config.deviceId ? { deviceId: { ideal: config.deviceId } } : true,
           audio: false
         }
 
@@ -98,7 +99,8 @@ export const CameraBubbleOverlay: React.FC = () => {
 
   const handleToggleShape = (e: React.MouseEvent) => {
     e.stopPropagation()
-    updateConfig({ shape: config.shape === 'circle' ? 'rect' : 'circle' })
+    const nextShape = config.shape === 'circle' ? 'rect' : config.shape === 'rect' ? '16:9' : 'circle'
+    updateConfig({ shape: nextShape })
   }
 
   const handleCycleSize = (e: React.MouseEvent) => {
@@ -130,7 +132,7 @@ export const CameraBubbleOverlay: React.FC = () => {
       <div
         className={`relative w-full h-full flex items-center justify-center transition-all duration-200 cursor-move group ${
           isCircle ? 'rounded-full' : 'rounded-2xl'
-        } ring-2 ring-white/80 dark:ring-blue-500/80 shadow-[0_12px_32px_rgba(0,0,0,0.6)] overflow-hidden bg-slate-950`}
+        } border-2 border-white/80 dark:border-blue-500/80 overflow-hidden bg-slate-950`}
       >
         {/* Live Video Feed */}
         {streamError ? (
@@ -145,8 +147,8 @@ export const CameraBubbleOverlay: React.FC = () => {
             playsInline
             muted
             className={`w-full h-full object-cover pointer-events-none transition-transform duration-150 ${
-              config.mirror ? 'scale-x-[-1]' : ''
-            }`}
+              isCircle ? 'rounded-full' : 'rounded-2xl'
+            } ${config.mirror ? 'scale-x-[-1]' : ''}`}
           />
         )}
 
@@ -170,10 +172,10 @@ export const CameraBubbleOverlay: React.FC = () => {
             {/* Shape Toggle */}
             <button
               onClick={handleToggleShape}
-              title={isCircle ? 'Switch to Rounded Rectangle' : 'Switch to Circle'}
+              title={`Switch Shape (Current: ${config.shape})`}
               className="p-1 rounded-full hover:bg-white/20 transition-colors cursor-pointer text-slate-200 hover:text-white"
             >
-              {isCircle ? <Square className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+              {config.shape === 'circle' ? <Square className="w-3 h-3" /> : config.shape === 'rect' ? <RectangleHorizontal className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
             </button>
 
             {/* Size Cycle */}

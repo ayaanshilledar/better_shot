@@ -43,7 +43,7 @@ export interface LayoutConfig {
   isMuted?: boolean
 }
 
-export type CameraOverlayShape = 'circle' | 'rect'
+export type CameraOverlayShape = 'circle' | 'rect' | '16:9'
 export type CameraOverlayPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
 export type CameraOverlaySize = 'small' | 'medium' | 'large'
 
