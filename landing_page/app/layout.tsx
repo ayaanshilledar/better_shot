@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "Velo — macOS-Inspired Screen Recorder for Windows",
   description:
     "A precision, high-performance screenshot and screen recording application with macOS-inspired aesthetics for Windows.",
+  icons: {
+    icon: "/Logo.png",
+    shortcut: "/Logo.png",
+    apple: "/Logo.png",
+  },
 };
 
 export default function RootLayout({

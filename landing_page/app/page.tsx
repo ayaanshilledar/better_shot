@@ -9,8 +9,13 @@ export default function Home() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[260px] bg-white/[0.04] blur-[130px] pointer-events-none -z-10" />
 
       {/* Navigation */}
-      <header className="w-full px-6 sm:px-10 py-6 flex items-center justify-start">
-        <span className="text-sm font-semibold tracking-tight text-white">
+      <header className="w-full px-6 sm:px-10 py-6 flex items-center justify-start gap-1.5">
+        <img
+          src="/Logo.png"
+          alt="Velo Logo"
+          className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
+        />
+        <span className="text-lg sm:text-xl font-bold tracking-tight text-white">
           Velo
         </span>
       </header>
