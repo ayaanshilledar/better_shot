@@ -121,6 +121,11 @@ export const CameraBubbleOverlay: React.FC = () => {
 
   const isCircle = config.shape === 'circle'
 
+  // Use clip-path for GPU-accelerated clipping instead of border-radius + overflow-hidden
+  const clipStyle: React.CSSProperties = isCircle
+    ? { clipPath: 'circle(50% at 50% 50%)' }
+    : { clipPath: 'inset(0 round 16px)' }
+
   return (
     <div
       className="w-screen h-screen flex items-center justify-center p-2 bg-transparent select-none font-sans overflow-hidden"
@@ -128,11 +133,10 @@ export const CameraBubbleOverlay: React.FC = () => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Outer Floating Shell */}
+      {/* Outer Floating Shell — clip-path is GPU-composited, no per-frame CPU clipping */}
       <div
-        className={`relative w-full h-full flex items-center justify-center transition-all duration-200 cursor-move group ${
-          isCircle ? 'rounded-full' : 'rounded-2xl'
-        } border-2 border-white/80 dark:border-blue-500/80 overflow-hidden bg-slate-950`}
+        className="relative w-full h-full flex items-center justify-center cursor-move group bg-slate-950"
+        style={{ ...clipStyle, willChange: 'clip-path' }}
       >
         {/* Live Video Feed */}
         {streamError ? (
@@ -146,9 +150,8 @@ export const CameraBubbleOverlay: React.FC = () => {
             autoPlay
             playsInline
             muted
-            className={`w-full h-full object-cover pointer-events-none transition-transform duration-150 ${
-              isCircle ? 'rounded-full' : 'rounded-2xl'
-            } ${config.mirror ? 'scale-x-[-1]' : ''}`}
+            className={`w-full h-full object-cover pointer-events-none ${config.mirror ? 'scale-x-[-1]' : ''}`}
+            style={{ willChange: 'transform' }}
           />
         )}
 
@@ -159,7 +162,7 @@ export const CameraBubbleOverlay: React.FC = () => {
           }`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <div className="flex items-center gap-1 p-1 bg-black/75 backdrop-blur-md rounded-full border border-white/20 shadow-lg text-white">
+          <div className="flex items-center gap-1 p-1 bg-black/85 rounded-full border border-white/20 shadow-lg text-white">
             {/* Mirror Toggle */}
             <button
               onClick={handleToggleMirror}
@@ -205,7 +208,7 @@ export const CameraBubbleOverlay: React.FC = () => {
         {/* Subtle Drag Hint icon when hovered */}
         {isHovered && (
           <div className="absolute top-2 inset-x-0 flex justify-center pointer-events-none z-10">
-            <div className="px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded-full flex items-center gap-1 border border-white/10 text-[9px] text-white/80 shadow">
+            <div className="px-1.5 py-0.5 bg-black/70 rounded-full flex items-center gap-1 border border-white/10 text-[9px] text-white/80 shadow">
               <Move className="w-2.5 h-2.5" />
               <span>Drag</span>
             </div>

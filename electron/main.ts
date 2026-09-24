@@ -70,6 +70,25 @@ try {
   console.warn('Could not set custom userData path:', err)
 }
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.bettershot.app')
+}
+
+function getAppIcon() {
+  const possiblePaths = [
+    path.join(mainDir, '..', 'public', 'Logo.png'),
+    path.join(mainDir, '..', 'dist', 'Logo.png'),
+    path.join(process.cwd(), 'public', 'Logo.png'),
+    path.join(process.cwd(), 'dist', 'Logo.png')
+  ]
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return nativeImage.createFromPath(p)
+    }
+  }
+  return undefined
+}
+
 let launcherWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let selectionWindow: BrowserWindow | null = null
@@ -94,6 +113,8 @@ function createEditorWindow(filePath?: string) {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenW, height: screenH } = primaryDisplay.workArea
 
+  const appIcon = getAppIcon()
+
   editorWindow = new BrowserWindow({
     width: Math.min(1240, screenW - 40),
     height: Math.min(820, screenH - 40),
@@ -104,6 +125,7 @@ function createEditorWindow(filePath?: string) {
     transparent: false,
     show: false,
     backgroundColor: '#0d0d11',
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -160,6 +182,8 @@ function createLauncherWindow() {
   const launcherX = displayX + Math.round((screenW - launcherWidth) / 2)
   const launcherY = displayY + Math.round((screenH - launcherHeight) / 2)
 
+  const appIcon = getAppIcon()
+
   launcherWindow = new BrowserWindow({
     width: launcherWidth,
     height: launcherHeight,
@@ -171,6 +195,7 @@ function createLauncherWindow() {
     alwaysOnTop: false,
     show: false,
     backgroundColor: '#00000000',
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -338,6 +363,7 @@ function createCameraBubbleWindow(config?: any) {
     skipTaskbar: true,
     show: false,
     hasShadow: false,
+    paintWhenInitiallyHidden: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: preloadPath,

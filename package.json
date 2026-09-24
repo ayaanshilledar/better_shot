@@ -14,21 +14,9 @@
   },
   "build": {
     "appId": "com.velo.app",
-    "productName": "Velo",
-    "compression": "maximum",
-    "electronLanguages": [
-      "en-US"
-    ],
-    "asar": true,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
-    ],
-
+    "icon": "public/Logo.png",
     "win": {
+      "icon": "public/Logo.png",
       "target": [
         {
           "target": "portable",

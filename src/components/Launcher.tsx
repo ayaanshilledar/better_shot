@@ -102,37 +102,15 @@ export const Launcher: React.FC<LauncherProps> = ({
     }
   }, [enableCamera])
 
-  // Mini live camera preview in launcher options
+  // Mini live camera preview in launcher — DISABLED
+  // The floating camera bubble window already has its own live stream.
+  // Opening a second getUserMedia on the same physical webcam causes frame drops
+  // and jitter in both streams because most webcams can only serve one consumer.
   useEffect(() => {
-    let active = true
-    if (enableCamera && isCameraOptionsOpen) {
-      navigator.mediaDevices.getUserMedia({
-        video: cameraConfig.deviceId ? { deviceId: { ideal: cameraConfig.deviceId } } : true,
-        audio: false
-      }).then((stream) => {
-        if (!active) {
-          stream.getTracks().forEach((t) => t.stop())
-          return
-        }
-        previewStreamRef.current = stream
-        if (previewVideoRef.current) {
-          previewVideoRef.current.srcObject = stream
-        }
-      }).catch((err) => {
-        console.warn('[BetterShot:Launcher] Mini preview error:', err)
-      })
-    } else {
-      if (previewStreamRef.current) {
-        previewStreamRef.current.getTracks().forEach((t) => t.stop())
-        previewStreamRef.current = null
-      }
-    }
-    return () => {
-      active = false
-      if (previewStreamRef.current) {
-        previewStreamRef.current.getTracks().forEach((t) => t.stop())
-        previewStreamRef.current = null
-      }
+    // Just clean up any existing preview stream
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach((t) => t.stop())
+      previewStreamRef.current = null
     }
   }, [enableCamera, isCameraOptionsOpen, cameraConfig.deviceId])
 

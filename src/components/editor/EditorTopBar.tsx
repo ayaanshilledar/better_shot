@@ -57,9 +57,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       window.electronAPI.toggleMaximizeWindow()
     }
   }
-
-  const currentScale = runtime?.previewScale || 'full'
-
   return (
     <header
       onDoubleClick={handleToggleMaximize}
@@ -118,28 +115,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         )}
       </div>
 
-      {/* Right Section: Preview Scale Selector + Theme Toggle + Window Controls */}
+      {/* Right Section: Theme Toggle + Window Controls */}
       <div className="flex items-center gap-3 no-drag">
-        {/* Preview Scale Selector (Right Aligned - Segmented tab style matching Launcher) */}
-        <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-[#252525] p-[3px] rounded-xl border border-slate-200 dark:border-white/[0.06]">
-          {(['full', 'half', 'quarter'] as const).map((scale) => {
-            const labels = { full: '100% Full', half: '50% Half', quarter: '25% Quarter' }
-            const isActive = currentScale === scale
-            return (
-              <button
-                key={scale}
-                onClick={() => onScaleChange && onScaleChange(scale)}
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-[8px] transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#2373F4] text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 dark:text-white/40 dark:hover:text-white/70'
-                }`}
-              >
-                {labels[scale]}
-              </button>
-            )
-          })}
-        </div>
 
         {/* Quick Theme Toggle Button */}
         <button
