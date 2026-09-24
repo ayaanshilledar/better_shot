@@ -2,7 +2,7 @@ import React from "react";
 
 export default function Footer() {
   return (
-    <footer className="w-full relative overflow-hidden bg-[#486799] text-white py-20 sm:py-28 px-6 sm:px-12 md:px-20">
+    <footer className="w-full relative overflow-hidden bg-[#2373F4] text-white py-20 sm:py-28 px-6 sm:px-12 md:px-20">
       {/* Center Giant Watermark Logo (Inspired by Reference) */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] sm:w-[500px] md:w-[580px] aspect-square pointer-events-none select-none opacity-20 flex items-center justify-center">
         <img
@@ -33,7 +33,7 @@ export default function Footer() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <a
               href="https://github.com/ayaanshilledar/better_shot/releases/latest"
-              className="px-6 py-2.5 rounded-full bg-white text-[#2a3c5a] font-semibold text-xs transition-all hover:bg-white/90 shadow-md"
+              className="px-6 py-2.5 rounded-full bg-white text-[#2373F4] font-semibold text-xs transition-all hover:bg-white/90 shadow-md"
             >
               Download for Windows
             </a>

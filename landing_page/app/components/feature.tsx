@@ -16,7 +16,7 @@ export default function Feature() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 sm:gap-16 items-center">
           <div className="flex flex-col items-start max-w-lg">
             <h3 className="text-2xl sm:text-4xl font-light tracking-tight text-white leading-tight">
-              Capture the screen, a window, or any custom area.
+              Capture the screen, a window, or any <span className="font-offbit tracking-wide text-white">custom area.</span>
             </h3>
           </div>
 
@@ -44,7 +44,7 @@ export default function Feature() {
           {/* Description */}
           <div className="flex flex-col items-start max-w-lg order-1 md:order-2">
             <h3 className="text-2xl sm:text-4xl font-light tracking-tight text-white leading-tight">
-              Camera bubble overlay with studio audio mixing.
+              <span className="font-offbit tracking-wide text-white">Camera bubble</span> overlay with studio audio mixing.
             </h3>
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function Feature() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 sm:gap-16 items-center">
           <div className="flex flex-col items-start max-w-lg">
             <h3 className="text-2xl sm:text-4xl font-light tracking-tight text-white leading-tight">
-              Trim, inspect, and export with zero friction.
+              <span className="font-offbit tracking-wide text-white">Trim, inspect</span>, and export with zero friction.
             </h3>
           </div>
 
