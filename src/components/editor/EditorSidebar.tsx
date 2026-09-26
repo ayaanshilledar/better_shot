@@ -686,129 +686,23 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         {/* Elevated AI Chat Panel */}
         {runtime.selectedTab === 'ai' && (
           <div className="flex flex-col flex-1 min-h-0 justify-between gap-2.5">
-            {/* Minimal Header / Status Bar */}
-            <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/5 shrink-0 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-700 dark:text-zinc-300">
-                <span className="font-semibold text-[11px]">Velo AI</span>
-                <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate max-w-[130px]">
-                  • {aiConfig.apiKey ? (aiConfig.selectedModel || 'Connected') : 'Local'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {canUndoAI && (
-                  <button
-                    type="button"
-                    onClick={onUndoLastAIEdit}
-                    className="text-[10px] text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:underline flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Undo last AI edit"
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>Undo</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onOpenAISettings}
-                  className="p-1 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Configure AI API Key"
-                >
-                  <Key className="w-3 h-3 text-slate-400 hover:text-slate-700 dark:hover:text-white" />
-                </button>
-              </div>
-            </div>
-
             {/* Chat Messages Feed */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0 custom-scrollbar text-xs">
-              {/* Optional Tip Banner if No API Key */}
-              {!aiConfig.apiKey && (aiMessages || []).length <= 2 && (
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 flex items-start gap-2 text-xs">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-slate-800 dark:text-zinc-200">
-                      Smart Offline Planner Active
-                    </p>
-                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                      Basic commands work offline. Add an API key in settings for advanced reasoning.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={onOpenAISettings}
-                      className="mt-1.5 px-2 py-0.5 text-[9.5px] font-medium bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded cursor-pointer transition-colors"
-                    >
-                      Configure Key
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {(aiMessages || []).length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-5 px-1 text-slate-400 dark:text-zinc-500">
+                <div className="h-full flex flex-col items-center justify-center text-center py-10 px-2 text-slate-400 dark:text-zinc-500">
                   <div className="mb-3 flex items-center justify-center">
-                    <MatrixOrb state={isAIExecuting ? 'thinking' : 'idle'} size={52} color="#3b82f6" />
+                    <MatrixOrb state={isAIExecuting ? 'thinking' : 'idle'} size={48} color="#FF5F56" />
                   </div>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 mb-0.5">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 mb-1">
                     Velo AI
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-[210px] leading-relaxed mb-4">
-                    Direct your edits naturally or select a workflow:
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-[200px] leading-relaxed">
+                    Type below to format layout, apply wallpapers, or trim video.
                   </p>
-
-                  {/* Clean Context-Aware Quick Action Cards - Pure Typographic, No Cheesy Icons */}
-                  <div className="flex flex-col gap-1.5 w-full">
-                    {(isImage
-                      ? [
-                          {
-                            title: 'Studio Polish Framing',
-                            desc: '16% padding, rounded corners & shadow',
-                            text: 'Apply 16% padding, rounded corners, and soft drop shadow'
-                          },
-                          {
-                            title: '1:1 Square Format',
-                            desc: 'Crop to square for social feed',
-                            text: 'Set 1:1 aspect ratio for social media'
-                          },
-                          {
-                            title: 'Sunset Glow Wallpaper',
-                            desc: 'Apply vibrant gradient backdrop',
-                            text: 'Set Sunset Glow wallpaper background'
-                          }
-                        ]
-                      : [
-                          {
-                            title: 'Studio Polish Framing',
-                            desc: '12% padding, rounded corners & shadow',
-                            text: 'Apply 12% padding, rounded corners, soft shadow and modern wallpaper'
-                          },
-                          {
-                            title: 'Format for 9:16 Shorts / Reels',
-                            desc: 'Fit vertical mobile canvas',
-                            text: 'Make 9:16 vertical for TikTok and Shorts'
-                          },
-                          {
-                            title: 'Sunset Glow Wallpaper',
-                            desc: 'Apply vibrant gradient backdrop',
-                            text: 'Set Sunset Glow gradient background'
-                          }
-                        ]
-                    ).map((chip, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          if (isAIExecuting) return
-                          onSendMessage?.(chip.text)
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-[#161924] hover:bg-slate-200/80 dark:hover:bg-white/[0.08] border border-black/5 dark:border-white/5 text-[11px] text-slate-700 dark:text-zinc-300 transition-all cursor-pointer flex flex-col gap-0.5 group"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-semibold text-slate-900 dark:text-zinc-200">{chip.title}</span>
-                          <ArrowUp className="w-3 h-3 opacity-0 group-hover:opacity-100 text-slate-400 dark:text-zinc-400 transition-opacity shrink-0 ml-1" />
-                        </div>
-                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 truncate">{chip.desc}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               ) : (
+
                 aiMessages.map((m) => {
                   const isThoughtOpen = expandedThoughtMap[m.id] ?? false
                   const isDiffOpen = expandedDiffMap[m.id] ?? false
@@ -849,57 +743,56 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                             : 'bg-slate-100/90 dark:bg-[#151821] text-slate-800 dark:text-zinc-200 border border-slate-200/70 dark:border-white/5 rounded-2xl rounded-tl-xs shadow-xs'
                         }`}
                       >
-                        {/* 1. Chain-of-Thought Disclosure */}
-                        {m.thoughtProcess && (
-                          <div className="mb-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedThoughtMap((prev) => ({ ...prev, [m.id]: !isThoughtOpen }))}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-                            >
-                              <span>Reasoning</span>
-                              {isThoughtOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
-                            </button>
-
-                            {isThoughtOpen && (
-                              <div className="px-2.5 pb-2.5 pt-1 space-y-1.5 text-[10px] text-slate-500 dark:text-zinc-400 border-t border-black/5 dark:border-white/5">
-                                {m.thoughtProcess.analysis && (
-                                  <div>
-                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Analysis</span>
-                                    <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.analysis}</p>
-                                  </div>
-                                )}
-                                {m.thoughtProcess.reasoning && (
-                                  <div>
-                                    <span className="font-semibold text-slate-700 dark:text-zinc-300">Rationale</span>
-                                    <p className="mt-0.5 leading-relaxed">{m.thoughtProcess.reasoning}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                        {/* Agent Persona Badge */}
+                        {m.sender !== 'user' && (
+                          <div className="flex items-center gap-1.5 mb-1.5 select-none">
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#FF5F56]/10 border border-[#FF5F56]/25 text-[#FF5F56] text-[9.5px] font-semibold tracking-tight">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF5F56]" />
+                              <span>Jacob</span>
+                            </div>
                           </div>
                         )}
 
-                        <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                        <div className="whitespace-pre-wrap leading-relaxed text-[12px]">{m.content}</div>
 
-                        {/* 2. Clean Key-Value Parameter Changes */}
-                        {meaningfulActions.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex flex-col gap-1.5">
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {meaningfulActions.map((act, idx) => (
-                                <div
-                                  key={idx}
-                                  className="px-2 py-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]"
+                        {/* Smart Interactive Clarifying Questions Chips */}
+                        {m.clarificationOptions && m.clarificationOptions.length > 0 && (
+                          <div className="mt-2.5 flex flex-col gap-1.5">
+                            <span className="text-[10px] font-medium text-slate-500 dark:text-zinc-400">
+                              Choose an option:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {m.clarificationOptions.map((opt, optIdx) => (
+                                <button
+                                  key={optIdx}
+                                  type="button"
+                                  onClick={() => onSendMessage?.(opt)}
+                                  disabled={isAIExecuting}
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950 hover:opacity-90 text-[10px] font-medium transition-all cursor-pointer shadow-xs active:scale-95"
                                 >
-                                  <span className="text-slate-500 dark:text-zinc-400 font-medium truncate">{act.key}</span>
-                                  <span className="text-slate-900 dark:text-zinc-200 font-semibold font-mono truncate ml-1">{act.val}</span>
-                                </div>
+                                  {opt}
+                                </button>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {/* 3. Confirmation Bar in Sidebar */}
+                        {/* Clean Human-Friendly Parameter Badges */}
+                        {meaningfulActions.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-black/5 dark:border-white/5">
+                            {meaningfulActions.map((act, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-[10.5px]"
+                              >
+                                <span className="text-slate-400 dark:text-zinc-500 font-medium">{act.key}:</span>
+                                <span className="font-semibold text-slate-800 dark:text-zinc-200">{act.val}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Confirmation Bar in Sidebar (if needed) */}
                         {m.status === 'awaiting_confirmation' && onConfirmPlan && onDismissPlan && (
                           <div className="mt-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex flex-col gap-2">
                             <span className="text-[10px] font-medium text-slate-700 dark:text-zinc-300">
@@ -924,32 +817,6 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           </div>
                         )}
 
-                        {/* 4. Verification Diff Section */}
-                        {m.verification && (
-                          <div className="mt-3 rounded-xl bg-emerald-500/[0.05] border border-emerald-500/20 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedDiffMap((prev) => ({ ...prev, [m.id]: !isDiffOpen }))}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                            >
-                              <span>
-                                {m.verification.diffs?.length ? `${m.verification.diffs.length} parameters verified` : 'Parameters verified'}
-                              </span>
-                              {isDiffOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
-                            </button>
-
-                            {isDiffOpen && (
-                              <div className="px-2.5 pb-2 pt-1 space-y-1 text-[9.5px] border-t border-emerald-500/10">
-                                {m.verification.diffs.map((diff, i) => (
-                                  <div key={i} className="flex items-center justify-between text-slate-600 dark:text-zinc-300">
-                                    <span className="text-slate-500 dark:text-zinc-400 capitalize">{diff.property.replace(/([A-Z])/g, ' $1')}</span>
-                                    <span className="font-mono text-slate-800 dark:text-zinc-200 font-medium">{diff.actual}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         {/* 5. Thinking Indicator */}
                         {m.status === 'thinking' && (

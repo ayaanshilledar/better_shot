@@ -38,12 +38,12 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "BetterShot"
+      "shortcutName": "Velo"
     }
   },
-
   "dependencies": {
     "clsx": "^2.1.1",
+    "koffi": "^3.3.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

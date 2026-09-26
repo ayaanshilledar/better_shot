@@ -13,6 +13,13 @@ export default defineConfig({
         entry: 'electron/main.ts',
         onstart(options) {
           options.startup()
+        },
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['koffi']
+            }
+          }
         }
       },
       {

@@ -192,8 +192,7 @@ export const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    // Only manage window lifecycle from the primary Launcher window
-    // Check hash to avoid secondary windows hiding themselves before their route updates
+  
     const isActuallyLauncher = window.location.hash === '' || window.location.hash === '#launcher' || window.location.hash.includes('launcher')
     if (route === 'launcher' && isActuallyLauncher) {
       if (enableCamera) {
@@ -328,6 +327,9 @@ export const App: React.FC = () => {
   const handleStopRecording = async () => {
     console.log('[BetterShot:App] handleStopRecording triggered...')
     try {
+      if (window.electronAPI?.stopRecordingMode) {
+        window.electronAPI.stopRecordingMode()
+      }
       if (window.electronAPI?.stopCameraBubble) {
         await window.electronAPI.stopCameraBubble()
       }
@@ -341,9 +343,6 @@ export const App: React.FC = () => {
           setAutoOpenHistory(true)
         }
       }
-      if (window.electronAPI?.stopRecordingMode) {
-        await window.electronAPI.stopRecordingMode()
-      }
     } catch (err) {
       console.error('[BetterShot:App] Error stopping recording:', err)
     }
@@ -352,13 +351,13 @@ export const App: React.FC = () => {
   const handleCancelRecording = async () => {
     console.log('[BetterShot:App] handleCancelRecording triggered...')
     try {
+      if (window.electronAPI?.stopRecordingMode) {
+        window.electronAPI.stopRecordingMode()
+      }
       if (window.electronAPI?.stopCameraBubble) {
         await window.electronAPI.stopCameraBubble()
       }
       await recorderService.stopRecording()
-      if (window.electronAPI?.stopRecordingMode) {
-        await window.electronAPI.stopRecordingMode()
-      }
     } catch (err) {
       console.error('[BetterShot:App] Error canceling recording:', err)
     }

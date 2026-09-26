@@ -102,12 +102,11 @@ export const Launcher: React.FC<LauncherProps> = ({
     }
   }, [enableCamera])
 
-  // Mini live camera preview in launcher — DISABLED
-  // The floating camera bubble window already has its own live stream.
-  // Opening a second getUserMedia on the same physical webcam causes frame drops
-  // and jitter in both streams because most webcams can only serve one consumer.
+
+
+
   useEffect(() => {
-    // Just clean up any existing preview stream
+   
     if (previewStreamRef.current) {
       previewStreamRef.current.getTracks().forEach((t) => t.stop())
       previewStreamRef.current = null

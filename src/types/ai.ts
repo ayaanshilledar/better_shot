@@ -1,5 +1,7 @@
 import { ShadowType, StudioProject } from './editor'
 
+export type AIAgentPersona = 'jacob' | 'dia'
+
 export type AIActionType =
   | 'switch_tab'
   | 'set_background'
@@ -97,17 +99,34 @@ export interface StateVerificationResult {
   summary: string
 }
 
+export interface DIACritiquePoint {
+  category: 'Framing' | 'Contrast' | 'Curves' | 'Timing' | 'Composition'
+  status: 'optimal' | 'pass' | 'warning'
+  comment: string
+}
+
+export interface DIAEvaluation {
+  score: number // e.g. 9.4
+  verdict: 'approved' | 'refinement_applied' | 'needs_clarification'
+  summary: string
+  critiquePoints: DIACritiquePoint[]
+  refinements?: AIAction[]
+}
+
 export interface AIChatMessage {
   id: string
-  sender: 'user' | 'assistant' | 'system'
+  sender: 'user' | 'assistant' | 'system' | 'jacob' | 'dia'
+  agent?: AIAgentPersona
   content: string
   timestamp: number
   actions?: AIAction[]
   thoughtProcess?: ThoughtProcess
-  status?: 'thinking' | 'awaiting_confirmation' | 'executing' | 'verifying' | 'completed' | 'failed'
+  status?: 'thinking' | 'awaiting_confirmation' | 'executing' | 'verifying' | 'evaluating' | 'completed' | 'failed'
   activeActionIndex?: number
   verification?: StateVerificationResult
+  evaluation?: DIAEvaluation
   suggestions?: string[]
+  clarificationOptions?: string[]
   error?: string
 }
 
@@ -130,15 +149,20 @@ export interface AICursorTarget {
   width?: number
   height?: number
   label: string
+  agent?: AIAgentPersona
   isClicking?: boolean
   selector?: string
 }
 
 export interface AIPlanResult {
   message: string
+  agent?: AIAgentPersona
   thoughtProcess?: ThoughtProcess
   actions: AIAction[]
   expectedChanges?: Record<string, any>
   proactiveSuggestions?: string[]
+  clarificationOptions?: string[]
+  isClarification?: boolean
   autoApply?: boolean
 }
+

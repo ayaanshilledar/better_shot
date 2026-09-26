@@ -121,7 +121,7 @@ export const CameraBubbleOverlay: React.FC = () => {
 
   const isCircle = config.shape === 'circle'
 
-  // Use clip-path for GPU-accelerated clipping instead of border-radius + overflow-hidden
+ 
   const clipStyle: React.CSSProperties = isCircle
     ? { clipPath: 'circle(50% at 50% 50%)' }
     : { clipPath: 'inset(0 round 16px)' }

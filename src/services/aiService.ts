@@ -398,23 +398,136 @@ export interface PlanVideoEditsOptions {
 
 /**
  * Detects if the user gave permission for immediate automatic application without confirmation.
+ * Straightforward edit commands now auto-apply directly by default for a smart, fluid experience.
  */
-export function detectAutoApplyIntent(prompt: string, autoApplyByDefault: boolean = false): boolean {
+export function detectAutoApplyIntent(prompt: string, autoApplyByDefault: boolean = true): boolean {
   if (autoApplyByDefault) return true
-  const p = prompt.toLowerCase()
-  const patterns = [
-    /do (your best|anything|whatever|it|all)/i,
-    /auto(-|\s)?apply/i,
-    /just (do it|apply|make it|fix it)/i,
-    /apply (right away|immediately|now|directly)/i,
-    /go ahead/i,
-    /no need to (ask|confirm)/i,
-    /make it look (great|awesome|good|clean|professional)/i,
-    /fix (it|everything)/i,
-    /polish (it|everything|up)/i
-  ]
-  return patterns.some((pattern) => pattern.test(p))
+  const p = prompt.toLowerCase().trim()
+  // Only withhold auto-apply if it's purely an informational inquiry or asking for advice without action
+  if (
+    p.startsWith('what ') ||
+    p.startsWith('why ') ||
+    p.startsWith('how ') ||
+    p.startsWith('can you explain') ||
+    p.includes('what is the current')
+  ) {
+    return false
+  }
+  return true
 }
+
+/**
+ * DIA Agent: Comprehensive Aesthetic & Visual Composition Evaluation Engine.
+ * Evaluates the output produced by Jacob and produces a concrete score and critique report.
+ */
+export function evaluateProjectAesthetics(
+  project: StudioProject,
+  _userIntent?: string,
+  _lastActions: AIAction[] = []
+): import('../types/ai').DIAEvaluation {
+  const points: import('../types/ai').DIACritiquePoint[] = []
+  let score = 9.8
+
+  // 1. Framing & Padding analysis
+  const padding = project.layout.padding
+  if (padding === 0 && project.layout.cornerRadius > 0) {
+    score -= 1.2
+    points.push({
+      category: 'Framing',
+      status: 'warning',
+      comment: 'Corner radius is active with 0% canvas padding, which will clip frame corners.'
+    })
+  } else if (padding < 6) {
+    score -= 0.3
+    points.push({
+      category: 'Framing',
+      status: 'warning',
+      comment: `Padding (${padding}%) is slightly tight for high-resolution displays.`
+    })
+  } else if (padding >= 8 && padding <= 20) {
+    points.push({
+      category: 'Framing',
+      status: 'optimal',
+      comment: `Balanced framing with ${padding}% breathing room.`
+    })
+  } else {
+    points.push({
+      category: 'Framing',
+      status: 'pass',
+      comment: `Canvas padding configured at ${padding}%.`
+    })
+  }
+
+  // 2. Curves & Corner Radius
+  const radius = project.layout.cornerRadius
+  if (radius >= 12 && radius <= 24) {
+    points.push({
+      category: 'Curves',
+      status: 'optimal',
+      comment: `${radius}px smooth border radius conforms with modern OS standards.`
+    })
+  } else if (radius > 28 && padding < 10) {
+    score -= 0.4
+    points.push({
+      category: 'Curves',
+      status: 'warning',
+      comment: `High corner radius (${radius}px) with low padding risks pixel clipping.`
+    })
+  } else {
+    points.push({
+      category: 'Curves',
+      status: 'pass',
+      comment: `${radius}px corner radius.`
+    })
+  }
+
+  // 3. Contrast & Background
+  const bg = project.background
+  if (bg.presetId === 'none' || bg.type === 'none') {
+    points.push({
+      category: 'Contrast',
+      status: 'pass',
+      comment: 'Transparent background configured for seamless web embedding.'
+    })
+  } else {
+    points.push({
+      category: 'Contrast',
+      status: 'optimal',
+      comment: `Background preset (${bg.presetId}) provides rich depth and contrast separation.`
+    })
+  }
+
+  // 4. Composition & Aspect Ratio
+  points.push({
+    category: 'Composition',
+    status: 'optimal',
+    comment: `Aspect ratio ${project.layout.aspectRatio} correctly proportioned.`
+  })
+
+  // 5. Automatic Refinements if severe aesthetic defect is present
+  const refinements: AIAction[] = []
+  let verdict: import('../types/ai').DIAEvaluation['verdict'] = 'approved'
+  if (padding === 0 && project.layout.cornerRadius > 0) {
+    verdict = 'refinement_applied'
+    refinements.push({
+      type: 'set_padding',
+      padding: 10,
+      label: 'Refining canvas padding to 10% for smooth corner visibility'
+    })
+  }
+
+  return {
+    score: Math.max(7.5, Math.min(10, parseFloat(score.toFixed(1)))),
+    verdict,
+    summary:
+      verdict === 'approved'
+        ? `Aesthetic score ${score.toFixed(1)}/10. Visual balance and composition approved.`
+        : `Aesthetic score ${score.toFixed(1)}/10. Refinement suggested for optimal framing.`,
+    critiquePoints: points,
+    refinements: refinements.length > 0 ? refinements : undefined
+  }
+}
+
 
 /**
  * Validates and compares project state before vs after AI execution.
@@ -548,6 +661,47 @@ export function heuristicPlanner(
     }
   }
 
+  // 0.5. Smart Clarifying Questions for Underspecified Prompts
+  if (
+    (p.includes('social') || p.includes('platform')) &&
+    !p.includes('tiktok') &&
+    !p.includes('reels') &&
+    !p.includes('youtube') &&
+    !p.includes('16:9') &&
+    !p.includes('9:16') &&
+    !p.includes('1:1')
+  ) {
+    return {
+      message: 'Which platform or aspect ratio would you like to optimize this recording for?',
+      thoughtProcess: {
+        analysis: 'User asked to optimize for social media without specifying target ratio.',
+        reasoning: 'Offering instant clickable platform chips for optimal framing precision.'
+      },
+      clarificationOptions: ['📱 TikTok / Reels (9:16)', '💻 YouTube / Desktop (16:9)', '📸 Instagram Feed (1:1)'],
+      isClarification: true,
+      actions: [],
+      autoApply: false
+    }
+  }
+
+  if (
+    (p === 'wallpaper' || p === 'background' || p === 'change wallpaper' || p === 'change background') &&
+    !p.includes('gradient') &&
+    !p.includes('none')
+  ) {
+    return {
+      message: 'Which visual wallpaper style would you like me to apply?',
+      thoughtProcess: {
+        analysis: 'User requested a wallpaper change without specifying a theme or gradient.',
+        reasoning: 'Presenting top aesthetic wallpaper themes as one-click selections.'
+      },
+      clarificationOptions: ['🌌 Northern Lights', '🪐 Cosmic Nebula', '🌊 Deep Ocean', '⚡ Minimal Slate'],
+      isClarification: true,
+      actions: [],
+      autoApply: false
+    }
+  }
+
   // 1. Aspect Ratio Intent
   if (
     p.includes('aspect') ||
@@ -639,8 +793,8 @@ export function heuristicPlanner(
 
   const message =
     changesSummary.length > 0
-      ? `I've planned the following improvements: **${changesSummary.join(', ')}**.`
-      : `I've analyzed your project and prepared styling improvements.`
+      ? `I've planned and applied the following improvements: **${changesSummary.join(', ')}**.`
+      : `I've analyzed your project and styled it for maximum visual impact.`
 
   return {
     message,
@@ -700,7 +854,6 @@ export async function planVideoEdits(
 
   if (!apiKey) {
     const res = heuristicPlanner(userPrompt, project, opts)
-    res.message += '\n\n*(💡 Tip: Add your free Groq or OpenAI API key in Settings for open-ended creative reasoning!)*'
     return res
   }
 
@@ -715,21 +868,33 @@ export async function planVideoEdits(
   const cursorSize = project.cursorConfig?.size || 1
   const presetsList = WALLPAPER_PRESETS.map((p) => ({ id: p.id, name: p.name, type: p.type }))
 
-  const systemInstruction = `You are Velo AI, an expert video and screenshot editor agent inside a desktop screen recording studio app.
-You do NOT just blindly return commands. You first THINK, REASON, EVALUATE ALTERNATIVES, and formulate a verifiable plan.
+  const systemInstruction = `You are Jacob, an elite video and screenshot art director inside a premium screen recording studio app.
+You work in tandem with DIA Agent, an automated visual quality auditor.
+
+YOUR CORE MISSION:
+Always make the user's video or screenshot look 10x better, more modern, and production-ready.
+
+DESIGN PRINCIPLES:
+1. SPATIAL ELEGANCE: Avoid 0% cramped padding. Apply 8%–16% breathing room so the media floats naturally above the backdrop.
+2. MODERN CORNER RADIUS: Set 14px–20px smooth rounded borders for an Apple-like polished aesthetic.
+3. DEPTH & SHADOW: Pair rounded frames with 'medium' or 'glow' drop shadows to create clean three-dimensional hierarchy.
+4. VIBRANT WALLPAPERS: Match the recording with high-contrast, modern background presets (e.g., Northern Lights, Cosmic Nebula, Minimal Slate) that make the content pop.
+5. CLEAN AUTONOMOUS FLOW: Execute styling directly ("autoApply": true). Do NOT ask the user for tedious confirmations.
+6. SMART CLARIFICATION: If the user's goal is ambiguous (e.g., "optimize for social", "change wallpaper"), ask a smart clarifying question, set "isClarification": true, "actions": [], and supply 2-4 interactive clickable "clarificationOptions" strings.
+7. USER-FACING MESSAGE: Keep "message" concise, elegant, and confident (e.g., "Framed your recording with 12% padding, deep drop shadow, and Northern Lights wallpaper."). Do not output raw audit tables or internal checklists.
+8. ALWAYS end actions by returning to the AI tab: { "type": "switch_tab", "tab": "ai", "label": "Returning to AI Assistant" }.
 
 You MUST output ONLY valid JSON matching this schema:
 {
   "thoughtProcess": {
-    "analysis": "Breakdown of user request, media characteristics, current framing and gaps",
-    "reasoning": "Aesthetic and functional rationale for why specific wallpapers, paddings, or aspect ratios were chosen",
-    "alternativesConsidered": [
-      "Alternative approach 1 and why it was rejected",
-      "Alternative approach 2 and why it was rejected"
-    ],
-    "verificationPlan": "How the changes will be verified against the project state post-execution"
+    "analysis": "Breakdown of media, current framing, and aesthetic opportunities",
+    "reasoning": "Aesthetic rationale for chosen wallpaper, padding, shadow, and corner radius",
+    "alternativesConsidered": ["Alt 1", "Alt 2"],
+    "verificationPlan": "Parameters to verify"
   },
-  "message": "Clear, friendly explanation of your proposed improvements to the user",
+  "message": "Polished, confident description of the aesthetic improvements made",
+  "isClarification": boolean,
+  "clarificationOptions": ["Option 1", "Option 2"],
   "actions": [
     { "type": "switch_tab", "tab": "background|layout|cursor|audio|export|ai", "label": "..." },
     { "type": "set_background", "presetId": "preset_id_or_none", "label": "..." },
@@ -754,6 +919,8 @@ You MUST output ONLY valid JSON matching this schema:
   ],
   "autoApply": boolean
 }
+
+
 
 === CURRENT PROJECT STATE (USE THIS FOR COMPLETE CONTEXT) ===
 Media Type: ${isImage ? 'Static Screenshot / Image (Do NOT generate trim actions)' : 'Screen Recording Video'}

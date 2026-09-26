@@ -13,7 +13,7 @@ import { AIChatDrawer } from './AIChatDrawer'
 import { AICursorOverlay, AICursorState } from './AICursorOverlay'
 import { AISettingsModal } from '../AISettingsModal'
 import { AIChatMessage, AIAction } from '../../types/ai'
-import { planVideoEdits } from '../../services/aiService'
+import { planVideoEdits, evaluateProjectAesthetics, verifyProjectChanges } from '../../services/aiService'
 import { WALLPAPER_PRESETS } from '../../config/presets'
 
 interface StudioEditorProps {
@@ -122,7 +122,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     )
 
     try {
-      // Animate AI Cursor taking control of the React DOM
+      // 1. Jacob Takes the Stage (Coral Cursor)
       for (let i = 0; i < plan.actions.length; i++) {
         const action = plan.actions[i]
         setCurrentActionIndex(i)
@@ -130,7 +130,7 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           prev.map((m) => (m.id === assistantMsgId ? { ...m, activeActionIndex: i } : m))
         )
 
-        // 1. Locate Target Element in DOM
+        // Locate Target Element in DOM
         let targetSelector = ''
         if (action.type === 'switch_tab') {
           targetSelector = `button[data-tab="${action.tab}"]`
@@ -163,9 +163,12 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         const targetX = targetRect ? targetRect.left + targetRect.width / 2 : fallbackX
         const targetY = targetRect ? targetRect.top + targetRect.height / 2 : fallbackY
 
-        // 2. Move AI Cursor to Target
+        // Move Jacob's Cursor
         setAiCursorState({
           visible: true,
+          agent: 'jacob',
+          name: 'Jacob',
+          color: '#FF5F56',
           x: targetX,
           y: targetY,
           isClicking: false,
@@ -180,15 +183,15 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
             : undefined
         })
 
-        // Wait for cursor flight animation
-        await sleep(450)
+        // Flight animation
+        await sleep(400)
 
-        // 3. Trigger Click Ripple
+        // Click Ripple
         setAiCursorState((prev) => ({ ...prev, isClicking: true }))
         await sleep(150)
         setAiCursorState((prev) => ({ ...prev, isClicking: false }))
 
-        // 4. Apply Project / Runtime Update
+        // Apply Update
         if (action.type === 'switch_tab') {
           setRuntime((r) => ({ ...r, selectedTab: action.tab }))
         } else if (action.type === 'set_background') {
@@ -255,18 +258,65 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
           handleUndoLastAIEdit()
         }
 
-        // Short pause between actions for visual observation
-        await sleep(300)
+        await sleep(250)
       }
 
-      // 5. Verification Phase: Compare state diff and validate expectations
-      setAiCursorState((prev) => ({ ...prev, visible: false, targetElementRect: undefined }))
+      // 2. DIA Agent Steps in for Quality Audit (Cyan Cursor)
       setAiMessages((prev) =>
-        prev.map((m) => (m.id === assistantMsgId ? { ...m, status: 'verifying' } : m))
+        prev.map((m) => (m.id === assistantMsgId ? { ...m, status: 'evaluating' } : m))
       )
-      await sleep(350)
 
-      const verification = (await import('../../services/aiService')).verifyProjectChanges(
+      // Move DIA's Inspection Cursor Across the Canvas
+      const canvasEl = document.querySelector('.studio-canvas-area') || document.body
+      const canvasRect = canvasEl.getBoundingClientRect()
+      const diaInspectX = canvasRect.left + canvasRect.width / 2
+      const diaInspectY = canvasRect.top + canvasRect.height / 3
+
+      setAiCursorState({
+        visible: true,
+        agent: 'dia',
+        name: 'DIA Agent',
+        color: '#06B6D4',
+        x: diaInspectX,
+        y: diaInspectY,
+        isClicking: false,
+        currentLabel: 'Auditing layout composition...'
+      })
+
+      await sleep(400)
+
+      // Run DIA Aesthetic & Composition Evaluator
+      const evaluation = evaluateProjectAesthetics(projectRef.current, '', plan.actions)
+
+      // 3. Autonomous Refinement Loop (if DIA found any adjustments needed)
+      if (evaluation.refinements && evaluation.refinements.length > 0) {
+        for (const refAction of evaluation.refinements) {
+          // Jacob flies back in to apply the refinement!
+          setAiCursorState({
+            visible: true,
+            agent: 'jacob',
+            name: 'Jacob',
+            color: '#FF5F56',
+            x: diaInspectX + 50,
+            y: diaInspectY + 50,
+            isClicking: true,
+            currentLabel: refAction.label
+          })
+
+          await sleep(350)
+
+          if (refAction.type === 'set_padding') {
+            updateProject((p) => ({ ...p, layout: { ...p.layout, padding: refAction.padding } }))
+          } else if (refAction.type === 'set_corner_radius') {
+            updateProject((p) => ({ ...p, layout: { ...p.layout, cornerRadius: refAction.cornerRadius } }))
+          }
+          await sleep(200)
+        }
+      }
+
+      // 4. Verification & Wrap-up
+      setAiCursorState((prev) => ({ ...prev, visible: false, targetElementRect: undefined }))
+      const verification = verifyProjectChanges(
         beforeSnapshot,
         projectRef.current,
         plan.expectedChanges
@@ -274,12 +324,15 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
 
       setIsAIExecuting(false)
       setRuntime((r) => ({ ...r, selectedTab: 'ai' }))
+
+      // Update Jacob's message to completed with verification
       setAiMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMsgId
             ? {
                 ...m,
                 status: 'completed',
+                agent: 'jacob',
                 verification,
                 suggestions: plan.proactiveSuggestions
               }
@@ -315,7 +368,8 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
     const initialAssistantMessage: AIChatMessage = {
       id: assistantMsgId,
       sender: 'assistant',
-      content: 'Analyzing your video framing, aesthetics & intent...',
+      agent: 'jacob',
+      content: 'Jacob is crafting your layout & styling adjustments...',
       timestamp: Date.now(),
       status: 'thinking'
     }
@@ -347,13 +401,33 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         [assistantMsgId]: { plan, beforeSnapshot }
       }))
 
-      if (plan.autoApply) {
-        // User explicitly permitted immediate execution or toggle is active
+      // If this is a clarifying question, show it immediately with clickable option chips!
+      if (plan.isClarification || (plan.clarificationOptions && plan.clarificationOptions.length > 0)) {
         setAiMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
               ? {
                   ...m,
+                  content: plan.message,
+                  agent: 'jacob',
+                  thoughtProcess: plan.thoughtProcess,
+                  clarificationOptions: plan.clarificationOptions,
+                  status: 'completed'
+                }
+              : m
+          )
+        )
+        return
+      }
+
+      if (plan.autoApply) {
+        // Direct execution without annoying confirmation popups
+        setAiMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? {
+                  ...m,
+                  agent: 'jacob',
                   content: plan.message,
                   thoughtProcess: plan.thoughtProcess,
                   actions: plan.actions,
@@ -365,12 +439,12 @@ export const StudioEditor: React.FC<StudioEditorProps> = ({
         )
         await executeAIPlan(assistantMsgId, plan, beforeSnapshot)
       } else {
-        // Require interactive confirmation for full transparency & credibility
         setAiMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
               ? {
                   ...m,
+                  agent: 'jacob',
                   content: plan.message,
                   thoughtProcess: plan.thoughtProcess,
                   actions: plan.actions,

@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session, dialog, clipboard, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, shell, screen, session, dialog, clipboard, nativeImage, Tray, Menu, globalShortcut } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { fileURLToPath } from 'url'
 import { cursorTracker, CursorTracker } from './cursorTracker'
+import { setWindowCaptureExclusion } from './nativeCaptureExclusion'
 
 // This file is emitted as an ES module. `process.cwd()` is the directory of the
 // shell that launched Electron, not the directory that contains this main bundle.
@@ -71,7 +72,7 @@ try {
 }
 
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.bettershot.app')
+  app.setAppUserModelId('com.velo.app')
 }
 
 function getAppIcon() {
@@ -94,6 +95,7 @@ let overlayWindow: BrowserWindow | null = null
 let selectionWindow: BrowserWindow | null = null
 let editorWindow: BrowserWindow | null = null
 let cameraBubbleWindow: BrowserWindow | null = null
+let recordingTray: Tray | null = null
 
 function createEditorWindow(filePath?: string) {
   if (launcherWindow && !launcherWindow.isDestroyed()) {
@@ -194,6 +196,8 @@ function createLauncherWindow() {
     transparent: true,
     alwaysOnTop: false,
     show: false,
+    hasShadow: false,
+    paintWhenInitiallyHidden: true,
     backgroundColor: '#00000000',
     ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
@@ -245,6 +249,8 @@ function createOverlayWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
+    hasShadow: false,
+    paintWhenInitiallyHidden: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: preloadPath,
@@ -254,6 +260,9 @@ function createOverlayWindow() {
       backgroundThrottling: false
     }
   })
+
+  // Exclude overlay from screen recordings using OS WDA_EXCLUDEFROMCAPTURE (0x11)
+  setWindowCaptureExclusion(overlayWindow, true)
 
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenW, height: screenH, x: displayX, y: displayY } = primaryDisplay.workArea
@@ -290,6 +299,8 @@ function createSelectionWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
+    hasShadow: false,
+    paintWhenInitiallyHidden: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: preloadPath,
@@ -299,6 +310,9 @@ function createSelectionWindow() {
       backgroundThrottling: false
     }
   })
+
+  // Exclude area selector from screen captures using OS WDA_EXCLUDEFROMCAPTURE (0x11)
+  setWindowCaptureExclusion(selectionWindow, true)
 
   if (devServerUrl) {
     selectionWindow.loadURL(`${devServerUrl}#select-area`)
@@ -375,6 +389,7 @@ function createCameraBubbleWindow(config?: any) {
   })
 
   cameraBubbleWindow.setAlwaysOnTop(true, 'screen-saver')
+  setWindowCaptureExclusion(cameraBubbleWindow, true)
 
   if (devServerUrl) {
     cameraBubbleWindow.loadURL(`${devServerUrl}#camera-bubble`)
@@ -389,6 +404,40 @@ function createCameraBubbleWindow(config?: any) {
   return cameraBubbleWindow
 }
 
+// Stores the source ID that the renderer wants to capture via getDisplayMedia.
+// setDisplayMediaRequestHandler uses this to return the correct source.
+let pendingRecordingSourceId: string | null = null
+
+// Helper: send a recording control command from tray/shortcut to the launcher window
+function sendTrayCommand(command: string) {
+  console.log(`[BetterShot:Main] Tray/Shortcut command: ${command}`)
+  if (launcherWindow && !launcherWindow.isDestroyed()) {
+    // Map tray commands to the same relay commands the overlay sends
+    if (command === 'pause-toggle') {
+      // The launcher listens for 'pause' or 'resume', we send a generic toggle
+      launcherWindow.webContents.send('launcher-control-command', 'pause')
+    } else if (command === 'mic-toggle') {
+      launcherWindow.webContents.send('launcher-control-command', 'mute-mic')
+    } else if (command === 'camera-toggle') {
+      launcherWindow.webContents.send('launcher-control-command', 'mute-camera')
+    } else {
+      launcherWindow.webContents.send('launcher-control-command', command)
+    }
+  }
+}
+
+// Helper: destroy the recording tray icon
+function destroyRecordingTray() {
+  if (recordingTray) {
+    try {
+      recordingTray.destroy()
+    } catch (e) {
+      // ignore
+    }
+    recordingTray = null
+  }
+}
+
 app.whenReady().then(() => {
   if (isSmokeTest) {
     verifySmokeAssets()
@@ -397,7 +446,18 @@ app.whenReady().then(() => {
   if (session.defaultSession) {
     session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
       desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
-        callback({ video: sources[0], audio: 'loopback' })
+        let selectedSource = sources[0]
+        if (pendingRecordingSourceId) {
+          const match = sources.find(s => s.id === pendingRecordingSourceId)
+          if (match) {
+            selectedSource = match
+            console.log(`[BetterShot:Main] DisplayMedia handler: matched pending source "${match.name}" (${match.id})`)
+          } else {
+            console.warn(`[BetterShot:Main] DisplayMedia handler: pending source ${pendingRecordingSourceId} not found, using default`)
+          }
+          pendingRecordingSourceId = null
+        }
+        callback({ video: selectedSource, audio: 'loopback' })
       })
     })
 
@@ -428,6 +488,12 @@ app.on('window-all-closed', () => {
 })
 
 // IPC Handlers
+
+ipcMain.handle('set-recording-source', (_event, sourceId: string | null) => {
+  console.log(`[BetterShot:Main] IPC handle: set-recording-source -> ${sourceId}`)
+  pendingRecordingSourceId = sourceId
+  return true
+})
 
 ipcMain.handle('get-desktop-sources', async () => {
   console.log('[BetterShot:Main] IPC handle: get-desktop-sources requested')
@@ -565,17 +631,67 @@ ipcMain.handle('capture-screenshot', async (_event, options?: { cropRegion?: any
 })
 
 ipcMain.handle('start-recording-mode', () => {
-  console.log('[BetterShot:Main] IPC handle: start-recording-mode')
+  console.log('[Velo:Main] IPC handle: start-recording-mode')
   if (launcherWindow && !launcherWindow.isDestroyed()) {
     launcherWindow.hide()
   }
   if (selectionWindow && !selectionWindow.isDestroyed()) {
     selectionWindow.hide()
   }
+
+  // Ensure overlayWindow is created, capture-excluded, and displayed
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    createOverlayWindow()
+  }
+
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.show()
+    setWindowCaptureExclusion(overlayWindow, true)
     overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   }
+
+  // Create system tray icon with recording controls
+  try {
+    destroyRecordingTray()
+    // Create a red circle icon for the tray
+    const trayIcon = nativeImage.createFromBuffer(
+      Buffer.from(
+        // 16x16 red circle PNG
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAgUlEQVQ4T2P8z8DwHwMDAwMTAxYAUsCI' +
+        'RQ5Fmgkf52ADGIagaGBCF8SmAcMFGC7AZwC6OIYLiDIAm4twGkCsC5jwBQExBqAkI5ISwJcMyDIAW0Sw' +
+        'IIPBBMUGkJWQYDCBbAeQnJBIMgBbOiApIZGdkGAxgawEhS0dDEhCAgDj5TsR2YmjvgAAAABJRU5ErkJggg==',
+        'base64'
+      )
+    )
+    recordingTray = new Tray(trayIcon)
+    recordingTray.setToolTip('Velo — Recording in progress')
+
+    const buildTrayMenu = () => Menu.buildFromTemplate([
+      { label: '⏹  Stop & Save', click: () => sendTrayCommand('stop') },
+      { label: '⏸  Pause / Resume', click: () => sendTrayCommand('pause-toggle') },
+      { type: 'separator' },
+      { label: '🎤  Mute / Unmute Mic', click: () => sendTrayCommand('mic-toggle') },
+      { label: '📷  Toggle Camera', click: () => sendTrayCommand('camera-toggle') },
+      { type: 'separator' },
+      { label: '🔄  Restart', click: () => sendTrayCommand('restart') },
+      { label: '🗑  Discard', click: () => sendTrayCommand('discard') }
+    ])
+    recordingTray.setContextMenu(buildTrayMenu())
+    recordingTray.on('click', () => sendTrayCommand('stop'))
+  } catch (err) {
+    console.warn('[BetterShot:Main] Could not create recording tray:', err)
+  }
+
+  // Register global keyboard shortcuts for recording controls
+  try {
+    globalShortcut.register('CommandOrControl+Shift+S', () => sendTrayCommand('stop'))
+    globalShortcut.register('CommandOrControl+Shift+P', () => sendTrayCommand('pause-toggle'))
+    globalShortcut.register('CommandOrControl+Shift+M', () => sendTrayCommand('mic-toggle'))
+    globalShortcut.register('CommandOrControl+Shift+D', () => sendTrayCommand('discard'))
+    console.log('[BetterShot:Main] Global recording shortcuts registered')
+  } catch (err) {
+    console.warn('[BetterShot:Main] Could not register global shortcuts:', err)
+  }
+
   return true
 })
 
@@ -586,6 +702,14 @@ ipcMain.handle('stop-recording-mode', () => {
   }
   if (cameraBubbleWindow && !cameraBubbleWindow.isDestroyed()) {
     cameraBubbleWindow.hide()
+  }
+  // Clean up tray and global shortcuts
+  destroyRecordingTray()
+  try {
+    globalShortcut.unregisterAll()
+    console.log('[BetterShot:Main] Global recording shortcuts unregistered')
+  } catch (err) {
+    console.warn('[BetterShot:Main] Could not unregister global shortcuts:', err)
   }
   // Only show launcher if editorWindow is NOT active/open
   if (launcherWindow && !launcherWindow.isDestroyed()) {
@@ -852,6 +976,8 @@ ipcMain.handle('set-overlay-mode', (_event, mode: 'countdown' | 'recording') => 
       width: fullW,
       height: fullH
     })
+    setWindowCaptureExclusion(overlayWindow, true)
+    overlayWindow.showInactive()
     overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   } else {
     overlayWindow.setBounds({
@@ -860,6 +986,8 @@ ipcMain.handle('set-overlay-mode', (_event, mode: 'countdown' | 'recording') => 
       width: 290,
       height: 48
     })
+    setWindowCaptureExclusion(overlayWindow, true)
+    overlayWindow.showInactive()
     overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   }
   return true

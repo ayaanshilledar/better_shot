@@ -27,6 +27,7 @@ export interface RecordedFile {
 const electronAPI = {
   getDesktopSources: (): Promise<DesktopSource[]> => ipcRenderer.invoke('get-desktop-sources'),
   startRecordingMode: (): Promise<boolean> => ipcRenderer.invoke('start-recording-mode'),
+  setRecordingSource: (sourceId: string | null): Promise<boolean> => ipcRenderer.invoke('set-recording-source', sourceId),
   stopRecordingMode: (): Promise<boolean> => ipcRenderer.invoke('stop-recording-mode'),
   openAreaSelector: (): Promise<boolean> => ipcRenderer.invoke('open-area-selector'),
   cancelAreaSelection: (): Promise<boolean> => ipcRenderer.invoke('cancel-area-selection'),

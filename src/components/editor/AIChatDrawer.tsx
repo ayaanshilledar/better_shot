@@ -16,6 +16,7 @@ import {
 import { MatrixOrb } from '../common/MatrixOrb'
 import { AIChatMessage, AIAction } from '../../types/ai'
 import { getAIConfig, saveAIConfig, PROVIDER_INFO } from '../../services/aiService'
+import { WALLPAPER_PRESETS } from '../../config/presets'
 
 interface AIChatDrawerProps {
   isOpen: boolean
@@ -213,36 +214,21 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
         {messages.length === 0 ? (
-          <div className="flex flex-col py-4 px-1 gap-4 items-center text-center">
+          <div className="flex flex-col py-10 px-2 gap-3 items-center text-center justify-center flex-1 text-slate-400 dark:text-zinc-500">
             <div className="flex items-center justify-center my-1">
-              <MatrixOrb state={isExecuting ? 'thinking' : 'idle'} size={48} color="#3b82f6" />
+              <MatrixOrb state={isExecuting ? 'thinking' : 'idle'} size={48} color="#FF5F56" />
             </div>
-            <div className="flex flex-col gap-1 max-w-[280px]">
+            <div className="flex flex-col gap-1 max-w-[260px]">
               <h4 className="text-xs font-semibold text-slate-900 dark:text-white">
-                How can I help with this video?
+                Velo AI Assistant
               </h4>
               <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Describe adjustments to framing, timing, and background.
+                Type below to adjust framing, aspect ratios, wallpapers, or timing.
               </p>
-            </div>
-
-            {/* Starter Suggestions */}
-            <div className="flex flex-col gap-1.5 w-full text-left">
-              <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-500 px-0.5">
-                Suggested actions
-              </span>
-              {suggestionChips.map((chip, i) => (
-                <button
-                  key={i}
-                  onClick={() => onSendMessage(chip)}
-                  className="w-full text-left px-3 py-2 rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-white/[0.03] dark:hover:bg-white/[0.07] border border-slate-200/70 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 text-[11px] text-slate-700 dark:text-zinc-300 transition-all cursor-pointer truncate"
-                >
-                  {chip}
-                </button>
-              ))}
             </div>
           </div>
         ) : (
+
           messages.map((m) => {
             const isDiffOpen = expandedDiffMap[m.id] ?? false
             const isThoughtOpen = expandedThoughtMap[m.id] ?? false
@@ -259,13 +245,34 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                       : 'bg-slate-100/90 dark:bg-[#18191e] text-slate-800 dark:text-zinc-200 border border-slate-200/60 dark:border-white/5 rounded-2xl rounded-tl-xs'
                   }`}
                 >
+                  {/* Agent Persona Badge */}
+                  {m.sender !== 'user' && (
+                    <div className="flex items-center gap-1.5 mb-1.5 select-none">
+                      {m.agent === 'dia' ? (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-[9.5px] font-semibold tracking-tight">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          <span>DIA Agent (Auditor)</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#FF5F56]/10 border border-[#FF5F56]/25 text-[#FF5F56] text-[9.5px] font-semibold tracking-tight">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#FF5F56]" />
+                          <span>Jacob (Stylist)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Active Execution Status Banner */}
-                  {(m.status === 'thinking' || m.status === 'executing' || m.status === 'verifying') && (
+                  {(m.status === 'thinking' || m.status === 'executing' || m.status === 'verifying' || m.status === 'evaluating') && (
                     <div className="w-full my-1.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex flex-col gap-2">
                       <div className="flex items-center gap-2 text-[10px] font-medium text-slate-600 dark:text-zinc-300">
                         <Loader2 className="w-3 h-3 animate-spin text-slate-500 dark:text-zinc-400" />
                         <span className="transition-opacity duration-150">
-                          {isReasonTransitioning ? 'Working...' : activeReason}
+                          {m.status === 'evaluating'
+                            ? 'DIA Agent is evaluating visual aesthetics...'
+                            : isReasonTransitioning
+                            ? 'Working...'
+                            : activeReason}
                         </span>
                       </div>
 
@@ -286,9 +293,30 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   )}
 
                   {/* Message Content */}
-                  <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed text-[12px]">{m.content}</div>
 
-                  {/* Clean Parameter Key-Value Grid */}
+                  {/* Smart Interactive Clarifying Questions Chips */}
+                  {m.clarificationOptions && m.clarificationOptions.length > 0 && (
+                    <div className="mt-2.5 flex flex-col gap-1.5">
+                      <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400">
+                        Choose an option to continue:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.clarificationOptions.map((opt, optIdx) => (
+                          <button
+                            key={optIdx}
+                            onClick={() => onSendMessage(opt)}
+                            disabled={isExecuting}
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950 hover:opacity-90 text-[11px] font-medium transition-all cursor-pointer shadow-xs active:scale-95"
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clean Human-Friendly Parameter Badges */}
                   {m.actions && m.actions.length > 0 && m.status !== 'thinking' && m.status !== 'executing' && (
                     (() => {
                       const meaningfulActions = m.actions
@@ -296,10 +324,17 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                           if (act.type === 'switch_tab' || act.type === 'undo') return null
                           if (act.type === 'set_padding') return { key: 'Padding', val: `${act.padding}%` }
                           if (act.type === 'set_corner_radius') return { key: 'Corners', val: `${act.cornerRadius}px` }
-                          if (act.type === 'set_shadow') return { key: 'Shadow', val: String(act.shadow) }
-                          if (act.type === 'set_background') return { key: 'Wallpaper', val: act.presetId === 'none' ? 'None' : (act.presetId || 'Custom') }
-                          if (act.type === 'set_aspect_ratio') return { key: 'Aspect', val: act.aspectRatio }
-                          if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s-${act.end?.toFixed(1) || 0}s` }
+                          if (act.type === 'set_shadow') {
+                            const sName = act.shadow === 'medium' ? 'Medium' : act.shadow === 'glow' ? 'Glow' : act.shadow === 'soft' ? 'Soft' : act.shadow === 'hard' ? 'Hard' : act.shadow
+                            return { key: 'Shadow', val: String(sName) }
+                          }
+                          if (act.type === 'set_background') {
+                            const found = WALLPAPER_PRESETS.find((w) => w.id === act.presetId)
+                            const bgName = act.presetId === 'none' ? 'None' : found ? found.name : act.presetId || 'Custom'
+                            return { key: 'Wallpaper', val: bgName }
+                          }
+                          if (act.type === 'set_aspect_ratio') return { key: 'Ratio', val: act.aspectRatio }
+                          if (act.type === 'trim_video') return { key: 'Trim', val: `${act.start?.toFixed(1) || 0}s–${act.end?.toFixed(1) || 0}s` }
 
                           if (act.label) {
                             if (/^returning to/i.test(act.label)) return null
@@ -318,24 +353,22 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                       if (meaningfulActions.length === 0) return null
 
                       return (
-                        <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex flex-col gap-1.5">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {meaningfulActions.map((act, idx) => (
-                              <div
-                                key={idx}
-                                className="px-2 py-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 flex items-center justify-between text-[10px]"
-                              >
-                                <span className="text-slate-500 dark:text-zinc-400 font-medium truncate">{act.key}</span>
-                                <span className="text-slate-900 dark:text-zinc-200 font-semibold font-mono truncate ml-1">{act.val}</span>
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-black/5 dark:border-white/5">
+                          {meaningfulActions.map((act, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-[10.5px]"
+                            >
+                              <span className="text-slate-400 dark:text-zinc-500 font-medium">{act.key}:</span>
+                              <span className="font-semibold text-slate-800 dark:text-zinc-200">{act.val}</span>
+                            </span>
+                          ))}
                         </div>
                       )
                     })()
                   )}
 
-                  {/* Confirmation Bar */}
+                  {/* Confirmation Bar (if ever needed) */}
                   {m.status === 'awaiting_confirmation' && onConfirmPlan && onDismissPlan && (
                     <div className="mt-3 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 flex flex-col gap-2">
                       <div className="flex items-center justify-between text-[10px] text-slate-700 dark:text-zinc-300 font-medium">
@@ -358,36 +391,8 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                       </div>
                     </div>
                   )}
-
-                  {/* Verification Diff */}
-                  {m.verification && (
-                    <div className="mt-3 rounded-xl bg-emerald-500/[0.05] border border-emerald-500/20 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedDiffMap((prev) => ({ ...prev, [m.id]: !isDiffOpen }))}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                      >
-                        <span>
-                          {m.verification.diffs?.length ? `${m.verification.diffs.length} parameters verified` : 'Parameters verified'}
-                        </span>
-                        {isDiffOpen ? <ChevronUp className="w-3 h-3 opacity-60" /> : <ChevronDown className="w-3 h-3 opacity-60" />}
-                      </button>
-
-                      {isDiffOpen && (
-                        <div className="px-2.5 pb-2 pt-1 space-y-1 text-[9.5px] border-t border-emerald-500/10">
-                          {m.verification.diffs.map((diff, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between text-slate-600 dark:text-zinc-300"
-                            >
-                              <span className="text-slate-500 dark:text-zinc-400 capitalize">{diff.property.replace(/([A-Z])/g, ' $1')}</span>
-                              <span className="font-mono text-slate-800 dark:text-zinc-200 font-medium">{diff.actual}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
+
 
                 {/* Follow-Up Suggestions */}
                 {m.suggestions && m.suggestions.length > 0 && m.status === 'completed' && (
