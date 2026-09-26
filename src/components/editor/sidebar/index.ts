@@ -1,0 +1,6 @@
+export { BackgroundTab } from './BackgroundTab'
+export { LayoutTab } from './LayoutTab'
+export { CursorTab } from './CursorTab'
+export { AudioTab } from './AudioTab'
+export { AITab } from './AITab'
+export { ExportTab } from './ExportTab'
